@@ -1,0 +1,21 @@
+  GMAOpyobs:
+  fixture: true
+  develop: develop
+
+env:
+  local: ./@env
+  remote: ../ESMA_env.git
+  tag: v3.13.0
+  develop: main
+
+cmake:
+  local: ./@cmake
+  remote: ../ESMA_cmake.git
+  tag: v3.14.0-alpha
+  develop: develop
+
+ecbuild:
+  local: ./@cmake/@ecbuild
+  remote: ../ecbuild.git
+  tag: geos/v1.2.0
+

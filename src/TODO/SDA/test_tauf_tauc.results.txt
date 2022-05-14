@@ -1,0 +1,4 @@
+
+ tauf_tauc results for 500 nm
+ tau = 0.6190, alpha = 1.5481, alphap = 1.7712, tau_f = 0.6024, alpha_f = 1.5948, tau_c = 0.0166, eta = 0.9732
+ Dtau = 0.0050, Dalpha = -0.0202, Dalphap = 0.0808, Dalpha_f = 0.3463, Dtau_f = 0.1246, Dtau_c = 0.1241, Deta = 0.2006
