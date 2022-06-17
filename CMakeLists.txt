@@ -10,7 +10,7 @@ cmake_policy (SET CMP0054 NEW)
 
 project (
   GMAOpyobs
-  VERSION 1.0.0
+  VERSION 1.0.1
   LANGUAGES Fortran CXX C)  # Note - CXX is required for ESMF
 
 # Enforce out of source directory builds
@@ -35,16 +35,19 @@ if (NOT CMAKE_BUILD_TYPE)
 
 # Where to find relevant cmake macros
 # -----------------------------------
-  foreach (dir cmake @cmake cmake@)
-     if (EXISTS ${CMAKE_CURRENT_LIST_DIR}/${dir})
-       list (APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/${dir}")
-       set (ESMA_CMAKE_PATH "${CMAKE_CURRENT_LIST_DIR}/${dir}"
-            CACHE PATH "Path to ESMA_cmake code")
-     endif ()
-   endforeach ()
+  if (NOT COMMAND esma)
+    foreach (dir cmake @cmake cmake@)
+       if (EXISTS ${CMAKE_CURRENT_LIST_DIR}/${dir})
+         list (APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/${dir}")
+         set (ESMA_CMAKE_PATH "${CMAKE_CURRENT_LIST_DIR}/${dir}"
+              CACHE PATH "Path to ESMA_cmake code")
+       endif ()
+    endforeach ()
+  
+    include (esma)
 
-   include (esma)
-
+    set (PYOBS_STANDALONE TRUE)
+  endif ()
    ecbuild_declare_project()
 
 # Generic DFLAGS
@@ -74,4 +77,6 @@ if (NOT CMAKE_BUILD_TYPE)
 
 # Adds ability to tar source
 # --------------------------
-  include(esma_cpack)
+  if (PYOBS_STANDALONE)
+    include(esma_cpack OPTIONAL)
+  endif ()  
