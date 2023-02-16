@@ -164,7 +164,23 @@ class AERONET_L2(object):
         aot_670 = _updAOT(aot_670,self.AOT_667) # close enough
         aot_670 = _updAOT(aot_670,self.AOT_675) # close enough
 
-        self.AOT_670 = aot_670[:] # update undefs with interpolated values        
+        self.AOT_670 = aot_670[:] # update undefs with interpolated values       
+
+        # Interpolate AOT to 660 nm
+        # -----------------------------------
+        aot_660 = MISSING * ones(len(self.lon))
+
+        aot_660a = aodInterpAngs(660.,self.AOT_532,self.AOT_667,532.,667.)
+        aot_660b = aodInterpAngs(660.,self.AOT_532,self.AOT_675,532.,675.)
+        aot_660c = aodInterpAngs(660.,self.AOT_500,self.AOT_667,500.,667.)
+        aot_660d = aodInterpAngs(660.,self.AOT_500,self.AOT_675,500.,675.)
+
+        aot_660 = _updAOT(aot_660,aot_660d)
+        aot_660 = _updAOT(aot_660,aot_660c)
+        aot_660 = _updAOT(aot_660,aot_660b)
+        aot_660 = _updAOT(aot_660,aot_660a)
+
+        self.AOT_660 = aot_660[:] # update undefs with interpolated values        
 
         # Interpolate AOT to 470 nm if needed
         # -----------------------------------
