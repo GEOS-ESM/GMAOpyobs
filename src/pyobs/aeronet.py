@@ -46,6 +46,8 @@ VARS = ( 'AERONET_Site',
  
 ALIAS = dict (          Longitude = 'lon',
                         Latitude = 'lat',
+                        Site_Longitude = 'lon',
+                        Site_Latitude = 'lat',
                       Julian_Day = 'doy',
                     AERONET_Site = 'Location', 
               )
@@ -55,9 +57,13 @@ KT = dict ( AOD = 45, )
 
 #---- 
 class AERONET_L2(object):
-    """Base class for AERONET Level 2 data."""
+    """
+    Base class for AERONET Level 2 data.
+    Default is to read version 2 files
+    use version = 3 to read version 3 files
+    """
 
-    def __init__ (self,Path,Vars=VARS,Verbose=False):
+    def __init__ (self,Path,version=2,Vars=VARS,Verbose=False):
         """
         Base class for generic AERONET dataset.
         """
@@ -66,6 +72,23 @@ class AERONET_L2(object):
         self.columns = None
         self.nobs = 0
         self.Vars = Vars
+
+        # Fix some variables names for version 3
+        # -------------------
+        if version == 3:
+            if type(self.Vars) is not list:
+                self.Vars = list(self.Vars)
+            if 'Longitude' in self.Vars:
+                i = self.Vars.index('Longitude')
+                self.Vars[i] = 'Site_Longitude'
+            if 'Latitude' in self.Vars:
+                i = self.Vars.index('Latitude')
+                self.Vars[i] = 'Site_Latitude'
+            if 'Elevation' in self.Vars:
+                i = self.Vars.index('Elevation')
+                self.Vars[i] = 'Site_Elevation'    
+
+            self.Vars = tuple(self.Vars)
 
         # Past is string or list
         # ----------------------
@@ -103,7 +126,13 @@ class AERONET_L2(object):
         Alias = list(ALIAS.keys())
         for var in self.Vars:
             if var in Alias:
-                self.__dict__[ALIAS[var]] = self.__dict__[var] 
+                self.__dict__[ALIAS[var]] = self.__dict__[var]
+        if 'Site_Longitude' in self.Vars:
+            self.Longitude = self.Site_Longitude
+        if 'Site_Latitude' in self.Vars:
+            self.Latitude = self.Site_Latitude
+        if 'Site_Elevation' in self.Vars:
+            self.Elevation = self.Site_Elevation
 
         # Interpolate AOT to 550 nm if needed
         # -----------------------------------
@@ -166,8 +195,8 @@ class AERONET_L2(object):
 
         # By default all is good if coordinates are ok
         # --------------------------------------------
-        self.iValid = (abs(self.Longitude)<=180.) & \
-                      (abs(self.Latitude)<=90.)
+        self.iValid = (abs(self.lon)<=180.) & \
+                      (abs(self.lat)<=90.)
 
         # clean up
         # --------
