@@ -86,7 +86,7 @@ class AERONET_L2(object):
                 self.Vars[i] = 'Site_Latitude'
             if 'Elevation' in self.Vars:
                 i = self.Vars.index('Elevation')
-                self.Vars[i] = 'Site_Elevation'    
+                self.Vars[i] = 'Site_Elevation'
 
             self.Vars = tuple(self.Vars)
 
@@ -164,7 +164,7 @@ class AERONET_L2(object):
         aot_670 = _updAOT(aot_670,self.AOT_667) # close enough
         aot_670 = _updAOT(aot_670,self.AOT_675) # close enough
 
-        self.AOT_670 = aot_670[:] # update undefs with interpolated values       
+        self.AOT_670 = aot_670[:] # update undefs with interpolated values
 
         # Interpolate AOT to 660 nm
         # -----------------------------------
@@ -180,7 +180,7 @@ class AERONET_L2(object):
         aot_660 = _updAOT(aot_660,aot_660b)
         aot_660 = _updAOT(aot_660,aot_660a)
 
-        self.AOT_660 = aot_660[:] # update undefs with interpolated values        
+        self.AOT_660 = aot_660[:] # update undefs with interpolated values
 
         # Interpolate AOT to 470 nm if needed
         # -----------------------------------
