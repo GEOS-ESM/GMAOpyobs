@@ -4,7 +4,7 @@
 
 """
 
-import sgp4_
+from . import sgp4_
 
 from datetime import datetime, timedelta
 from numpy import sin, cos, pi, arccos, dot, sqrt, array
