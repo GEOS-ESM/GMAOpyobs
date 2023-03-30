@@ -4,6 +4,7 @@
 
 from datetime import datetime, timedelta
 from numpy    import loadtxt, ones, NaN, concatenate, array, pi, cos, sin, arccos, zeros
+import numpy as np
 from glob     import glob
 import gzip
 import collections
@@ -17,13 +18,15 @@ LLOD    = -88888.0 # Lower Limit of Detection (LOD) flag
 class ICARTT(object):
     """Reads ICARTT text files into Numpy arrays"""
 
-    def __init__ (self,Filenames,Alias=None,FixUnits=True,Verbose=False):
+    def __init__ (self,Filenames,Alias=None,FixUnits=True,Verbose=False,only_good=False):
         """
         Loads one or more ICART text files, creating an ICART object.
         When entering many files, make sure they are in chronological
         order.
         
         FixUnits --- Convert some enginering units to MKS
+
+        only_good --- filter out points where lat/lon is missing. Needed for trj_sampler.py
         """
 
         self.verb = Verbose
@@ -97,7 +100,22 @@ class ICARTT(object):
         # Navigation shorthands
         # ---------------------
         self._shorthands()
-                
+
+
+        # Subset for only_good point with valid lat and lon
+        # Needed for trj_sampler
+        # ----------------------------------------------------------
+        if only_good:
+            iGood = ~np.isnan(self.Nav['Longitude']) & ~np.isnan(self.Nav['Latitude']) 
+            for var in self.Vars:
+                self.__dict__[var] = self.__dict__[var][iGood]
+
+            for var in ['Time','Longitude','Latitude','Altitude','Pressure']:
+                if self.Nav[var] is not None:
+                    self.Nav[var] = self.Nav[var][iGood]
+
+            self.tyme = self.tyme[iGood]
+            self._shorthands()
 #--
     def _readManyFiles (self,Filenames,Alias=None):
         """
