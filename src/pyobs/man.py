@@ -4,8 +4,7 @@
 
 MISSING = -999.
 from datetime import datetime
-from numpy import loadtxt, ones, savez, pi, log
-
+import numpy as np
 Months = ('jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec')
 
 def date2nymd(s):
@@ -64,11 +63,12 @@ def _getNames(cols):
 
     NewName['Date(dd:mm:yyyy)'] = 'Date'
     NewName['Time(hh:mm:ss)']   = 'Time'
+    NewName['Water Vapor(cm)'] = 'WaterVapor'
 
     return (Names, NewName)
 
 #----
-Vars = ( 'Longitude', 'Latitude', 'Date', 'Time',
+Vars = ( 'Longitude', 'Latitude', 'Date(dd:mm:yyyy)', 'Time(hh:mm:ss)','Water Vapor(cm)',
          'AOD_340nm', 'AOD_380nm', 'AOD_440nm', 'AOD_500nm',
          'AOD_675nm', 'AOD_870nm', 'AOD_1020nm', 'AOD_1640nm' )
 
@@ -76,14 +76,16 @@ class MAN(object):
     """Base class for Martime Aerosol Network (MAN)."""
 
     def __init__ (self,
-                  fname='All_MAN_series_Level2_June21_2010.csv',
+                  fname,
                   Vars=Vars):
 
         cols = _getCols(fname)
-        Names, NewName = _getNames(cols)
+        Names, Alias = _getNames(cols)
 
         self.filename = fname
-            
+        self.Vars = Vars
+        self.Alias = Alias
+
         iVars = ()
         formats = ()
         converters = {}
@@ -106,7 +108,7 @@ class MAN(object):
 
 #       Read the data
 #       -------------
-        data = loadtxt(fname, delimiter=',',
+        data = np.loadtxt(fname, delimiter=',',
                        dtype={'names':Vars,'formats':formats},
                        converters = converters,
                        skiprows=1, usecols=iVars)
@@ -118,31 +120,59 @@ class MAN(object):
 #       -------------------------------------------------
         for i in range(len(Vars)):
             if formats[i]=='f4':
-                v = ones(N)
+                v = np.ones(N)
                 for j in range(N):
                     v[j] = data[j][i]
             else:
                 v = []
                 for j in range(N):
                     v.append(data[j][i])
+                v = np.array(v)
 
             self.__dict__[Vars[i]] = v
 
-            if NewName[Vars[i]] != Vars[i]:
-                self.__dict__[NewName[Vars[i]]] = v # alias
+            if Alias[Vars[i]] != Vars[i]:
+                self.__dict__[Alias[Vars[i]]] = v # alias
 
 #       Interpolate AOD to 553
 #       ----------------------
-        alpha = (log(553.) - log(500.) ) / ( log(675.) - log(500.) )
+        alpha = (np.log(553.) - np.log(500.) ) / ( np.log(675.) - np.log(500.) )
         i = (self.aTau500>0) & (self.aTau675>0)
-        self.aTau550 =  MISSING * ones(N)
+        self.aTau550 =  MISSING * np.ones(N)
         self.aTau550[i] =  (1.-alpha) * self.aTau500[i] + alpha * self.aTau675[i]
+        self.Vars += ('aTau550',)
+
+#       Interpolate AOD to 660
+#       ----------------------
+        alpha = (np.log(660.) - np.log(500.) ) / ( np.log(675.) - np.log(500.) )
+        i = (self.aTau500>0) & (self.aTau675>0)
+        self.aTau660 =  MISSING * np.ones(N)
+        self.aTau660[i] =  (1.-alpha) * self.aTau500[i] + alpha * self.aTau675[i]
+        self.Vars += ('aTau660',)
+
+#       Interpolate AOD to 470
+#       ----------------------
+        alpha = (np.log(470.) - np.log(500.) ) / ( np.log(440.) - np.log(500.) )
+        i = (self.aTau500>0) & (self.aTau440>0)
+        self.aTau470 =  MISSING * np.ones(N)
+        self.aTau470[i] =  (1.-alpha) * self.aTau500[i] + alpha * self.aTau440[i]
+        self.Vars += ('aTau470',)
+
+#       Interpolate AOD to 412
+#       ----------------------
+        alpha = (np.log(412.) - np.log(380.) ) / ( np.log(440.) - np.log(380.) )
+        i = (self.aTau380>0) & (self.aTau440>0)
+        self.aTau412 =  MISSING * np.ones(N)
+        self.aTau412[i] =  (1.-alpha) * self.aTau380[i] + alpha * self.aTau440[i]
+        self.Vars += ('aTau412',)
+
 
 #       Create grads time
 #       -----------------
         self.time = []
         for i in range(N):
                self.time.append(gatime(self.Date[i],self.Time[i]))
+        self.time = np.array(self.time)
 
 #       Create python datetime
 #       ----------------------
@@ -151,6 +181,8 @@ class MAN(object):
             yy,mm,dd = date2nymd(self.Date[i])
             h, m = time2nhms(self.Time[i])
             self.tyme.append(datetime(yy,mm,dd,h,m))
+
+        self.tyme = np.array(self.tyme)
 #---
     def addVar(self,ga,outfile=None,expr='tau',vname=None, clmYear=None):
         """
@@ -161,7 +193,7 @@ class MAN(object):
         """
 
         N = self.N
-        U = ones(N)
+        U = np.ones(N)
         U[:] = MISSING
 
         if vname == None:
@@ -192,7 +224,7 @@ class MAN(object):
         if outfile is not None:
             version = 1
             meta = [ version, self.filename, vname, expr ]
-            savez(outfile,meta=meta,lon=self.lon,lat=self.lat,
+            np.savez(outfile,meta=meta,lon=self.lon,lat=self.lat,
                   date=self.Date,time=self.Time,var=U)
 
 #....................................................................
@@ -234,9 +266,9 @@ if __name__ == "__main__":
 
     i = (anet>0) & (mxdo>0) & (mxdo_>0)
 
-    lmxdo = log(mxdo[i]+0.01)
-    lmxdo_ = log(mxdo_[i]+0.01) 
-    lanet = log(anet[i]+0.01)
+    lmxdo = np.log(mxdo[i]+0.01)
+    lmxdo_ = np.log(mxdo_[i]+0.01) 
+    lanet = np.log(anet[i]+0.01)
 
     slope, intercept, r_value, p_value, std_err = linregress(lanet,lmxdo)
     slope_, intercept_, r_value_, p_value_, std_err_ = linregress(lanet,lmxdo_)
