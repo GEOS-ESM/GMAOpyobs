@@ -146,25 +146,25 @@ class MAN(object):
 #       ----------------------
         alpha = (np.log(660.) - np.log(500.) ) / ( np.log(675.) - np.log(500.) )
         i = (self.aTau500>0) & (self.aTau675>0)
-        self.aTau660intrp =  MISSING * np.ones(N)
-        self.aTau660intrp[i] =  (1.-alpha) * self.aTau500[i] + alpha * self.aTau675[i]
-        self.Vars += ('aTau660intrp',)
+        self.aTau660 =  MISSING * np.ones(N)
+        self.aTau660[i] =  (1.-alpha) * self.aTau500[i] + alpha * self.aTau675[i]
+        self.Vars += ('aTau660',)
 
 #       Interpolate AOD to 470
 #       ----------------------
         alpha = (np.log(470.) - np.log(500.) ) / ( np.log(440.) - np.log(500.) )
         i = (self.aTau500>0) & (self.aTau440>0)
-        self.aTau470intrp =  MISSING * np.ones(N)
-        self.aTau470intrp[i] =  (1.-alpha) * self.aTau500[i] + alpha * self.aTau440[i]
-        self.Vars += ('aTau470intrp',)
+        self.aTau470 =  MISSING * np.ones(N)
+        self.aTau470[i] =  (1.-alpha) * self.aTau500[i] + alpha * self.aTau440[i]
+        self.Vars += ('aTau470',)
 
 #       Interpolate AOD to 412
 #       ----------------------
         alpha = (np.log(412.) - np.log(380.) ) / ( np.log(440.) - np.log(380.) )
         i = (self.aTau380>0) & (self.aTau440>0)
-        self.aTau412intrp =  MISSING * np.ones(N)
-        self.aTau412intrp[i] =  (1.-alpha) * self.aTau380[i] + alpha * self.aTau440[i]
-        self.Vars += ('aTau412intrp',)
+        self.aTau412 =  MISSING * np.ones(N)
+        self.aTau412[i] =  (1.-alpha) * self.aTau380[i] + alpha * self.aTau440[i]
+        self.Vars += ('aTau412',)
 
 
 #       Create grads time
