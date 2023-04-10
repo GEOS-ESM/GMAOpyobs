@@ -4,7 +4,6 @@
 
 import os
 import sys
-from   types    import *
 from   numpy    import loadtxt, ones, zeros, savez, pi, log, concatenate, \
                        arange, savez, shape, array, linspace
 from   datetime import datetime, timedelta
