@@ -4,7 +4,6 @@
 
 import os
 import sys
-from   types    import *
 from   numpy    import loadtxt, ones, zeros, savez, pi, log, concatenate, \
                        arange, savez, shape, array, linspace
 from   datetime import datetime, timedelta
@@ -92,7 +91,7 @@ class AERONET_L2(object):
 
         # Past is string or list
         # ----------------------
-        if type(Path) is ListType:
+        if isinstance(Path, (list, tuple)):
             if len(Path) == 0:
                 print("WARNING: Empty AERONET object created")
                 return
@@ -275,11 +274,11 @@ class AERONET_L2(object):
                     raise ValueError("cannot find <%s> in file <%s>"%(name,filename))
                 self.iVars += (i,)
                 if name=='Date':
-                    self.formats += ('S10',)
+                    self.formats += ('U10',)
                 elif name=='Time':
-                    self.formats += ('S8',)
+                    self.formats += ('U8',)
                 elif name=='AERONET_Site':
-                    self.formats += ('S20',)
+                    self.formats += ('U20',)
                 else:
                     self.converters[i] = _convert2Float
                     self.formats += ('f4',)
