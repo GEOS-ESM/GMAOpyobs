@@ -16,7 +16,9 @@ class BITS(object):
             mask = 2**(end - start) -1
             return (self._d >> start) & mask
         elif isinstance(index, int):
-            return (self._d >> index) & 1 
+            return (self._d >> index) & 1
+        else:
+            raise TypeError(f"Bad type {type(index)}, must be int or slice")
 
     def __setitem__(self,index,value):
         if isinstance(index, slice):
@@ -31,6 +33,8 @@ class BITS(object):
             value    = (value&1)<<index
             mask     = (1)<<index
             self._d  = (self._d & ~mask) | value
+        else:
+            raise TypeError(f"Bad type {type(index)}, must be int or slice")
 
 
 
