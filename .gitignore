@@ -1,0 +1,16 @@
+*~
+*.nc
+*.npz
+/cmake/
+/@cmake/
+/cmake@/
+/env/
+/@env/
+/env@/
+/BUILD/
+/build*/
+/install*/
+/.mepo/
+__pycache__/
+.ipynb_checkpoints/
+parallel_build.o*

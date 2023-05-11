@@ -1,0 +1,13 @@
+#!/bin/csh -f
+#
+# Run cmake with reasonable defaults. Why make the user do all these steps?
+#
+
+source @env/g5_modules # to be sure
+mkdir -p build
+cd build
+##cmake .. -DBASEDIR=$BASEDIR/`uname -s` \
+cmake .. \
+         -DCMAKE_Fortran_COMPILER=ifort \
+         -DCMAKE_INSTALL_PREFIX=../install
+      

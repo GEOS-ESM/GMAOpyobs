@@ -1,0 +1,17 @@
+#
+# Example resource file for Trajectory Sampler.
+#
+
+# T,H,O3,QV: http://opendap.nccs.nasa.gov:80/dods/GEOS-5/fp/0.25_deg/assim/inst3_3d_asm_Nv
+# T,H,O3,QV: /home/adasilva/opendap/fp/opendap/assim/inst3_3d_asm_Nv
+# T,H,O3,QV: ./opendap/inst3_3d_asm_Nv
+#TOTEXTTAU,SLP: http://opendap.nccs.nasa.gov:80/dods/GEOS-5/fp/0.25_deg/assim/inst1_2d_hwl_Nx
+#T: http://opendap.nccs.nasa.gov:80/dods/GEOS-5/fp/0.25_deg/assim/inst3_3d_asm_Np
+#OCEXTTAUbsat,OCEXTTAUbsun:/home/adasilva/iesa/aerosol/experiments/seac4rs_01/inst1_2d_hwl_Nx.ddf
+
+#gwettop : /home/adasilva/GAAS/DEE/opendap/gwet
+#w10m : /home/adasilva/GAAS/DEE/opendap/w10m
+
+# Note that 1), 2) is needed to make what preceeds the : unique.
+1) * : http://opendap.nccs.nasa.gov:80/dods/GEOS-5/fp/0.25_deg/fcast/inst1_2d_hwl_Nx/inst1_2d_hwl_Nx.20160430_12
+2) * : http://opendap.nccs.nasa.gov:80/dods/GEOS-5/fp/0.25_deg/fcast/inst1_2d_hwl_Nx/inst1_2d_asm_Nx.20160430_12
