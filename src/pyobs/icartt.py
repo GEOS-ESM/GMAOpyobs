@@ -248,7 +248,7 @@ class ICARTT(object):
         
 #       Use Config to load other attributes
 #       -----------------------------------
-        cf = config.Config(filename)
+        cf = Config(filename)
         for rc in list(cf.keys()):
             self.__dict__[rc.upper()] = cf(rc)
         
