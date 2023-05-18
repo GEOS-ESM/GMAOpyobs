@@ -497,7 +497,7 @@ class MxD04_L2(object):
         if Verb >=1:
             print("[w] Writing file <"+filename+"> with %d observations"%ods_.nobs)
 
-        ods_.write(filename,self.nymd,self.nhms,nsyn=8,ftype='pre_anal')
+        ods_.write(filename,self.nymd,self.nhms,nsyn=8,ftype='post_anal')
         
 #---
     def writeg(self,filename=None,dir='.',expid=None,refine=8,res=None,
