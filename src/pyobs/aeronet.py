@@ -196,7 +196,18 @@ class AERONET_L2(object):
         aot_470 = _updAOT(aot_470,aot_470a)
 
         self.AOT_470 = aot_470[:] # update undefs with interpolated values        
-        
+
+        # Interpolate AOT to 490 nm if needed
+        # -----------------------------------
+        aot_490 = self.AOT_490.copy()
+        aot_490a = aodInterpAngs(490.,self.AOT_443,self.AOT_500,443.,500.)
+        aot_490b = aodInterpAngs(490.,self.AOT_440,self.AOT_500,440.,500.)        
+
+        aot_490 = _updAOT(aot_490,aot_490a)
+        aot_490 = _updAOT(aot_490,aot_490b)
+
+        self.AOT_490 = aot_490[:] # update undefs with interpolated values
+
         # Create timedate
         # ---------------
         self.tyme = array([ isoparse('-'.join(d.split(':')[-1::-1])+'T'+t) for d,t in zip(self.Date,self.Time) ])
