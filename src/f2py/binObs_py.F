@@ -202,6 +202,69 @@
       end do
 
       end
+!-----------
+
+      subroutine binObsCnt3D(lon,lat,obs,nobs,nSample,im,jm,km,missing)
+!vb      use MAPL_BaseMod, only: MAPL_GetHorzijIndex
+      implicit NONE
+      integer, intent(in) :: im, jm, km,nobs
+      real, intent(in)  :: lon(nobs)
+      real, intent(in)  :: lat(nobs)
+      real, intent(in)  :: obs(nobs,km)
+      real, intent(in)  :: missing
+      real, intent(out) :: nSample(im,jm,km)
+!
+! Count the Bined obs. It assumes a global 3D GEOS-5 A-Grid:
+! P. Castellanos Sep 2022
+!  Longitudes in [-180,10]
+!  Latitudes  in [-90,90]
+!
+!
+
+      integer :: i, j, k, n
+      real :: dLon, dLat, xLon
+      integer :: ics(nobs),jcs(nobs)
+      real, parameter :: radToDeg = 57.2957795
+
+      dLon = 360. / im
+      dLat = 180. / ( jm - 1.)
+
+      nSample = 0.0
+      do k = 1, km
+
+         if (jm == 6*im)then
+               print*, "warning, function under dev"
+!vb               call MAPL_GetHorzijIndex(im,jm,nobs,ics,jcs,
+!vb     &         lon=lon/radToDeg,lat=lat/radToDeg)
+
+!vb               if (abs(obs(n,k)-missing) > 0.01*abs(missing)) then
+!vb               nSample(ics(n),jcs(n),k) = nSample(ics(n),jcs(n),k) + 1.0
+         else
+
+            do n = 1,nobs
+
+               if ( (abs(lon(n))>180.) .OR. (abs(lat(n))>90.) ) cycle
+
+               xLon = lon(n)
+               if ( xLon >= 180. ) xLon = xLon - 360.
+
+               i = 1 + nint((xlon + 180.  ) / dLon)
+               j = 1 + nint((lat(n) + 90. ) / dLat)
+
+               if ( i>im ) i = i - im
+               if ( i<1  ) i = i + im
+
+               if (abs(obs(n,k)-missing) > 0.01*abs(missing)) then
+                  nSample(i,j,k) = nSample(i,j,k) + 1.0
+               end if
+
+            end do
+
+         end if
+
+      end do
+
+      end
 !-------------
       subroutine binRms2D(lon,lat,obs,nobs,gObs,im,jm,missing)
 !vb      use MAPL_BaseMod, only: MAPL_GetHorzijIndex
