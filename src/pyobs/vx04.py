@@ -24,7 +24,7 @@ except:
     pass
 
 from netCDF4 import Dataset
-from bits import BITS
+from .bits import BITS
 
 #---  
 
@@ -215,7 +215,7 @@ class Vx04_L2(object):
        """
 
        if algo not in ('DT_LAND', 'DT_OCEAN', 'DB_LAND', 'DB_OCEAN'):
-           raise ValueError, "invalid algorithm "+algo+" --- must be DT_LAND, DT_OCEAN, DB_LAND, DB_OCEAN"
+           raise ValueError("invalid algorithm "+algo+" --- must be DT_LAND, DT_OCEAN, DB_LAND, DB_OCEAN")
 
 #      Initially are lists of numpy arrays for each granule
 #      ------------------------------------------------
@@ -244,7 +244,7 @@ class Vx04_L2(object):
        if type(Path) is list:
            if len(Path) == 0:
                self.nobs = 0
-               print "WARNING: Empty Vx04_L2 object created"
+               print("WARNING: Empty Vx04_L2 object created")
                return
        else:
            Path = [Path, ]
@@ -254,7 +254,7 @@ class Vx04_L2(object):
        # --------------------------------
        if len(self.Scattering_Angle) == 0:
            self.nobs = 0
-           print "WARNING: Empty MxD04_L2 object created"
+           print("WARNING: Empty MxD04_L2 object created")
            return           
 
        # Make each attribute a single numpy array
@@ -265,7 +265,7 @@ class Vx04_L2(object):
            try:
                self.__dict__[sds] = np.ma.concatenate(self.__dict__[sds])
            except:
-               print "Failed concatenating "+sds
+               print("Failed concatenating "+sds)
 
        
        # Determine index of "good" observations
@@ -279,7 +279,7 @@ class Vx04_L2(object):
        elif self.algo == 'DB_OCEAN':
            self.iGood = self.Aerosol_Optical_Thickness_QA_Flag_Ocean == BEST
        else:
-           raise ValueError, 'invalid algorithm (very strange)'
+           raise ValueError('invalid algorithm (very strange)')
 
 
        # Keep only "good" observations
@@ -293,13 +293,13 @@ class Vx04_L2(object):
                elif rank == 2:
                    self.__dict__[sds] = self.__dict__[sds][m,:]
                else:
-                   raise IndexError, 'invalid rank=%d'%rank
+                   raise IndexError('invalid rank=%d'%rank)
            self.iGood = self.iGood[m]
 
        
        # Make aliases for compatibility with older code 
        # ----------------------------------------------
-       Alias = self.ALIAS.keys()
+       Alias = list(self.ALIAS.keys())
        for sds in self.SDS:
            if sds in Alias:
                self.__dict__[self.ALIAS[sds]] = self.__dict__[sds] 
@@ -494,7 +494,7 @@ class Vx04_L2(object):
                 else:
                     self._readGranuleDT(item)
             else:
-                print "%s is not a valid file or directory, ignoring it"%item
+                print("%s is not a valid file or directory, ignoring it"%item)
 #---
     def _readDir(self,dir):
         """Recursively, look for files in directory."""
@@ -503,7 +503,7 @@ class Vx04_L2(object):
             if os.path.isdir(path):      self._readDir(path)
             elif os.path.isfile(path):   self._readGranule(path)
             else:
-                print "%s is not a valid file or directory, ignoring it"%item
+                print("%s is not a valid file or directory, ignoring it"%item)
 
 #---
     def _readGranuleDB(self,filename):
@@ -513,11 +513,11 @@ class Vx04_L2(object):
         # ---------------------------------------
         try:
             if self.verb:
-                print "[] Working on "+filename
+                print("[] Working on "+filename)
             nc = Dataset(filename)
         except:
             if self.verb > 2:
-                print "- %s: not recognized as an netCDF file"%filename
+                print("- %s: not recognized as an netCDF file"%filename)
             return 
 
         # Read select variables (reshape to allow concatenation later)
@@ -542,7 +542,7 @@ class Vx04_L2(object):
             elif len(v.shape) == 2:
                 v = v.ravel()
             else:
-                raise IndexError, "invalid shape for SDS <%s>"%sds
+                raise IndexError("invalid shape for SDS <%s>"%sds)
             self.__dict__[sds].append(v) 
 
 
@@ -568,13 +568,13 @@ class Vx04_L2(object):
         # ---------------------------------------
         try:
             if self.verb:
-                print "[] Working on "+filename
+                print("[] Working on "+filename)
             nc = Dataset(filename)
             data  = nc.groups['geophysical_data']
             loc   = nc.groups['geolocation_data']
         except:
             if self.verb > 2:
-                print "- %s: not recognized as an netCDF file"%filename
+                print("- %s: not recognized as an netCDF file"%filename)
             return
 
         # Read select variables (reshape to allow concatenation later)
@@ -605,7 +605,7 @@ class Vx04_L2(object):
             elif len(v.shape) == 2:
                 v = v.ravel()
             else:
-                raise IndexError, "invalid shape for SDS <%s>"%sds
+                raise IndexError("invalid shape for SDS <%s>"%sds)
             self.__dict__[sds].append(v)
 
 
@@ -631,7 +631,7 @@ class Vx04_L2(object):
         """
         Reduce observations according to index I. 
         """
-        Nicknames = self.ALIAS.values()
+        Nicknames = list(self.ALIAS.values())
         for name in self.__dict__:
             if name in Nicknames:
                 continue # alias do not get reduced
@@ -641,7 +641,7 @@ class Vx04_L2(object):
                     # print "{} Reducing "+name
                     self.__dict__[name] = q[I]
 
-        Alias = self.ALIAS.keys()
+        Alias = list(self.ALIAS.keys())
         for sds in self.SDS:
             if sds in Alias:
                 self.__dict__[self.ALIAS[sds]] = self.__dict__[sds] # redefine aliases
@@ -691,7 +691,7 @@ class Vx04_L2(object):
                      reflectance = self.reflectance)
 
         if Verb >=1:
-            print "[w] Wrote file "+filename
+            print("[w] Wrote file "+filename)
 #---
 
     def writeODS(self,filename=None,dir='.',expid=None,channels=None,
@@ -702,7 +702,7 @@ class Vx04_L2(object):
         """
         
         if self.syn_time == None:
-            raise ValuError, "synoptic time missing, cannot write ODS"
+            raise ValuError("synoptic time missing, cannot write ODS")
             
         # Stop here if no good obs available
         # ----------------------------------
@@ -728,7 +728,7 @@ class Vx04_L2(object):
         i = 0
         ks = np.arange(ns) + 1
         for ch in channels:
-            I = range(i,i+ns)
+            I = list(range(i,i+ns))
             j = list(channels).index(ch) # index of channel
             ods.ks[I]  = ks
             ods.lat[I] = self.lat[:]
@@ -761,7 +761,7 @@ class Vx04_L2(object):
 
         ods_ = ods.select(qcx=0)
         if Verb >=1:
-            print "[w] Writing file <"+filename+"> with %d observations"%ods_.nobs
+            print("[w] Writing file <"+filename+"> with %d observations"%ods_.nobs)
 
         ods_.write(filename,self.nymd,self.nhms,nsyn=8,ftype='pre_anal')
         
@@ -905,7 +905,7 @@ class Vx04_L2(object):
 #           pass
 
        if Verb >=1:
-           print "[w] Wrote file "+filename
+           print("[w] Wrote file "+filename)
 
 #---
     def addVar(self,ga,expr='mag(u10m,v10m)',vname='wind',clmYear=None,tight=True):
@@ -1018,13 +1018,13 @@ def granules ( path, algo, sat, syn_time, coll='011', nsyn=8, verbose=False ):
                 filen = glob(basen)[0]
                 Granules += [filen,]
                 if verbose:
-                    print " [x] Found "+filen
+                    print(" [x] Found "+filen)
             except:
                 pass
         t += dt
 
     if len(Granules) == 0:
-        print "WARNING: no %s collection %s granules found for"%(algo,coll), syn_time
+        print("WARNING: no %s collection %s granules found for"%(algo,coll), syn_time)
 
     return Granules
 
@@ -1037,25 +1037,25 @@ def print_stats(name,x=None):
         x = name
         name = 'mean,stdv,rms,min,25%,median,75%,max: '
     if name == '__header__':
-        print ''
+        print('')
         n = (80 - len(x))/2
-        print n * ' ' + x
-        print n * ' ' + len(x) * '-'
-        print ''
-        print '   Name       mean      stdv      rms      min     25%    median     75%      max'
-        print ' ---------  -------  -------  -------  -------  -------  -------  -------  -------'
+        print(n * ' ' + x)
+        print(n * ' ' + len(x) * '-')
+        print('')
+        print('   Name       mean      stdv      rms      min     25%    median     75%      max')
+        print(' ---------  -------  -------  -------  -------  -------  -------  -------  -------')
     elif name == '__sep__':
-        print ' ---------  -------  -------  -------  -------  -------  -------  -------  -------'
+        print(' ---------  -------  -------  -------  -------  -------  -------  -------  -------')
     elif name == '__footer__':
-        print ' ---------  -------  -------  -------  -------  -------  -------  -------  -------'
-        print ''
+        print(' ---------  -------  -------  -------  -------  -------  -------  -------  -------')
+        print('')
     else:
         ave = x.mean()
         std = x.std()
         rms = np.sqrt(ave*ave+std*std)
         prc = prctile(x)
-        print '%10s  %7.2f  %7.2f  %7.2f  %7.2f  %7.2f  %7.2f  %7.2f  %7.2f  '%\
-            (name,ave,std,rms,prc[0],prc[1],prc[2],prc[3],prc[4])
+        print('%10s  %7.2f  %7.2f  %7.2f  %7.2f  %7.2f  %7.2f  %7.2f  %7.2f  '%\
+            (name,ave,std,rms,prc[0],prc[1],prc[2],prc[3],prc[4]))
 
 #--
 
