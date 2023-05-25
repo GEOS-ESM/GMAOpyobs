@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- subroutine binObsCnt3D to binObs_py to counts obs in NNR L3 files
+
 ### Changed
 
 ### Fixed
