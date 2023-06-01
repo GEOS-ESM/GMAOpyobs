@@ -8,7 +8,6 @@ Arlindo.daSilva@nasa.gov
 
 import os
 import sys
-from types    import *
 from numpy    import zeros, ones, sqrt, std, mean, unique,\
                      concatenate, where, array, linspace,\
                      shape, arange, interp
@@ -184,7 +183,7 @@ class MxD04_L2(object):
 
        # Read each granule, appending them to the list
        # ---------------------------------------------
-       if type(Path) is ListType:
+       if type(Path) is list:
            if len(Path) == 0:
                self.nobs = 0
                print("WARNING: Empty MxD04_L2 object created")
@@ -755,7 +754,7 @@ def granules ( path, prod, syn_time, coll='051', nsyn=8 ):
 def print_stats(name,x=None):
     "Prints simple stats"
     from pylab import prctile
-    if type(name) is not StringType:
+    if type(name) is not str:
         x = name
         name = 'mean,stdv,rms,min,25%,median,75%,max: '
     if name == '__header__':
