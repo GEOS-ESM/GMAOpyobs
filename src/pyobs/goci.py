@@ -8,7 +8,6 @@ Arlindo.daSilva@nasa.gov
 
 import os
 import sys
-from   types    import *
 
 from   numpy    import zeros, ones, concatenate, array, shape, arange, tile
 from   numpy    import flipud, isnan, append, empty
@@ -91,7 +90,7 @@ class GOCI(object):
 
         # Read each granule, appending them to the list
         # ---------------------------------------------
-        if type(Path) is ListType:
+        if type(Path) is list:
             if len(Path) == 0:
                 self.nobs = 0
                 print("WARNING: Empty GOCI object created")

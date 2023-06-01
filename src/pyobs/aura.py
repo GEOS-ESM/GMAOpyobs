@@ -4,7 +4,6 @@
 """
 
 import os
-from types    import *
 from glob     import glob
 
 import h5py
@@ -108,7 +107,7 @@ class AURA_L2(object):
         
         # Read each orbit, appending them to the list
         # -------------------------------------------
-        if type(Path) is ListType:
+        if type(Path) is list:
             if len(Path) == 0:
                 self.nobs = 0
                 print("WARNING: Empty AURA object created")

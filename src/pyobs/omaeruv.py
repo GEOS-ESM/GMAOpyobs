@@ -3,7 +3,6 @@
 """
 
 import os
-from types    import *
 
 import h5py
 from   numpy    import ones, concatenate, linspace, reshape

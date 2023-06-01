@@ -4,8 +4,6 @@
 
 import os
 
-from types             import *
-
 from numpy             import sum, zeros, ones, sqrt, std, mean, unique, \
                               concatenate, where, linspace, meshgrid, exp, savez, \
                               percentile
@@ -179,7 +177,7 @@ def plot_linregress(x_values,y_values,x_bins):
 #---           
 def print_stats(name,x=None):
     "Prints simple stats"
-    if type(name) is not StringType:
+    if type(name) is not str:
         x = name
         name = 'mean,stdv,rms,min,25%,median,75%,max: '
     if name == '__header__':

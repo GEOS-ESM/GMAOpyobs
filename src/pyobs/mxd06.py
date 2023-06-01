@@ -19,7 +19,6 @@ import sys
 import numpy as np
 import numpy.ma as ma
 
-from types     import *
 from datetime  import datetime, timedelta
 from glob      import glob
 
@@ -145,7 +144,7 @@ class MxD06_L2(object):
 
        # Read each granule, appending to the SDS lists
        # ---------------------------------------------
-       if type(Path) is ListType:
+       if type(Path) is list:
            if len(Path) == 0:
                print("WARNING: Empty MxD06_L2 object created")
                return
