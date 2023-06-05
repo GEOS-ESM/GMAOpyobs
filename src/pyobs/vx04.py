@@ -155,10 +155,10 @@ BAD, MARGINAL, GOOD, BEST = ( 0, 1, 2, 3 ) # DT QA marks
 translate_sat = {'Suomi-NPP': 'SNPP'}
 
 
-KX = dict ( SNPP_DT_OCEAN = 401,
-            SNPP_DT_LAND  = 402,
-            SNPP_DB_OCEAN  = 403,
-            SNPP_DB_LAND  = 404, 
+KX = dict ( SNPP_DT_OCEAN = 336,
+            SNPP_DT_LAND  = 335,
+            SNPP_DB_OCEAN  = 334,
+            SNPP_DB_LAND  = 333, 
           )
 
 KT = dict ( AOD = 45, )
