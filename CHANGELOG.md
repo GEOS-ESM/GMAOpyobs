@@ -9,15 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+### Fixed
+
+### Removed
+
+# [v1.0.3] 2023-05-25
+
+### Added
+
 - add interpolated 490 AOD to aeronet.py. lines up with VIIRS wavelengths
 - subroutine binObsCnt3D to binObs_py to counts obs in NNR L3 files
+- vx04.py VIIRS reader
 
 ### Changed
 
 ### Fixed
 
 ### Removed
-
 
 # [v1.0.2] 2023-05-17
 
