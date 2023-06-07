@@ -4,7 +4,6 @@ Reads Geostationary pixel location/geometry file
 
 import os
 import sys
-from types import *
 
 from netCDF4 import Dataset
 

@@ -3,7 +3,6 @@
 import os
 import sys
 
-from types     import *
 from pyhdf     import SD
 from netCDF4   import Dataset
 from datetime  import date, datetime, timedelta
@@ -78,9 +77,9 @@ class AVHRR_L2B(object):
             self.nobs = 0
             print("WARNING: Empty AVHRR object created")
             return         
-     if type(Path) in (ListType,TupleType):
+     if type(Path) in (list,tuple):
          pass # good to go
-     elif type(Path) is StringType:
+     elif type(Path) is str:
          if Path[-4:] == '.npz':
            self._initNPZ(Path,Verb) # reduced NPZ files
            return
@@ -115,7 +114,7 @@ class AVHRR_L2B(object):
         """
         Load from NPZ file.
         """
-        if type(npzFiles) == StringType:
+        if type(npzFiles) == str:
             npzFiles = sorted(glob(npzFiles))
 
         if Verbose:

@@ -8,7 +8,6 @@ import os
 import h5py
 from   numpy    import ones, zeros, interp, NaN, isnan, array, ma
 from   datetime import datetime, timedelta
-from types      import *
 
 from matplotlib.pyplot import imshow, xlabel, ylabel, title, colorbar, \
                               gca, axes, figure, show, savefig, grid
@@ -153,7 +152,7 @@ class DIAL(object):
 
         if Vars is None:
             Vars = ga.query('file').vars
-        elif type(Vars) is StringType:
+        elif type(Vars) is str:
             Vars = [Vars,]
         for var in Vars:
             if Verbose:

@@ -4,7 +4,6 @@
 
 import os
 import sys
-from   types    import *
 from   numpy    import loadtxt, ones, zeros,  savez, pi, log, interp, \
                        concatenate, arange, savez, shape, array
 from   datetime import datetime as TIME
@@ -127,7 +126,7 @@ class MAPSS(MCD43GF,IGBP):
 
         # Past is string or list
         # ----------------------
-        if type(Path) is ListType:
+        if type(Path) is list:
             if len(Path) == 0:
                 print("WARNING: Empty MAPSS object created")
                 return

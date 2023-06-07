@@ -6,7 +6,6 @@
 import os
 import sys
 
-from types    import *
 from pyhdf import SD
 from glob     import glob
 from   numpy    import ones, concatenate, array,linspace,arange, transpose
@@ -73,7 +72,7 @@ class NAAPS(object):
      # Read each orbit, appending them to the list
      # -------------------------------------------
      
-     if type(Path) is ListType:
+     if type(Path) is list:
         if len(Path) == 0:
             self.nobs = 0
             print("WARNING: Empty NAAPS object created")

@@ -7,7 +7,6 @@ Arlindo.daSilva@nasa.gov
 """
 
 import os
-from types import *
 
 import numpy as np
 
@@ -72,7 +71,7 @@ class MxD14_L2(object):
 
 #      Read each granule, appending them to the list
 #      ---------------------------------------------
-       if type(Path) is not ListType:
+       if type(Path) is not list:
            Path = [Path, ]
        self._readList(Path)
 
@@ -383,7 +382,7 @@ def plot_kde(X,a=None,b=None,N=256,Title=None,Label=None):
            
 def print_stats(name,x=None):
     "Prints simple stats"
-    if type(name) is not StringType:
+    if type(name) is not str:
         x = name
         name = 'mean,stdv,rms,min,25%,median,75%,max: '
     if name == '__header__':
