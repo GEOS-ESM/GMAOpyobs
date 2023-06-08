@@ -5,7 +5,6 @@
 
 import os
 import sys
-from types    import *
 from glob     import glob
 
 import h5py

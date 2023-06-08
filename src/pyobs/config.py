@@ -10,7 +10,6 @@ import string
 import re
 import os
 import sys
-from types import *
 from datetime import datetime
 
 class Config(object):

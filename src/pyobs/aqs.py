@@ -4,7 +4,6 @@
 
 import os
 import sys
-from types    import *
 from numpy    import loadtxt, ones, savez, pi, log, concatenate, arange
 from datetime import timedelta,datetime as TIME
 
@@ -49,7 +48,7 @@ class AQS(object):
 
         # Read each granule, appending them to the list
         # ---------------------------------------------
-        if type(Path) is ListType:
+        if type(Path) is list:
             if len(Path) == 0:
                 print("WARNING: Empty AQS object created")
                 return
@@ -228,7 +227,7 @@ class AQS_SITES(object):
 
         # Read each granule, appending them to the list
         # ---------------------------------------------
-        if type(Path) is ListType:
+        if type(Path) is list:
             if len(Path) == 0:
                 print("WARNING: Empty MxD04_L2 object created")
                 return

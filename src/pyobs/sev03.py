@@ -4,7 +4,6 @@ Reads Level 1 SEVIRI pixel location/geometry and surface height files
 
 import os
 import sys
-from types    import *
 
 from pyhdf.SD import SD, HDF4Error
 

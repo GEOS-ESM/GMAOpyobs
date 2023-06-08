@@ -4,7 +4,6 @@
 
 import os
 
-from types import *
 from numpy import loadtxt, ones, median, array, load, savez
 from datetime import datetime
 from glob  import glob
@@ -210,7 +209,7 @@ class MINXs(object):
         properties for each plume.
         """
 
-        if type(minxFiles) == StringType:
+        if type(minxFiles) == str:
             #minxFiles = sorted(glob(minxFiles))
             minxFiles = glob(minxFiles) # should be sorted, must be fixed after AGU (ams)
 

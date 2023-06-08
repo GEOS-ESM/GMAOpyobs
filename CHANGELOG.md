@@ -13,6 +13,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+# [v.1.0.4] 2023-06-07
+
+### Added
+
+### Fixed
+
+- removed all instances of using the 'types' module in pyobs
+
+### Removed
+
 # [v1.0.3] 2023-05-25
 
 ### Added
