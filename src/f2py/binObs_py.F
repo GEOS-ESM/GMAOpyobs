@@ -202,6 +202,76 @@
       end do
 
       end
+
+!-----------
+
+      subroutine binObsVar3D(lon,lat,obs,meanObs,gObs,nobs,im,jm,km,missing)
+      implicit NONE
+      integer, intent(in) :: im, jm, km,nobs
+      real, intent(in)  :: lon(nobs)
+      real, intent(in)  :: lat(nobs)
+      real, intent(in)  :: obs(nobs,km)
+      real, intent(in)  :: meanObs(im,jm,km)
+      real, intent(in)  :: missing
+      real, intent(out) :: gObs(im,jm,km)
+!
+! Get median of  binned obs. It assumes a global 3D GEOS-5 A-Grid:
+! P. Castellanos Jun 2023
+!  Longitudes in [-180,10]
+!  Latitudes  in [-90,90]
+!
+!
+
+      integer :: i, j, k, n
+      real :: dLon, dLat, xLon
+      real :: nSample(im,jm)
+      integer :: ics(nobs),jcs(nobs)
+      real, allocatables :: temp(:)
+      real, parameter :: radToDeg = 57.2957795
+
+      dLon = 360. / im
+      dLat = 180. / ( jm - 1.)
+
+      gObs = 0.0
+
+      do k = 1, km
+         nSample = 0.0
+
+         if (jm == 6*im)then
+               print*, "warning, function under dev"
+
+         else
+
+            do n = 1,nobs
+               if ( (abs(lon(n))>180.) .OR. (abs(lat(n))>90.) ) cycle
+
+               xLon = lon(n)
+               if ( xLon >= 180. ) xLon = xLon - 360.
+
+               i = 1 + nint((xlon + 180.  ) / dLon)
+               j = 1 + nint((lat(n) + 90. ) / dLat)
+
+               if ( i>im ) i = i - im
+               if ( i<1  ) i = i + im
+
+               if (abs(obs(n,k)-missing) > 0.01*abs(missing)) then
+                  gObs(i,j,k) = gObs(i,j,k) + (obs(n,k) - meanObs(i,j,k))**2
+                  nSample(i,j) = nSample(i,j) + 1.0
+               end if
+
+            end do
+
+         end if
+
+         where ( nsample > 2 )
+            gObs(:,:,k) = gObs(:,:,k) / (nSample-1)
+         elsewhere
+            gObs(:,:,k) = missing
+         end where
+
+      end do
+
+      end             
 !-----------
 
       subroutine binObsCnt3D(lon,lat,obs,nobs,nSample,im,jm,km,missing)
