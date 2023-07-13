@@ -530,7 +530,7 @@ class MxD04_L2(object):
 
        """
        from gfio import GFIO
-       from binObs_   import binobs2d, binobs3d
+       from binObs_   import binobs2d, binobs3d, binobscnt3d
        
        # Stop here is no good obs available
        # ----------------------------------
@@ -573,6 +573,8 @@ class MxD04_L2(object):
        vtitle = [ 'Aerosol Optical Depth',
                   'Aerosol Optical Depth (Revised)',
                   'Aerosol Optical Depth (Fine Mode)',
+                  'Aerosol Optical Depth Obs Count',
+                  'Aerosol Optical Depth (Revised) Obs Count',                  
                   'Cloud Fraction' ]
 
        vname  = ['tau', 'tau_', 'tau_fine', 'count_tau', 'count_tau_','cloud' ]
