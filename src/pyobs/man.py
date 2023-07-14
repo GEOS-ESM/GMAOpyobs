@@ -97,11 +97,11 @@ class MAN(object):
 
             iVars = iVars + (i,)
             if name=='Date':
-                formats = formats + ('S8',)
+                formats = formats + ('U8',)
             elif name=='Date(dd:mm:yyyy)':
-                formats = formats + ('S10',)
+                formats = formats + ('U10',)
             elif 'Time' in name:
-                formats = formats + ('S8',)
+                formats = formats + ('U8',)
             else:
                 converters[i] = lambda s: float(s or MISSING)
                 formats = formats + ('f4',)
@@ -266,7 +266,7 @@ def concat_cruises(inDir,outFile,lev='20',dtype='series',param='AOD'):
 
     oFile = open(outFile,'w')
     # read headers
-    iFile = open(filelist[0],'r')
+    iFile = open(filelist[0],'r',encoding="ISO-8859-1")
     for i in range(4):
         iFile.readline()
     head = iFile.readline()
@@ -274,7 +274,8 @@ def concat_cruises(inDir,outFile,lev='20',dtype='series',param='AOD'):
     iFile.close()
 
     for fname in filelist:
-        iFile = open(fname,'r')
+        print(fname)
+        iFile = open(fname,'r',encoding="ISO-8859-1")
         txt = iFile.readlines()
         iFile.close()
         oFile.writelines(txt[5:])
