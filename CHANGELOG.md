@@ -13,6 +13,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+# [v1.0.5] 2026-06-15
+
+### Added
+
+- mxd04 Level3 gridded product writes out the number of observations that went into the grid cell
+
+### Fixed
+
+### Removed
+
 # [v.1.0.4] 2023-06-07
 
 ### Added
