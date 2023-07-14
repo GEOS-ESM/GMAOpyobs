@@ -247,7 +247,7 @@ def _estimate():
     man.addVar(ga,'nnr_001.mydo.tau_.npz',expr='tau_')
 
 #-----------------------
-def concat_cruises(inDir,outDir,lev='20',dtype='series',param='AOD'):
+def concat_cruises(inDir,outFile,lev='20',dtype='series',param='AOD'):
     """
     MAN data comes as a tarball of seperate text files for each cruise
     This function concatenates all the individual cruise files into one file
@@ -264,7 +264,6 @@ def concat_cruises(inDir,outDir,lev='20',dtype='series',param='AOD'):
     else:
         raise ValueError("unknown MAN paramater <%s>, must be either AOD or SDA"%param) 
 
-    outFile = outDir + '/All_MAN_{}_{}_Level{}.csv'.format(param,dtype,lev)
     oFile = open(outFile,'w')
     # read headers
     iFile = open(filelist[0],'r')
