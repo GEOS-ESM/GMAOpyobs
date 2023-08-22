@@ -18,8 +18,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - mxd04 Level3 gridded product writes out the number of observations that went into the grid cell
+- man.py function to create a concatenated of all the seperate cruises
 
 ### Fixed
+
+- reading date/time variables from MAN concatenated file needs to be unicode not byte
 
 ### Removed
 

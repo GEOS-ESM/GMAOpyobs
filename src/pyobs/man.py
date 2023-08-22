@@ -97,11 +97,11 @@ class MAN(object):
 
             iVars = iVars + (i,)
             if name=='Date':
-                formats = formats + ('S8',)
+                formats = formats + ('U8',)
             elif name=='Date(dd:mm:yyyy)':
-                formats = formats + ('S10',)
+                formats = formats + ('U10',)
             elif 'Time' in name:
-                formats = formats + ('S8',)
+                formats = formats + ('U8',)
             else:
                 converters[i] = lambda s: float(s or MISSING)
                 formats = formats + ('f4',)
@@ -245,6 +245,42 @@ def _estimate():
     fh = ga.open('nnr_001.mydo.ddf')
     man.addVar(ga,'nnr_001.mydo.tau.npz',expr='tau')
     man.addVar(ga,'nnr_001.mydo.tau_.npz',expr='tau_')
+
+#-----------------------
+def concat_cruises(inDir,outFile,lev='20',dtype='series',param='AOD'):
+    """
+    MAN data comes as a tarball of seperate text files for each cruise
+    This function concatenates all the individual cruise files into one file
+    The AOD files can be read by the MAN class above
+
+    Default is Level2 AOD seris data, but can also work with the SDA and "all_points" and "daily" files
+    """
+    from glob import glob
+
+    if param == 'AOD':
+        filelist = sorted(glob(inDir + '/AOD/*{}.lev{}'.format(dtype,lev)))
+    elif param == 'SDA':
+        filelist = sorted(glob(inDir + '/SDA/*{}.*_{}'.format(dtype,lev)))
+    else:
+        raise ValueError("unknown MAN paramater <%s>, must be either AOD or SDA"%param) 
+
+    oFile = open(outFile,'w')
+    # read headers
+    iFile = open(filelist[0],'r',encoding="ISO-8859-1")
+    for i in range(4):
+        iFile.readline()
+    head = iFile.readline()
+    oFile.write(head)
+    iFile.close()
+
+    for fname in filelist:
+        print(fname)
+        iFile = open(fname,'r',encoding="ISO-8859-1")
+        txt = iFile.readlines()
+        iFile.close()
+        oFile.writelines(txt[5:])
+
+    oFile.close()    
 
 if __name__ == "__main__":
 
