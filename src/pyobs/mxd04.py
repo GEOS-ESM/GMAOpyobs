@@ -530,7 +530,7 @@ class MxD04_L2(object):
 
        """
        from gfio import GFIO
-       from binObs_   import binobs2d, binobs3d
+       from binObs_   import binobs2d, binobs3d, binobscnt3d
        
        # Stop here is no good obs available
        # ----------------------------------
@@ -573,11 +573,13 @@ class MxD04_L2(object):
        vtitle = [ 'Aerosol Optical Depth',
                   'Aerosol Optical Depth (Revised)',
                   'Aerosol Optical Depth (Fine Mode)',
+                  'Aerosol Optical Depth Obs Count',
+                  'Aerosol Optical Depth (Revised) Obs Count',                  
                   'Cloud Fraction' ]
 
-       vname  = ['tau', 'tau_', 'tau_fine', 'cloud' ]
-       vunits = [ '1',    '1',     '1',       '1',  ]
-       kmvar  = [ nch,    nch,     nch,        0    ]
+       vname  = ['tau', 'tau_', 'tau_fine', 'count_tau', 'count_tau_','cloud' ]
+       vunits = [ '1',    '1',     '1',      '1',            '1',       '1',  ]
+       kmvar  = [ nch,    nch,     nch,      nch,            nch,        0    ]
 
        title = 'Gridded MODIS Aerosol Retrievals'
        source = 'NASA/GSFC/GMAO GEOS-5 Aerosol Group'
@@ -624,6 +626,10 @@ class MxD04_L2(object):
                binobs3d(self.lon,self.lat,aod_,im,jm,MISSING) )
        f.write('tau_fine', nymd, nhms, 
                binobs3d(self.lon,self.lat,aod_fine,im,jm,MISSING) )
+       f.write('count_tau', nymd, nhms,
+               binobscnt3d(self.lon,self.lat,aod,im,jm,MISSING) )
+       f.write('count_tau_', nymd, nhms,
+               binobscnt3d(self.lon,self.lat,aod_,im,jm,MISSING) )       
        f.write('cloud', nymd, nhms, 
                binobs2d(self.lon,self.lat,self.cloud,im,jm,MISSING) )
            
