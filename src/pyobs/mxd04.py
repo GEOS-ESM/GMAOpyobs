@@ -582,7 +582,7 @@ class MxD04_L2(object):
        kmvar  = [ nch,    nch,     nch,      nch,            nch,        0   ]
 
        if hasattr(self,'ae'):
-           vtitle + = ['Angstrom Exponent 440-870',
+           vtitle += ['Angstrom Exponent 440-870',
                        'Angstrom Exponent 440-870 (Revised)']
 
            vname += ['ae','ae_' ]
