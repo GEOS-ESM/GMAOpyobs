@@ -847,6 +847,14 @@ class Vx04_L2(object):
        vunits = [ '1',    '1',     '1',       '1',            '1',       '1',  ]
        kmvar  = [ nch,    nch,     nch,       nch,            nch,        0    ]
 
+       if hasattr(self,'ae'):
+           vtitle += ['Angstrom Exponent 440-870',
+                       'Angstrom Exponent 440-870 (Revised)']
+
+           vname += ['ae','ae_' ]
+           vunits += ['1', '1'  ]
+           kmvar += [0,   0   ]
+
        title = 'Gridded MODIS Aerosol Retrievals'
        source = 'NASA/GSFC/GMAO GEOS-5 Aerosol Group'
        contact = 'arlindo.dasilva@nasa.gov'
@@ -898,7 +906,14 @@ class Vx04_L2(object):
                binobscnt3d(self.lon,self.lat,aod_,im,jm,MISSING) )
        f.write('cloud', nymd, nhms, 
                binobs2d(self.lon,self.lat,self.cloud,im,jm,MISSING) )
-           
+       # The AE may not exist
+       # ----------------------
+       if hasattr(self,'ae'):
+           f.write('ae', nymd, nhms,
+                   binobs2d(self.lon,self.lat,self.ae,im,jm,MISSING) )
+           f.write('ae_', nymd, nhms,
+                   binobs2d(self.lon,self.lat,self.ae_,im,jm,MISSING) )
+
 #       try:
 #           f.close()
 #       except:

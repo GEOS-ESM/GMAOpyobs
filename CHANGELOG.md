@@ -13,7 +13,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
-# [v1.0.5] 2026-06-15
+# [v1.0.6] 2023-09-08
+
+### Added
+
+- mxd04 and vx04 will write out gridded angstrom exponent if available
+
+### Fixed
+
+### Removed
+
+# [v1.0.5] 2023-06-15
 
 ### Added
 

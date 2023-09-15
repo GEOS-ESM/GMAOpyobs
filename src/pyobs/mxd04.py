@@ -577,9 +577,17 @@ class MxD04_L2(object):
                   'Aerosol Optical Depth (Revised) Obs Count',                  
                   'Cloud Fraction' ]
 
-       vname  = ['tau', 'tau_', 'tau_fine', 'count_tau', 'count_tau_','cloud' ]
-       vunits = [ '1',    '1',     '1',      '1',            '1',       '1',  ]
-       kmvar  = [ nch,    nch,     nch,      nch,            nch,        0    ]
+       vname  = ['tau', 'tau_', 'tau_fine', 'count_tau', 'count_tau_','cloud']
+       vunits = [ '1',    '1',     '1',      '1',            '1',       '1'  ]
+       kmvar  = [ nch,    nch,     nch,      nch,            nch,        0   ]
+
+       if hasattr(self,'ae'):
+           vtitle += ['Angstrom Exponent 440-870',
+                       'Angstrom Exponent 440-870 (Revised)']
+
+           vname += ['ae','ae_' ]
+           vunits += ['1', '1'  ]
+           kmvar += [0,   0   ]
 
        title = 'Gridded MODIS Aerosol Retrievals'
        source = 'NASA/GSFC/GMAO GEOS-5 Aerosol Group'
@@ -618,6 +626,7 @@ class MxD04_L2(object):
        except:
            aod_ = MISSING * ones(aod.shape) # will compress like a charm
 
+
        # Grid variable and write to file
        # -------------------------------
        f.write('tau', nymd, nhms, 
@@ -632,6 +641,13 @@ class MxD04_L2(object):
                binobscnt3d(self.lon,self.lat,aod_,im,jm,MISSING) )       
        f.write('cloud', nymd, nhms, 
                binobs2d(self.lon,self.lat,self.cloud,im,jm,MISSING) )
+       # The AE may not exist
+       # ----------------------       
+       if hasattr(self,'ae'):
+           f.write('ae', nymd, nhms,
+                   binobs2d(self.lon,self.lat,self.ae,im,jm,MISSING) )
+           f.write('ae_', nymd, nhms,
+                   binobs2d(self.lon,self.lat,self.ae_,im,jm,MISSING) )       
            
 #       try:
 #           f.close()
