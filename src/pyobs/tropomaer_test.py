@@ -1,5 +1,5 @@
 """
-Reads Level 2 tropomaer granules for a single day and returns a
+Reads Level 2 MOD04/MYD04 granules for a single day and returns a
 single object with the relevant data.
 
 This software is hereby placed in the public domain.
@@ -21,19 +21,21 @@ try:
 except:
     pass
 
-import netCDF4 as nc
+from pyhdf.SD import SD, HDF4Error
+
+from .bits import BITS
 
 #---  
 
-DATE_START = datetime(2010,1,1,0,0,0)
+DATE_START = datetime(1993,1,1,0,0,0)
 
 SDS = dict (
-      GEODATA = ('longitude', 'latitude', 
+      META = ('longitude', 'latitude', 
               'time','delta_time',
 #tro           'latitude_bounds','longitude_bounds',
               'viewing_zenith_angle', 'viewing_azimuth_angle',
-              'solar_zenith_angle',  'solar_azimuth_angle'),
-      SCIDATA = ('FinalAerosolAbsOpticalDepth',
+              'solar_zenith_angle',  'solar_azimuth_angle')
+      TROPO = ('FinalAerosolAbsOpticalDepth',
                'FinalAerosolLayerHeight',
                'FinalAerosolOpticalDepth',
                'FinalAerosolSingleScattAlb',
@@ -45,10 +47,12 @@ SDS = dict (
                'UVAerosolIndex',
                'VIIRS_confidently_clear',
                'CloudFraction')
-        )
 
 CHANNELS = dict (
                   TROPO = ( 354, 388, 500 ),
+#                  LAND = ( 470, 550, 660 ),
+#                  OCEAN = ( 470, 550, 660, 870, 1200, 1600, 2100 ),
+#                   DEEP = ( 412, 470, 550, 660 ), # file has 550 separate
                    SREF = ( 354, 388 ),
                 )
 
@@ -60,19 +64,19 @@ ALIAS = dict (  longitude = 'lon',
                 solar_azimuth_angle = 'SolarAzimuth',
                 FinalAerosolOpticalDepth = 'aod',
                 FinalAerosolAbsOpticalDepth = 'aod_abs',  #absorption AOD
-                FinalAerosolLayerHeight = 'alh',
-                FinalAerosolSingleScattAlb = 'ssa',  
+                FinalAerosolLayerHeight = 'alh'  #new,
+                FinalAerosolSingleScattAlb = 'ssa'  
                 CloudFraction = 'cloud',
                 FinalAlgorithmFlags= 'qa_flag',
-                FinalAlgorithmFlagsACA = 'qa_flag_aca',
+                FinalAlgorithmFlagsACA = 'qa_flag_aca'
                 Reflectivity = 'reflectance',
-                NormRadiance = 'normradiance',
-                Residue = 'residue',
-                UVAerosolIndex = 'UVAI',
-                VIIRS_confidently_clear = 'viirs'
+                NormRadiance = 'normradiance'
+                Residue = 'residue'
+                UVAerosolIndex = 'UVAI'
+                VIIRS_confidently_clear = 'viirs',
              )
 
-BEST = 0 # QA marks
+BAD, MARGINAL, GOOD, BEST = ( 0, 1, 2, 3 ) # QA marks
 
 KX = dict ( TerraOCEAN = 301,
             TerraLAND  = 302,
@@ -96,13 +100,13 @@ MISSING = 999.999
 
 #...........................................................................
 
-class TROPOMAER_L2(object):
+class MxD04_L2(object):
     """
     This class implements the MODIS Level 2 AEROSOL products, usually
     referred to as MOD04 (TERRA satellite) and MYD04 (AQUA satellite).
     """
 
-    def __init__ (self,Path,syn_time=None,nsyn=8,Verb=0,
+    def __init__ (self,Path,Algo,syn_time=None,nsyn=8,Verb=0,
                   only_good=True,SDS=SDS,alias=None):
        """
        Reads individual granules or a full day of Level 2 MOD04/MYD04 files
@@ -114,6 +118,7 @@ class TROPOMAER_L2(object):
                  of files and directories.  Directories are
                  transversed recursively. If a non MOD04/MYD04 Level 2
                  file is encountered, it is simply ignored.
+         Algo -- Algorithm: LAND, OCEAN or DEEP (for Deep Blue)
 
        Optional parameters:
          syn_type  --- synoptic time
@@ -129,12 +134,16 @@ class TROPOMAER_L2(object):
 
        """
 
+       if Algo not in ('LAND', 'OCEAN', 'DEEP'):
+           raise ValueError("invalid algorithm "+Algo+" --- must be LAND, OCEAN or DEEP")
+
 #      Initially are lists of numpy arrays for each granule
 #      ------------------------------------------------
        self.verb = Verb
        self.sat  = None # Satellite name
        self.col  = None # collection, e.g., 005
-       self.SDS = SDS
+       self.algo = Algo
+       self.SDS = SDS['META'] + SDS[Algo]
 
        # Add/Substitute some aliases if given
        # ------------------------------------
@@ -145,7 +154,7 @@ class TROPOMAER_L2(object):
 
        # Create empty lists for SDS to be read from file
        # -----------------------------------------------
-       for name in self.SDS['GEODATA']+self.SDS['SCIDATA']:
+       for name in self.SDS:
            self.__dict__[name] = []
 
        # Read each granule, appending them to the list
@@ -158,9 +167,7 @@ class TROPOMAER_L2(object):
        else:
            Path = [Path, ]
        self._readList(Path)
-       sys.exit(0)
-#       quit()
-       
+
        #Protect against empty MXD04 files
        # --------------------------------
        if len(self.longitude) == 0:
@@ -175,11 +182,23 @@ class TROPOMAER_L2(object):
                self.__dict__[sds] = concatenate(self.__dict__[sds])
            except:
                print("Failed concatenating "+sds)
+           if "Quality_Assurance" in sds:
+               if Algo == 'DEEP':
+                     pass
+               else:
+                     self.__dict__['qa_flag'] = BITS(self.__dict__[sds][:,0])[1:4] # QA Flag
 
        # Determine index of "good" observations
        # --------------------------------------
-       self.iGood = self.qa_flag==0
-       raise ValueError('invalid algorithm (very strange)')
+       if Algo == 'LAND':
+           self.iGood = self.qa_flag==BEST
+       elif Algo == 'OCEAN':
+           self.iGood = self.qa_flag>BAD
+       elif Algo == 'DEEP':
+           self.qa_flag = self.Deep_Blue_Aerosol_Optical_Depth_550_Land_QA_Flag
+           self.iGood = self.qa_flag>BAD # for now
+       else:
+           raise ValueError('invalid algorithm (very strange)')
 
        # Keep only "good" observations
        # -----------------------------
@@ -253,44 +272,59 @@ class TROPOMAER_L2(object):
 
 #---
     def _readGranule(self,filename):
-        """Reads one TROPOMAER granule with Level 2 aerosol data."""
+        """Reads one MOD04/MYD04 granule with Level 2 aerosol data."""
 
         # Don't fuss if the file cannot be opened
         # ---------------------------------------
         try:
             if self.verb:
                 print("[] Working on "+filename)
-            hfile = nc.Dataset(filename)
-        except: 
+            hfile = SD(filename)
+        except HDF4Error:
             if self.verb > 2:
                 print("- %s: not recognized as an HDF file"%filename)
             return 
 
         # Read select variables (reshape to allow concatenation later)
         # ------------------------------------------------------------
-        for group in self.SDS:
-            grp = hfile.groups[group]
-            for sds_ in self.SDS[group]:
-                sds = sds_
-                v = grp.variables[sds][:]
-                if len(v.shape) == 3:
-                    i, j, k = v.shape
+        for sds_ in self.SDS:
+            sds = sds_
+            try:
+                v = hfile.select(sds).get()
+            except:
+                if sds in NEW_SDS: # cope with new names in Coll. 6
+                    sds = NEW_SDS[sds_]
+                    v = hfile.select(sds).get()
+            a = hfile.select(sds).attributes()
+            if a['scale_factor']!=1.0 or a['add_offset']!=0.0:
+                v = a['scale_factor'] * v + a['add_offset']
+            if len(v.shape) == 3:
+                i, j, k = v.shape
+                if "Quality_Assurance" in sds:
                     v = v.reshape((i*j,k))
-                elif len(v.shape) == 2:
-                    v = v.ravel()
-                elif len(v.shape) == 1:
-                    pass
-                elif sds == 'time':
-                    pass
                 else:
-                    raise IndexError("invalid shape for SDS <{}> {}".format(sds,v.shape))
-                self.__dict__[sds_].append(v) # Keep Collection 5 names!
+                    v = v.reshape((i,j*k)).T
+            elif len(v.shape) == 2:
+                v = v.ravel()
+            else:
+                raise IndexError("invalid shape for SDS <%s>"%sds)
+            self.__dict__[sds_].append(v) # Keep Collection 5 names!
 
+        # Core Metadata
+        # -------------
+        cm = hfile.attributes()['CoreMetadata.0']
+
+#       Satellite name
+#       --------------
+        if self.sat is None:
+            sat = cm.split('ASSOCIATEDPLATFORMSHORTNAME')[1].split('\n')[3].split('=')[1]
+            self.sat = sat.lstrip().replace('"','')
             
 #       Collection
 #       ----------
         if self.col is None:
-            self.col = "%03d"%int(hfile.VersionID)
+            col = int(cm.split('COLLECTION')[1].split('VERSIONID')[1].split('\n')[2].split('=')[1])
+            self.col = "%03d"%col
 
 #---
 
@@ -343,7 +377,6 @@ class TROPOMAER_L2(object):
                               ks = self.ks,
                         channels = self.channels,
                          qa_flag = self.qa_flag,
-                     qa_flag_aca = self.qa_flag_aca,
                      SolarZenith = self.SolarZenith,
                     SolarAzimuth = self.SolarAzimuth,
                     SensorZenith = self.SensorZenith,
@@ -351,13 +384,7 @@ class TROPOMAER_L2(object):
                            cloud = self.cloud,
                              aod = self.aod,
                         aod_abs = self.aod_abs,
-                            alh = self.alh,
-                            ssa = self.ssa,
-                     reflectance = self.reflectance,
-                    normradiance = self.normradiance,
-                         residue = self.residue,
-                            UVAI = self.UVAI,
-                           viirs = self.virrs)
+                     reflectance = self.reflectance)
 
         if Verb >=1:
             print("[w] Wrote file "+filename)
@@ -676,9 +703,8 @@ def granules ( path, prod, syn_time, coll='051', nsyn=8 ):
     while t < t2:
         if t >= t1:
             doy = t.timetuple()[7]
-#shlee -change file name
-#            basen = "%s/%s/%s/%04d/%03d/%s_L2.A%04d%03d.%02d%02d.%s.*.nc"\   
-#                     %(path,coll,prod,t.year,doy,prod,t.year,doy,t.hour,t.minute,coll)
+            basen = "%s/%s/%s/%04d/%03d/%s_L2.A%04d%03d.%02d%02d.%s.*.hdf"\
+                     %(path,coll,prod,t.year,doy,prod,t.year,doy,t.hour,t.minute,coll)
             try:
                 filen = glob(basen)[0]
                 Granules += [filen,]
