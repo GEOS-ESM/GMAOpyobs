@@ -10,7 +10,7 @@ import os
 import sys
 from numpy    import zeros, ones, sqrt, std, mean, unique,\
                      concatenate, where, array, linspace,\
-                     shape, arange, interp
+                     shape, arange, interp, reshape, repeat
 from datetime import date, datetime, timedelta
 from glob     import glob
 
@@ -29,7 +29,6 @@ DATE_START = datetime(2010,1,1,0,0,0)
 
 SDS = dict (
       GEODATA = ('longitude', 'latitude', 
-              'time','delta_time',
 #tro           'latitude_bounds','longitude_bounds',
               'viewing_zenith_angle', 'viewing_azimuth_angle',
               'solar_zenith_angle',  'solar_azimuth_angle'),
@@ -84,13 +83,6 @@ KX = dict ( TerraOCEAN = 301,
 
 KT = dict ( AOD = 45, )
 
-IDENT = dict ( TerraOCEAN = 'modo',
-               TerraLAND  = 'modl',
-               TerraDEEP  = 'modd',
-               AquaOCEAN  = 'mydo',
-               AquaLAND   = 'mydl',
-               AquaDEEP   = 'mydd'
-          )
 
 MISSING = 999.999
 
@@ -132,7 +124,7 @@ class TROPOMAER_L2(object):
 #      Initially are lists of numpy arrays for each granule
 #      ------------------------------------------------
        self.verb = Verb
-       self.sat  = None # Satellite name
+       self.sat  = 'TROPOMI' # Satellite name
        self.col  = None # collection, e.g., 005
        self.SDS = SDS
 
@@ -157,8 +149,11 @@ class TROPOMAER_L2(object):
                return
        else:
            Path = [Path, ]
+       print("test2")
        self._readList(Path)
-       sys.exit(0)
+       print("test3")
+       self.SDS['GEODATA']+=('Scan_Start_Time',)
+#       sys.exit(0)
 #       quit()
        
        #Protect against empty MXD04 files
@@ -170,7 +165,7 @@ class TROPOMAER_L2(object):
 
        # Make each attribute a single numpy array
        # ----------------------------------------
-       for sds in self.SDS:
+       for sds in self.SDS['GEODATA']+self.SDS['SCIDATA']:
            try:
                self.__dict__[sds] = concatenate(self.__dict__[sds])
            except:
@@ -178,14 +173,13 @@ class TROPOMAER_L2(object):
 
        # Determine index of "good" observations
        # --------------------------------------
-       self.iGood = self.qa_flag==0
-       raise ValueError('invalid algorithm (very strange)')
+       self.iGood = self.FinalAlgorithmFlags==0
 
        # Keep only "good" observations
        # -----------------------------
        if only_good:
            m = self.iGood
-           for sds in self.SDS:
+           for sds in self.SDS['GEODATA']+self.SDS['SCIDATA']:
                rank = len(self.__dict__[sds].shape)
                if rank == 1:
                    self.__dict__[sds] = self.__dict__[sds][m]
@@ -193,29 +187,25 @@ class TROPOMAER_L2(object):
                    self.__dict__[sds] = self.__dict__[sds][m,:]
                else:
                    raise IndexError('invalid rank=%d'%rank)
-           self.qa_flag = self.qa_flag[m]
            self.iGood = self.iGood[m]
 
        # Make aliases for compatibility with older code 
        # ----------------------------------------------
        Alias = list(self.ALIAS.keys())
-       for sds in self.SDS:
+       for sds in self.SDS['GEODATA']+self.SDS['SCIDATA']:
            if sds in Alias:
                self.__dict__[self.ALIAS[sds]] = self.__dict__[sds] 
 
        # Create corresponding python time
        # --------------------------------
-       self.Time = array([DATE_START+timedelta(seconds=s) for s in self.Scan_Start_Time])
-
+#       self.Time = array([DATE_START+timedelta(seconds=s) for s in self.Scan_Start_Time])
+       self.Time = self.Scan_Start_Time
        # ODS friendly attributes
        # -----------------------
        self.nobs = self.longitude.shape[0]
-       self.kx = KX[self.sat+self.algo]
-       self.ident = IDENT[self.sat+self.algo]
-       self.Channels = CHANNELS["OCEAN"]   # all channels
+#       self.kx = KX[self.sat+self.algo]
        self.sChannels = CHANNELS["SREF"]   # LAND surface reflectivity (not the same as algo)
-       self.dChannels = CHANNELS["DEEP"]   # LAND surface reflectivity (not the same as algo)
-       self.channels = CHANNELS[self.algo]
+       self.channels = CHANNELS["TROPO"]
        if syn_time == None:
            self.syn_time = None
            self.time = None
@@ -265,6 +255,26 @@ class TROPOMAER_L2(object):
             if self.verb > 2:
                 print("- %s: not recognized as an HDF file"%filename)
             return 
+#shlee- time variable
+        print("test1-1")
+        bb=hfile.groups['GEODATA'].variables['delta_time'][:]
+        scanline=hfile.dimensions['scanline'].size
+        ground_pixel=hfile.dimensions['ground_pixel'].size
+        cc=reshape(bb,(scanline,1))
+        delta=repeat(cc,ground_pixel,axis=1)
+        print(delta.shape)
+        tt=hfile.groups['GEODATA'].variables['time'][:]
+        tt.shape = (1)
+        startd=timedelta(seconds=int(tt[0]))
+        print("test1-2")
+        Scan_Start_Time=[startd+timedelta(seconds=dt) for dt in delta.ravel()/1000]
+        Scan_Start_Time=array(Scan_Start_Time)
+        Scan_Start_Time=reshape(Scan_Start_Time,(scanline,ground_pixel))
+        print(Scan_Start_Time.shape)
+        print("test1-3")
+        self.scanline=scanline
+        self.ground_pixel=ground_pixel
+        self.Scan_Start_Time=Scan_Start_Time
 
         # Read select variables (reshape to allow concatenation later)
         # ------------------------------------------------------------
@@ -285,8 +295,7 @@ class TROPOMAER_L2(object):
                 else:
                     raise IndexError("invalid shape for SDS <{}> {}".format(sds,v.shape))
                 self.__dict__[sds_].append(v) # Keep Collection 5 names!
-
-            
+              
 #       Collection
 #       ----------
         if self.col is None:
