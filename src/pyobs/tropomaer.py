@@ -90,14 +90,13 @@ MISSING = 999.999
 
 class TROPOMAER_L2(object):
     """
-    This class implements the MODIS Level 2 AEROSOL products, usually
-    referred to as MOD04 (TERRA satellite) and MYD04 (AQUA satellite).
+    This class implements the TROPOMI Level 2 AEROSOL products..
     """
 
     def __init__ (self,Path,syn_time=None,nsyn=8,Verb=0,
                   only_good=True,SDS=SDS,alias=None):
        """
-       Reads individual granules or a full day of Level 2 MOD04/MYD04 files
+       Reads individual granules or a full day of Level 2 TROPOMAER files
        present on a given *Path* and returns a single object with
        all data concatenated for a given algorithm. On input, 
 
@@ -115,7 +114,7 @@ class TROPOMAER_L2(object):
                  0 - really quiet (default)
                  1 - Warns if invalid file is found
                  2 - Prints out non-zero number of aerosols in each file.
-         SDS      --- Variables to be read from MODIS hdf files.  Must 
+         SDS      --- Variables to be read from TROPOMI nc files.  Must 
                       be a dictionary with keys 'META' and Algo
          ALIAS    --- dictionary of alises for SDSs
 
@@ -149,12 +148,10 @@ class TROPOMAER_L2(object):
                return
        else:
            Path = [Path, ]
-       print("test2")
        self._readList(Path)
-       print("test3")
+
+       # Read TROPOMI Time variable 
        self.SDS['GEODATA']+=('Scan_Start_Time',)
-#       sys.exit(0)
-#       quit()
        
        #Protect against empty MXD04 files
        # --------------------------------
@@ -255,23 +252,22 @@ class TROPOMAER_L2(object):
             if self.verb > 2:
                 print("- %s: not recognized as an HDF file"%filename)
             return 
-#shlee- time variable
-        print("test1-1")
+
+        # Make TROPOMI time variable
+        #---------------------------
         bb=hfile.groups['GEODATA'].variables['delta_time'][:]
         scanline=hfile.dimensions['scanline'].size
         ground_pixel=hfile.dimensions['ground_pixel'].size
         cc=reshape(bb,(scanline,1))
         delta=repeat(cc,ground_pixel,axis=1)
-        print(delta.shape)
+        #print(delta.shape)
         tt=hfile.groups['GEODATA'].variables['time'][:]
         tt.shape = (1)
         startd=timedelta(seconds=int(tt[0]))
-        print("test1-2")
         Scan_Start_Time=[startd+timedelta(seconds=dt) for dt in delta.ravel()/1000]
         Scan_Start_Time=array(Scan_Start_Time)
         Scan_Start_Time=reshape(Scan_Start_Time,(scanline,ground_pixel))
-        print(Scan_Start_Time.shape)
-        print("test1-3")
+        #print(Scan_Start_Time.shape)
         self.scanline=scanline
         self.ground_pixel=ground_pixel
         self.Scan_Start_Time=Scan_Start_Time
@@ -447,7 +443,7 @@ class TROPOMAER_L2(object):
     def writeg(self,filename=None,dir='.',expid=None,refine=8,res=None,
                channels=None,Verb=1):
        """
-        Writes gridded MODIS measurements to file.
+        Writes gridded TROPOMIC measurements to file.
 
          refine  -- refinement level for a base 4x5 GEOS-5 grid
                        refine=1  produces a   4  x  5    grid
@@ -526,7 +522,7 @@ class TROPOMAER_L2(object):
        vunits = [ '1',    '1',     '1',      '1',            '1',       '1',  ]
        kmvar  = [ nch,    nch,     nch,      nch,            nch,        0    ]
 
-       title = 'Gridded MODIS Aerosol Retrievals'
+       title = 'Gridded TROPOMI Aerosol Retrievals'
        source = 'NASA/GSFC/GMAO GEOS-5 Aerosol Group'
        contact = 'arlindo.dasilva@nasa.gov'
 
@@ -677,7 +673,7 @@ def granules ( path, prod, syn_time, coll='051', nsyn=8 ):
     dt = timedelta(seconds = 12. * 60. * 60. / nsyn)
     t1, t2 = (syn_time-dt,syn_time+dt)
 
-    # Find MODIS granules in synoptic time range
+    # Find TROPOMI granules in synoptic time range
     # ------------------------------------------
     dt = timedelta(minutes=5)
     t = datetime(t1.year,t1.month,t1.day,t1.hour,0,0)
@@ -744,12 +740,9 @@ def _gatime(nymd,nhms):
 
 if __name__ == "__main__":
 
-#    syn_time = datetime(2008,6,30,0,0,0)
     syn_time = datetime(2016,10,26,10,0,0)
-#    Files = granules('/nobackup/MODIS/Level2/','MYD04',syn_time,coll='006')
+
     Files = granules('/discover/nobackup/dao_ops/intermediate/flk/modis','MOD04',syn_time,coll='006')
 
     ocean = MxD04_L2(Files,'OCEAN',syn_time,Verb=1,only_good=True)
-#    land  = MxD04_L2(Files,'LAND',syn_time,Verb=1)
-#    deep  = MxD04_L2(Files,'DEEP',syn_time,Verb=1)
     
