@@ -73,13 +73,7 @@ ALIAS = dict (  longitude = 'lon',
 
 BEST = 0 # QA marks
 
-KX = dict ( TerraOCEAN = 301,
-            TerraLAND  = 302,
-            TerraDEEP  = 310,
-            AquaOCEAN  = 311, 
-            AquaLAND   = 312,
-            AquaDEEP   = 320,
-          )
+KX =  341
 
 KT = dict ( AOD = 45, )
 
@@ -125,7 +119,7 @@ class TROPOMAER_L2(object):
        self.verb = Verb
        self.sat  = 'TROPOMI' # Satellite name
        self.col  = None # collection, e.g., 005
-       self.SDS = SDS
+       self.SDS = SDS.copy()
 
        # Add/Substitute some aliases if given
        # ------------------------------------
@@ -152,7 +146,7 @@ class TROPOMAER_L2(object):
 
        # Read TROPOMI Time variable 
        self.SDS['GEODATA']+=('Scan_Start_Time',)
-       
+ 
        #Protect against empty MXD04 files
        # --------------------------------
        if len(self.longitude) == 0:
@@ -200,7 +194,7 @@ class TROPOMAER_L2(object):
        # ODS friendly attributes
        # -----------------------
        self.nobs = self.longitude.shape[0]
-#       self.kx = KX[self.sat+self.algo]
+       self.kx = KX
        self.sChannels = CHANNELS["SREF"]   # LAND surface reflectivity (not the same as algo)
        self.channels = CHANNELS["TROPO"]
        if syn_time == None:
