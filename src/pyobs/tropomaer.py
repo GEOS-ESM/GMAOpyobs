@@ -138,7 +138,7 @@ class TROPOMAER_L2(object):
        if type(Path) is list:
            if len(Path) == 0:
                self.nobs = 0
-               print("WARNING: Empty MxD04_L2 object created")
+               print("WARNING: Empty TROPOMAER_L2 object created")
                return
        else:
            Path = [Path, ]
@@ -151,7 +151,7 @@ class TROPOMAER_L2(object):
        # --------------------------------
        if len(self.longitude) == 0:
            self.nobs = 0
-           print("WARNING: Empty MxD04_L2 object created")
+           print("WARNING: Empty TROPOMAER_L2 object created")
            return           
 
        # Make each attribute a single numpy array
@@ -650,10 +650,10 @@ class TROPOMAER_L2(object):
 
 def granules ( path, prod, syn_time, coll='051', nsyn=8 ):
     """
-    Returns a list of MxD04 granules for a given product at given synoptic time.
+    Returns a list of TROPOMAER granules for a given product at given synoptic time.
     On input,
 
-    path      ---  mounting point for the MxD04 Level 2 files
+    path      ---  mounting point for the TROPOMAER Level 2 files
     prod      ---  either MOD04 or MYD04
     syn_time  ---  synoptic time (timedate format)
 
@@ -734,9 +734,9 @@ def _gatime(nymd,nhms):
 
 if __name__ == "__main__":
 
-    syn_time = datetime(2016,10,26,10,0,0)
+    syn_time = datetime(2022,09,02,10,0,0)
 
-    Files = granules('/discover/nobackup/dao_ops/intermediate/flk/modis','MOD04',syn_time,coll='006')
-
-    ocean = MxD04_L2(Files,'OCEAN',syn_time,Verb=1,only_good=True)
+#    Files = granules('/discover/nobackup/dao_ops/intermediate/flk/modis','MOD04',syn_time,coll='006')
+    Files = granules('/gpfsm/dnb34/slee72/data/TROPOMI/TROPOMI-Sentinel-5P_L2-TROPOMAER_2022m0902t080702-o25324_v01-2022m0904t094948.nc')
+    aa = TROPOMAER_L2(Files,syn_time,Verb=1,only_good=True)
     
