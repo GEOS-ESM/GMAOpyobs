@@ -132,7 +132,6 @@ class TROPOMAER_L2(object):
        # -----------------------------------------------
        for name in self.SDS['GEODATA']+self.SDS['SCIDATA']+('Scan_Start_Time',):
            self.__dict__[name] = []
-           print(f'name1: {name}')
 
        # Read each granule, appending them to the list
        # ---------------------------------------------
@@ -146,7 +145,6 @@ class TROPOMAER_L2(object):
        self._readList(Path)
 
        # Read TROPOMI Time variable 
-#       self.__dict__[('Scan_Start_Time',)] = []
        self.SDS['GEODATA']+=('Scan_Start_Time',)
 
        #Protect against empty MXD04 files
@@ -161,7 +159,6 @@ class TROPOMAER_L2(object):
        for sds in self.SDS['GEODATA']+self.SDS['SCIDATA']:
            try:
                self.__dict__[sds] = concatenate(self.__dict__[sds])
-               print(f'test1 {sds}')
            except:
                print("Failed concatenating "+sds)
 
@@ -175,9 +172,6 @@ class TROPOMAER_L2(object):
            m = self.iGood
            for sds in self.SDS['SCIDATA']+self.SDS['GEODATA']:
                rank = len(self.__dict__[sds].shape)
-#               print(f'{sds}')
-               print(f'test2 {sds} {self.__dict__[sds].shape}')
-#               print(f'test dict2 {self.__dict__[sds][m].shape}')
                
                if rank == 1:
                    self.__dict__[sds] = self.__dict__[sds][m]
@@ -263,20 +257,17 @@ class TROPOMAER_L2(object):
         ground_pixel=hfile.dimensions['ground_pixel'].size
         cc=reshape(bb,(scanline,1))
         delta=repeat(cc,ground_pixel,axis=1)
-        #print(delta.shape)
         tt=hfile.groups['GEODATA'].variables['time'][:]
         tt.shape = (1)
         startd=timedelta(seconds=int(tt[0]))
         Scan_Start_Time_list=[startd+timedelta(seconds=dt) for dt in delta.ravel()/1000]
         Scan_Start_Time_arr=array(Scan_Start_Time_list)  #list to array (1877850)
-#        print('ch1-',type(Scan_Start_Time),Scan_Start_Time.shape)
 #        Scan_Start_Time_arr=reshape(Scan_Start_Time_arr,(scanline,ground_pixel)) #(1877850,)->(4173, 450)
-#        print('ch2-',type(Scan_Start_Time),Scan_Start_Time.shape)
-#        print(hfile.groups['SCIDATA'].variables['FinalAerosolOpticalDepth'].shape)
         self.scanline=scanline
         self.ground_pixel=ground_pixel
+
 #        self.Scan_Start_Time=Scan_Start_Time
-        self.__dict__['Scan_Start_Time'].append(Scan_Start_Time_arr)
+        self.__dict__['Scan_Start_Time'].append(Scan_Start_Time_arr)  #shlee - append each file time variables
 
 
         # Read select variables (reshape to allow concatenation later)
@@ -297,24 +288,7 @@ class TROPOMAER_L2(object):
                     pass
                 else:
                     raise IndexError("invalid shape for SDS <{}> {}".format(sds,v.shape))
-                self.__dict__[sds_].append(v) # Keep Collection 5 names! self.__dict__[sds_] is list, v is array
-                
-                #shlee-checking
-                print(f'name2: {sds_}')
-                print(v.shape)
-                print('after append:', len(self.__dict__[sds]))
-                test_t=array(self.__dict__[sds_])
-                print(test_t.shape)  #2 file -> (2, 1877400)
-
-
-#                print(f'name: {sds_}, shape: {self.__dict__[sds_].shape}') #error-self.__dict__ is list
-        ## shlee need to append scan_start_time
-#        print('after shape:', Scan_Start_Time.shape)
-#        print('time shape:',hfile.groups['GEODATA'].variables['time'].shape)
-#        print(type(Scan_Start_Time))
-
-#        print('after aod shape:', self.__dict__[FinalAerosolOpticalDepth].shape)
-#        self.__dict__['Scan_Start_Time'].append(Scan_Start_Time)
+                self.__dict__[sds_].append(v) #  self.__dict__[sds_] is list, v is array
 
 #       Collection
 #       ----------
