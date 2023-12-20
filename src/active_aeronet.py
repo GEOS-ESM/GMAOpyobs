@@ -146,11 +146,11 @@ class AERONET(object):
                     raise ValueError("cannot find <%s> in file <%s>"%(name,filename))
                 self.iVars += (i,)
                 if name=='Date':
-                    self.formats += ('S10',)
+                    self.formats += ('U10',)
                 elif name=='Time':
-                    self.formats += ('S8',)
+                    self.formats += ('U8',)
                 elif name=='AERONET_Site':
-                    self.formats += ('S20',)
+                    self.formats += ('U20',)
                 else:
                     self.converters[i] = _convert2Float
                     self.formats += ('f4',)
