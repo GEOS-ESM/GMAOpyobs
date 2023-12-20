@@ -13,6 +13,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+# [v1.0.7]
+
+### Added
+
+### Fixed
+
+- converted active_aeronet.py to py3
+
+### Removed
+
 # [v1.0.6] 2023-09-08
 
 ### Added
