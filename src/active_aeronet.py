@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
    Simple script to return the names and locations of AERONET sites
    that have reported data in the last N days.
@@ -40,7 +41,7 @@ class AERONET(object):
         # ----------------------
         if type(Path) is list:
             if len(Path) == 0:
-                print "WARNING: NO AERONET FILES FOUND"
+                print("WARNING: NO AERONET FILES FOUND")
                 return
         else:
             Path = [Path, ]
@@ -60,11 +61,11 @@ class AERONET(object):
             try:
                 self.__dict__[var] = np.concatenate(self.__dict__[var])
             except:
-                print "Failed concatenating "+var
+                print("Failed concatenating "+var)
 
         # Make aliases
         # ------------
-        Alias = ALIAS.keys()
+        Alias = list(ALIAS.keys())
         for var in self.Vars:
             if var in Alias:
                 self.__dict__[ALIAS[var]] = self.__dict__[var]
@@ -74,7 +75,7 @@ class AERONET(object):
         Locations = {}
         for loc,lon,lat in zip(self.Location,self.lon,self.lat):
             Locations[loc] = (lon,lat) 
-        self.Stations = Locations.keys()
+        self.Stations = list(Locations.keys())
 
 
         # write aeronet_stations.rc
@@ -98,7 +99,7 @@ class AERONET(object):
             if os.path.isdir(item):      self._readDir(item)
             elif os.path.isfile(item):   self._readGranule(item)
             else:
-                print "%s is not a valid file or directory, ignoring it"%item
+                print("%s is not a valid file or directory, ignoring it"%item)
 #---
     def _readDir(self,dir):
         """Recursively, look for files in directory."""
@@ -107,7 +108,7 @@ class AERONET(object):
             if os.path.isdir(path):      self._readDir(path)
             elif os.path.isfile(path):   self._readGranule(path)
             else:
-                print "%s is not a valid file or directory, ignoring it"%item
+                print("%s is not a valid file or directory, ignoring it"%item)
 
 #---
     def _readGranule(self,filename):
@@ -131,7 +132,7 @@ class AERONET(object):
                 i += 1
 
             if self.columns == None:
-                raise ValueError, "Cannot find Column header"
+                raise ValueError("Cannot find Column header")
 
             # Read relevant columns from AERONET granule
             # ----------------------------------------
@@ -142,7 +143,7 @@ class AERONET(object):
                 try:
                     i = self.columns.index(name)
                 except:
-                    raise ValueError, "cannot find <%s> in file <%s>"%(name,filename)
+                    raise ValueError("cannot find <%s> in file <%s>"%(name,filename))
                 self.iVars += (i,)
                 if name=='Date':
                     self.formats += ('S10',)
@@ -198,10 +199,10 @@ def retrieve( filename='aeronet.csv',
     cmd = 'wget --no-check-certificate -q -O %s "%s%s&if_no_html=1"'%(filename,webportal,request)
 
     if verbose:
-        print cmd
+        print(cmd)
         
     if os.system(cmd):
-        raise ValueError, "Cannot retrieve request <%cmd>"
+        raise ValueError("Cannot retrieve request <%cmd>")
 
         
         
