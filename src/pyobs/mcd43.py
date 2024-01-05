@@ -9,6 +9,7 @@ import numpy       as np
 import cartopy.crs as ccrs
 import xarray      as xr
 
+from warnings import warn
 from datetime import date, datetime, timedelta
 from glob     import glob
 #from pyhdf.SD import SD, HDF4Error
@@ -100,7 +101,7 @@ class McD43(object):
     This class implements the MODIS LAND BRDF daily Level 3 products, MCD43B1 (1000m horz res), 
     """
 
-    def __init__ (self,Path,lon,lat,Verb=1):
+    def __init__ (self,Path,lon,lat):
        """
        Reads individual tile files for full day of Level 3 MCD43 
        present on a given *Path* and returns a objects with
@@ -117,13 +118,7 @@ class McD43(object):
        # List of HDF files for a given directory,
        # typically corresponding to a date.
        #-----------------------------------------
-       self.verb = Verb
        self.SDS = SDS['LAND'] 
-
-       # Lazyload each MCD43 file, retrieving bounding boxes
-       # and assigning missing coordinate variables
-       # ---------------------------------------------------
-       self._lazyload(Path)
 
        # From a list of lat and lon, return the tile numbers v(vertical), h(horiz)
        # global coordinates (x,y) inside each tile
@@ -131,36 +126,51 @@ class McD43(object):
        self.nobs = len(lon)
        self._findTile(lon,lat)
        
+       # Lazy load each needed MCD43 file, retrieving bounding boxes
+       # and assigning missing coordinate variables
+       # -----------------------------------------------------------
+       self._lazyload(Path)
+
        # Read BRDF kernels at each observation location
        # ----------------------------------------------
-       self.interpBRDF()
+       self.interp2BRDF()
       
-          
+
+    def _getBoundsFromMetatada(self,ds):
+        """
+        Given a MCD43 granule xarray dataset, returns bounds
+        found in the metadata. Useful to verify correctness of
+        _tn2bbox().
+        """
+
+        meta = ds.attrs['ArchiveMetadata.0']
+        lons = np.array((float(meta.split('WESTBOUNDINGCOORDINATE')[1].split('=')[2].split('\n')[0]),
+                         float(meta.split('EASTBOUNDINGCOORDINATE')[1].split('=')[2].split('\n')[0]) ))
+        lats = np.array((float(meta.split('SOUTHBOUNDINGCOORDINATE')[1].split('=')[2].split('\n')[0]),
+                         float(meta.split('NORTHBOUNDINGCOORDINATE')[1].split('=')[2].split('\n')[0]) ))
+
+        meta = ds.attrs['StructMetadata.0']
+        xs, ys = np.zeros(2), np.zeros(2)
+        xs[0],ys[1] = np.array(meta.split('UpperLeftPointMtrs')[1].split('\n')[0].replace('=(','').replace(')','').split(',')).astype('float')
+        xs[1],ys[0] = np.array(meta.split('LowerRightMtrs')[1].split('\n')[0].replace('=(','').replace(')','').split(',')).astype('float')
+
+        return (lons, lats, xs, ys)
+        
 #---
-    def _lazyload(self,Path):
+    def _lazyLoadTiles(self,Path):
         """
         Lazy load each tile file, retrieve bounding boxes
         and add coordinate variables to xarray object.
         """
+        neededTiles = list(self.obsTileIndex.keys()) 
         TileFileNames = glob(Path + '*.hdf')
         self.Tiles = dict()
         for fn in TileFileNames:
             tn = os.path.basename(fn).split('.')[2]
+            if tn not in neededTiles: continue # only load what is needed
+            
             ds = xr.open_dataset(fn,engine='netcdf4')
             
-            ## xs, ys = np.zeros(2), np.zeros(2)
-            ## meta = ds.attrs['ArchiveMetadata.0']
-            ## lons = np.array((float(meta.split('WESTBOUNDINGCOORDINATE')[1].split('=')[2].split('\n')[0]),
-            ##                  float(meta.split('EASTBOUNDINGCOORDINATE')[1].split('=')[2].split('\n')[0]) ))
-            ## lats = np.array(( float(meta.split('SOUTHBOUNDINGCOORDINATE')[1].split('=')[2].split('\n')[0]),
-            ##                   float(meta.split('NORTHBOUNDINGCOORDINATE')[1].split('=')[2].split('\n')[0]) ))
-            
-            ## meta = ds.attrs['StructMetadata.0']
-            ## xs[0],ys[1] = np.array(meta.split('UpperLeftPointMtrs')[1].split('\n')[0].replace('=(','').replace(')','').split(',')).astype('float')
-            ## xs[1],ys[0] = np.array(meta.split('LowerRightMtrs')[1].split('\n')[0].replace('=(','').replace(')','').split(',')).astype('float')
-
-            ## self.Tiles[tn] = dict ( ds=ds, lons=lons, lats=lats, xs=xs, ys=ys )
-
             # Give dimensions sensible names
             # ------------------------------
             ds = ds.rename({'XDim:MOD_Grid_BRDF': 'x',
@@ -195,16 +205,56 @@ class McD43(object):
        v  = nV - 1 - (self.y-y_90)//dV     # tile vertical coordinate v in [0,18]
        h  = (self.x-x_180)//dH             # tile horizontal coordinate in [0,36]
 
-       self.obsTileIndex = dict()        # index of those observations on a given tile
+       self.obsTileIndex = dict()          # index of those observations on a given tile
        T1D = v*nH + h
-       for t1d in np.unique(T1D):        # loop over unique set of tiles
+       for t1d in np.unique(T1D):          # loop over unique set of tiles
            v = t1d // nH
            h = t1d % nH
            tn = 'h%02dv%02d'%(h,v)            # tile name, e.g., h00v18
            self.obsTileIndex[tn] = T1D==t1d   # save obs indices corresponding to this tile
        
 #---
-    def interpBRDF(self):
+    def interpBRDF(self,check=True):
+        """
+        Sample BRDF kernels from MCD43A1/B1 at observation locations.
+        """
+
+        for sds in self.SDS:
+           self.__dict__[sds] = xr.DataArray(np.ones((self.nobs,3)),
+                                             coords = { 'lon': ('nobs',self.lon),
+                                                        'lat': ('nobs',self.lat)},
+                                             dims=('nobs','k'))
+        for tn in self.obsTileIndex:
+
+           I  = self.obsTileIndex[tn]  # obs indices on this tile
+           ds = self.Tiles[tn]         # xarray corresponding to tile
+           
+           x, y = self.x[I], self.y[I] # obs coords on this tile
+
+           # print(tn,'lon = ',self.lon[I], 'lat = ',self.lat[I])
+           if check:
+               X, Y = ds.coords['x'], ds.coords['y']
+               if x.min()<X.min() or x.max()>X.max():
+                   raise ValueError('x out of range for '+tn)
+               if y.min()<Y.min() or y.max()>Y.max():
+                   raise ValueError('y out of range for '+tn)
+           
+           for sds in self.SDS:
+               z = ds[sds].sel(x=x, y=y,method='nearest').values
+               self.__dict__[sds][I,:] = z
+               if check:
+                   if np.all(np.isnan(z)):
+                       warn('>>> All interpolated values of <'+sds+'> are nan for '+tn)
+                   
+
+        # Convenient aliases
+        for sds in self.SDS:
+           #print(sds,self.__dict__[sds])
+           if sds in list(ALIAS.keys()):
+               self.__dict__[ALIAS[sds]] = self.__dict__[sds] 
+         
+#---
+    def interp2BRDF(self,check=True):
         """
         Sample BRDF kernels from MCD43A1/B1 at observation locations.
         """
@@ -223,10 +273,26 @@ class McD43(object):
            
            x, y = self.x[I], self.y[I] # obs coords on this tile
 
-           print(tn,'lon = ',self.lon[I], 'lat = ',self.lat[I])
+           # print(tn,'lon = ',self.lon[I], 'lat = ',self.lat[I])
+           if check:
+               X, Y = ds.coords['x'], ds.coords['y']
+               if x.min()<X.min() or x.max()>X.max():
+                   raise ValueError('x out of range for '+tn)
+               if y.min()<Y.min() or y.max()>Y.max():
+                   raise ValueError('y out of range for '+tn)
            
            for sds in self.SDS:
-               self.__dict__[sds][I,:] = ds[sds].sel(x=x, y=y,method='nearest').values
+               #z = ds[sds].sel(x=x, y=y,method='nearest').values
+               i = np.int32((x - X[0])/(X[1]-X[0]))
+               j = np.int32((Y[0] - y)/(Y[0]-Y[1])) # remember, y is N-S
+               print('i=',i,'j=',j)
+               z = ds[sds].values[i,j,:]
+               print(z.shape)
+               self.__dict__[sds][I,:] = z
+               if check:
+                   if np.all(np.isnan(z)):
+                       warn('>>> All interpolated values of <'+sds+'> are nan for '+tn)
+                   
 
         # Convenient aliases
         for sds in self.SDS:
@@ -258,7 +324,7 @@ def fluxnet(filen):
         lats += [Lat[I][0],]
 
     variables = dict( lons=np.array(lons), lats=np.array(lats) )
-    return pd.DataFrame( variables,index=Stations)     
+    return pd.DataFrame(variables,index=Stations)     
     
 
 if __name__ == "__main__":
