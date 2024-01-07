@@ -7,21 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 # [Unreleased]
 
-### Added
+### Added 
 
 ### Fixed
 
+- Modernized mcd43.py by making use of xarray and cartopy map transforms.
+
 ### Removed
+
+
 
 # [v1.0.7]
 
-### Added
-
 ### Fixed
+
+### Changed
 
 - converted active_aeronet.py to py3
 
-### Removed
+
 
 # [v1.0.6] 2023-09-08
 
@@ -29,9 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - mxd04 and vx04 will write out gridded angstrom exponent if available
 
-### Fixed
 
-### Removed
 
 # [v1.0.5] 2023-06-15
 
@@ -48,13 +50,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 # [v.1.0.4] 2023-06-07
 
-### Added
 
 ### Fixed
 
 - removed all instances of using the 'types' module in pyobs
 
-### Removed
+
 
 # [v1.0.3] 2023-05-25
 
@@ -64,23 +65,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - subroutine binObsCnt3D to binObs_py to counts obs in NNR L3 files
 - vx04.py VIIRS reader
 
-### Changed
-
-### Fixed
-
-### Removed
 
 # [v1.0.2] 2023-05-17
 
-### Added
-
-### Changed
 
 ### Fixed
 
 - mxd04.writeods now writes a 'post_anal' file. this saves the original retrieved AOD in the ods files
 
-### Removed 
 
 ## [1.0.1] - 2023-05-16
 
