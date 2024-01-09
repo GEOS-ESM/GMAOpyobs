@@ -10,6 +10,8 @@ import numpy  as np
 import xarray as xr
 import pandas as pd
 
+import xrctl  as ctl
+
 from glob import glob
 
 os.environ['HDF5_USE_FILE_LOCKING']='FALSE'
@@ -17,7 +19,7 @@ os.environ['HDF5_USE_FILE_LOCKING']='FALSE'
 class STATION(object):
 
     def __init__(self, stations, lons, lats,
-                 dataset, time=None, chunks=None,
+                 dataset, time_range=None, chunks=None,
                  verbose=False):
         """
         Specifies dataset to be sampled at obs location.
@@ -29,7 +31,7 @@ class STATION(object):
                           (must have extension .ctl or .xdf)
                           or a glob template (e.g., *.nc)
                  list,tuple: a list of file names
-        time: when using a GrADS templates, the time interval
+        time_range: when using a GrADS templates, the time interval
               to generate a list of files.
 
         """
@@ -50,13 +52,7 @@ class STATION(object):
         # a glob type of template
         # ---------------------------------------------------------
         elif isinstance(dataset,str):
-
-            if dataset.split('.')[-1] in ('ctl','xdf'):    # GrADS style control file
-                Files = _parseCTL(dataset,time)
-            else:
-                Files = dataset
-                
-            self.ds = xr.open_mfdataset(Files,parallel=True) # list of file names
+            self.ds = ctl.open_mfdataset(dataset,parallel=True) # special handles GrADS-style ctl if found
 
         # Save coordinates
         # ----------------
@@ -92,9 +88,9 @@ class STATION(object):
 
 if __name__ == "__main__":
 
+      from datetime import datetime
+    
       merra2_dn = '/Users/adasilva/data/merra2/Y2023/M04/'
-      aer_Nx = merra2_dn + '/MERRA2.tavg1_2d_aer_Nx.????????.nc4'
-
       fluxnet_fn = '/Users/adasilva/data/brdf/fluxnet_stations.csv'
 
       stations = pd.read_csv('/Users/adasilva/data/brdf/fluxnet_stations.csv',
@@ -106,10 +102,21 @@ if __name__ == "__main__":
       lats = stations['lats'].values
 
 
+      # Using file lists
+      # ----------------
+      aer_Nx = merra2_dn + '/MERRA2.tavg1_2d_aer_Nx.????????.nc4'
       stn = STATION(stations.index,lons,lats,aer_Nx,verbose=1)
-
       ds = stn.sample(Variables=['DUEXTTAU', 'DUCMASS'])
-
       print(ds)
+
+      # GrADS-style ctl
+      # ---------------
+      ctlfile = '/Users/adasilva/data/merra2/ctl/tavg1_2d_aer_Nx.ctl'
+      tbeg, tend = datetime(2023,4,7,0,30), datetime(2023,4,15,23,30)
+      stn2 = STATION(stations.index,lons,lats,ctlfile,
+                     time_range=(tbeg,tend),verbose=1)
+      ds2 = stn.sample(Variables=['DUEXTTAU', 'DUCMASS'])
+      print(ds2)
+
 
         
