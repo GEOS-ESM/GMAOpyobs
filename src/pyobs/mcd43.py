@@ -200,10 +200,10 @@ class McD43(object):
 
         # Convenience list of variables, coordinates and dimensions
         # ---------------------------------------------------------
-        self.coords, self.variables, self.dims = list(ds.coords), list(ds.variables), list(ds.dims)
-        for v in self.variables:
-            if v in self.coords:
-                self.variables.remove(v) # exclude coordinate variables
+        self.coords, self.variables, self.dims = list(ds.coords), list(ds.data_vars), list(ds.dims)
+        self.shapes = dict()
+        for vn in self.variables:
+            self.shapes[vn] = ds[vn].shape
 #---
     def interp(self, vname, method='nearest'):
         """
@@ -219,7 +219,7 @@ class McD43(object):
 
         # Container for output
         # --------------------
-        var = xr.DataArray(np.ones((self.nobs,3)),
+        var = xr.DataArray(np.ones((self.nobs,3))+np.nan,
                                      coords = { 'lon': ('nobs',self.lon),
                                                 'lat': ('nobs',self.lat)},
                                      dims=('nobs','k') )
@@ -227,30 +227,35 @@ class McD43(object):
         for tn in self.obsTileIndex:
 
            I  = self.obsTileIndex[tn]  # obs indices on this tile
-           ds = self.Tiles[tn]         # xarray corresponding to tile
-           
+
            x, y = self.x[I], self.y[I] # obs coords on this tile
 
-           if __DEBUG__:
-               X, Y = ds.coords['x'], ds.coords['y']
-               if x.min()<X.min() or x.max()>X.max():
-                   raise ValueError('x out of range for '+tn)
-               if y.min()<Y.min() or y.max()>Y.max():
-                   raise ValueError('y out of range for '+tn)
+           try:
+               ds = self.Tiles[tn]         # xarray corresponding to tile
 
-           if method == 'nearest':
-               vinterp = ds[vname].sel(x=x, y=y,method=method)
-           else:               
-               vinterp = ds[vname].interp(x=x, y=y,method=method)
+               if __DEBUG__:
+                   X, Y = ds.coords['x'], ds.coords['y']
+                   if x.min()<X.min() or x.max()>X.max():
+                       raise ValueError('x out of range for '+tn)
+                   if y.min()<Y.min() or y.max()>Y.max():
+                       raise ValueError('y out of range for '+tn)
 
-           if len(vinterp.shape) == 1:
-               var[I,0] = vinterp          
-           elif len(vinterp.shape) == 2:   
-               var[I,:] = vinterp
-           else:
-               raise Warning('Internal error, this should never happen!')
+               if method == 'nearest':
+                   vinterp = ds[vname].sel(x=x, y=y,method=method)
+               else:               
+                   vinterp = ds[vname].interp(x=x, y=y,method=method)
 
-        if len(vinterp.shape) == 1:
+               if len(vinterp.shape) == 1:
+                   var[I,0] = vinterp          
+               elif len(vinterp.shape) == 2:   
+                   var[I,:] = vinterp
+               else:
+                   raise Warning('Internal error, this should never happen!')
+
+           except:
+               pass  # values will remain underf
+            
+        if len(self.shapes[vname]) == 2:
            return var[:,0]               
         else:
            return var
