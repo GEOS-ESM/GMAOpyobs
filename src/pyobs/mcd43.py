@@ -332,7 +332,8 @@ if __name__ == "__main__":
       # Note: omit variables to interpolate all variables
       # -------------------------------------------------
       Variables = ['Nadir_Reflectance_Band1', 'Nadir_Reflectance_Band2']
-      V = brdf.interp_many(Variables,Index=stations.index)
+      #V = brdf.interp_many(Variables,Index=stations.index)
+      V = brdf.interp_many(Variables)
       print('\n Dataframe:')
       print(V)
 

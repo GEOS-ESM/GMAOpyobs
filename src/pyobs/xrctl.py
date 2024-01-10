@@ -96,24 +96,46 @@ def parse_ctl(ctlfile, time_range=None):
         dt = timedelta(seconds=secs)
 
     lm = int(nt)
-    
+    tbeg = _gat2dt(t0)
+    tend = tbeg + (lm-1) * dt
+
     if time_range is None:
-        tbeg = _gat2dt(t0)
-        tend = tbeg + (lm-1) * dt
+        t1, t2 = tbeg, tend
     else:
-        tbeg, tend = time_range
-        
+        t1, dummy = tbracket (tbeg, tend, dt, time_range[0])
+        dummy, t2 = tbracket (tbeg, tend, dt, time_range[1])
+
+    # print(t1,t2)
+    
     # Create file list
     # ----------------
     Files = []
-    t = tbeg
-    while t<=tend:
+    t = t1
+    while t<=t2:
         Files.append(_strTemplate(dset,time=t))
         t += dt
 
     return np.unique(Files)
 
+#--
+def tbracket (tbeg, tend, dt, t):
+    """
+    Given (t1,t2) find bracketing times on file.
+    """
+    if t<tbeg:
+        raise XRctlError('%s before %s'%(str(t),str(tbeg)))
+    elif t>tend:
+        raise XRctlError('%s after %s'%(str(t),str(tend)))
 
+    n = int((t-tbeg)/dt)
+    t1 = tbeg + n * dt
+    if t>t1:
+        t2 = t1 + dt
+    else:
+        t2 = t1
+        
+    return (t1,t2)
+  
 
 __Months__ = ['JAN','FEB','MAR','APR','MAY','JUN',
               'JUL','AUG','SEP','OCT','NOV','DEC']
@@ -238,9 +260,9 @@ if __name__ == "__main__":
     #print('Full Month\n', Files_all)
     #print('Partial Month\n', Files)
 
-    #ds1 = open_mfdataset(Files,parallel=True)
+    ds1 = open_mfdataset(Files,parallel=True)
 
-    ds2 = open_mfdataset(ctlfile,time_range=(tbeg,tend),parallel=True)
+    #ds2 = open_mfdataset(ctlfile,time_range=(tbeg,tend),parallel=True)
 
  
 
