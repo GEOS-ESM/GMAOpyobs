@@ -11,6 +11,7 @@ import pandas      as pd
     
 from glob     import glob
 
+
 #...........................................................................
 
 # The 2 relevant transforms
@@ -89,6 +90,15 @@ def _tn2bbox(TileName):
     
 
 #...........................................................................
+
+class NodataError(Exception):
+    """
+    Defines Nodata exceptions.
+    """
+    def __init__(self, value):
+        self.value = value
+    def __str__(self):
+        return repr(self.value)
 
 class McD43(object):
     """
@@ -176,6 +186,9 @@ class McD43(object):
  
             self.Tiles[tn] = ds
 
+        if len(self.Tiles) == 0:
+            raise NodataError("No valid MCD43 tiles for this day.")
+            
         # Add coordinate variables
         # ------------------------
         self.nx, self.ny = ds.dims['x'], ds.dims['y']
