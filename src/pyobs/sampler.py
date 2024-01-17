@@ -10,7 +10,7 @@ import numpy  as np
 import xarray as xr
 import pandas as pd
 
-import xrctl  as xc
+from pyobs import xrctl  as xc
 
 from glob import glob
 
