@@ -58,8 +58,8 @@ class STATION(object):
         # Save coordinates
         # ----------------
         self.stations = xr.DataArray(stations, dims='station')
-        self.lons = xr.DataArray(lons, dims='station')
-        self.lats = xr.DataArray(lons, dims='station')
+        self.lons = xr.DataArray(lons, dims='station',attrs=self.ds.coords['lon'].attrs)
+        self.lats = xr.DataArray(lats, dims='station',attrs=self.ds.coords['lat'].attrs)
 
         # TO DO: when using xESMF for regridding, pre-compute transforms here
         # -------------------------------------------------------------------
