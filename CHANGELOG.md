@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Modernized mcd43.py by making use of xarray and cartopy map transforms.
+- small bug fixes in sampler.STATIONS
 
 ### Removed
 
