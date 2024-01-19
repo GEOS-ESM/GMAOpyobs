@@ -14,7 +14,20 @@ from datetime        import datetime, timedelta
 from dateutil.parser import parse as isoparser
 from optparse        import OptionParser
 
-import pyobs.aircrafts as ac
+# When running under pyobs we will use this
+# from pyobs.aircrafts import platform
+
+# For now, hardwire DC8.
+platform = dict(
+DC8 = {'Platform':'dc8','names':['dc8','DC8','DC-8','dc-8','DC 8','dc 8','Dc','dC'],
+    'max_alt':13000.0,'base_speed':130.0,'speed_per_alt':0.0075,
+    'mean_speed': 136,
+    'max_speed':175.0,'max_speed_alt':6000.0,'descent_speed_decrease':15.0,
+    'climb_vert_speed':15.0,'descent_vert_speed':-10.0,'alt_for_variable_vert_speed':0.0,
+    'vert_speed_base':15.0,'vert_speed_per_alt':0.001,
+    'rate_of_turn':None,'turn_bank_angle':15.0,
+    'warning':False},
+)
 
 def write_traj(options,takeoff):
     """
@@ -37,7 +50,7 @@ def write_traj(options,takeoff):
         
         geod = pj.Geod(ellps='WGS84')
         _, _, dist = geod.inv(wp.lon[0:-1],wp.lat[0:-1],wp.lon[1:],wp.lat[1:])
-        speed = ac.platform[options.plane]['mean_speed'] # m/s
+        speed = platform[options.plane]['mean_speed'] # m/s
         dt = dist / speed
         time[1:] += np.array([timedelta(seconds=s) for s in dt.cumsum()])
         
@@ -46,8 +59,8 @@ def write_traj(options,takeoff):
     # ---------------------------
     traj = pd.DataFrame(dict(lon=wp.lon.values, lat=wp.lat.values), index=time)
     
-    if options.verbose:
-        print(traj)
+    #if options.verbose:
+    #    print(traj)
 
     # Write out results
     # -----------------
