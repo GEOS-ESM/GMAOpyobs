@@ -1,6 +1,7 @@
 """
    Python interface to several Level 2 observing systems, mostly from EOS.
-This is a port to Python 3 from Python 2 sources. In doing the portion,
+This is a port to Python 3 from Python 2 sources.
+In doing the portion,
 
 Packages that have been ignored
 -------------------------------
@@ -19,7 +20,10 @@ Packages that have been renamed
    calipso.py       renamed  calipso_l1p5.py
    calipso_lev2.py  renamed  calipso_l2.py
 
-"""
+IMPORTANT: all imports at this level have been commented out to minimize
+           dependencies.  Dependencies are only triggered if a particular
+           submodule is imported.
+          
 
 from .aeronet   import AERONET_L2
 from .aura      import AURA_L2
@@ -69,6 +73,8 @@ from .sev03     import SEV03 # inconsistent class name; Level 2?
 #from .sgp4      import getTrack, dayPeriod # requires f2py extension
 
 from .toms      import TOMS_L2
+
+"""
 
 
 

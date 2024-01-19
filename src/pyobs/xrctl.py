@@ -42,7 +42,7 @@ def open_mfdataset(paths,*args, time_range=None,**kwargs):
 
 def parse_ctl(ctlfile, time_range=None):
     """
-    Initialize an aggregated NC4ctl object.
+    Initialize an aggregated XRctl object.
     """
 
     # Parse CTL file

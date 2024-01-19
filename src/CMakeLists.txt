@@ -13,7 +13,7 @@
 
 # Python executables
 # ------------------  
-  install(PROGRAMS active_aeronet.py csBinner.py DESTINATION bin)
+  install(PROGRAMS active_aeronet.py csBinner.py wp2traj.py DESTINATION bin)
 
 # TO DO: Convert these to pure python
 #        ext_sampler.py  stn_sampler.py stn_xsect.py  trj_sampler.py  trj_xsect.py 
