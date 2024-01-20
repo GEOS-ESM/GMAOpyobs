@@ -39,7 +39,7 @@ def write_traj(options,takeoff):
     if 'city_aircraft_takeoff' in options.outFile:
         outFile = options.outFile.replace('city',city).replace('aircraft',options.plane).replace('takeoff',takeoff)
     else:
-        outfile = options.outfile
+        outFile = options.outFile
         
     # Generate time coordinates
     # -------------------------
