@@ -10,11 +10,23 @@ import numpy  as np
 import xarray as xr
 import pandas as pd
 
-import xrctl  as xc
-
+from datetime import datetime, timedelta
 from glob import glob
 
+from . import xrctl as xc
+
 os.environ['HDF5_USE_FILE_LOCKING']='FALSE'
+
+#............................................................
+class SamplerError(Exception):
+    """
+    Defines NC4ctl general exception errors.
+    """
+    def __init__(self, value):
+        self.value = value
+    def __str__(self):
+        return repr(self.value)
+
 
 class STATION(object):
 
@@ -53,8 +65,12 @@ class STATION(object):
         # a glob type of template
         # ---------------------------------------------------------
         elif isinstance(dataset,str):
-            self.ds = xc.open_mfdataset(dataset,time_range=time_range,parallel=True) # special handles GrADS-style ctl if found
+            # Special handles GrADS-style ctl if found
+            self.ds = xc.open_mfdataset(dataset,time_range=time_range,parallel=True)
 
+        else:
+            raise SamplerError("Invalid dataset specification.")
+            
         # Save coordinates
         # ----------------
         self.stations = xr.DataArray(stations, dims='station')
@@ -124,7 +140,12 @@ class TRAJECTORY(object):
         # a glob type of template
         # ---------------------------------------------------------
         elif isinstance(dataset,str):
+            # Special handles GrADS-style ctl if found
+            # ----------------------------------------
             self.ds = xc.open_mfdataset(dataset,parallel=True) # special handles GrADS-style ctl if found
+
+        else:
+            raise SamplerError("Invalid dataset specification.")
 
         # Save coordinates with proper attributes
         # ---------------------------------------
@@ -149,21 +170,100 @@ class TRAJECTORY(object):
         sampled = dict()
 
         for vn in Variables:
-            if self.verb: print('[ ] sampling ',vn)
+            if self.verb: print('[ ] sampling',vn)
             sampled[vn] = self.ds[vn].interp(time=self.times,lon=self.lons,lat=self.lats,method=method)
 
         return xr.Dataset(sampled).assign_coords({'time': self.times})
 
 #......................................................................................
 
+class TLETRAJ(TRAJECTORY):
+
+
+    def __init__ (self, tleFile, t1, t2, dt, *args, **kwargs):
+        """
+        Generate trajectory from Two-line (TLE) file.
+
+        t1, t2: datetime, time interval
+        dt    : timedelta, timestep
+
+        """
+
+        from .tle import TLE
+        
+        # Generate coordinates
+        # --------------------
+        times, lons, lats = TLE(tleFile).getSubpoint(t1,t2,dt)
+
+        # Initialize base class
+        # ---------------------
+        super().__init__(times, lons, lats, *args, **kwargs)
+        
+
+class WPTRAJ(TRAJECTORY):
+
+    def __init__ (self, wpFile, plane, takeoff, *args, **kwargs):
+        """
+        Generate trajectory from a CSV waypoint file.
+
+        """
+
+        from .waypoint import WAYPOINT
+
+        # Generate trajectory from waypoint file and takeoff time
+        # -------------------------------------------------------
+        traj = WAYPOINT(wpFile, plane).getTraj(takeoff)
+
+        # Initialize base class
+        # ---------------------
+        times, lons, lats = traj.index.values, traj['lon'].values, traj['lat'].values 
+        super().__init__(times, lons, lats, *args, **kwargs)
+        
+
+#......................................................................................
+
 if __name__ == "__main__":
 
+      pass
+  
+def test_tle():
+
+      tleFile = '/Users/adasilva/data/tle/terra/terra.2023-04-15.tle'
+
+      aer_Nx = '/Users/adasilva/data/merra2/ctl/tavg1_2d_aer_Nx.ctl' # GrADSctl
+
+      t1 = datetime(2023,4,15,0,0,0)
+      t2 = datetime(2023,4,15,6,0,0)
+      dt = timedelta(minutes=1)
+    
+      wt = TLETRAJ(tleFile,t1,t2,dt,aer_Nx,verbose=True)
+
+      ds = wt.sample()
+
+      return ds
+  
+def test_waypoint():
+
+      wpFile = '/Users/adasilva/data/wp/phillipines_waypoints.csv'
+
+      aer_Nx = '/Users/adasilva/data/merra2/ctl/tavg1_2d_aer_Nx.ctl' # GrADSctl
+
+      takeoff = '2023-04-15T08:00:00'       # either string or datetime
+      takeoff = datetime(2023,4,15,8,0,0)
+      
+      wt = WPTRAJ(wpFile,'DC8',takeoff,aer_Nx,verbose=True)
+      
+      ds = wt.sample()
+
+      return ds
+  
+def test_trajecgory():
+    
       from datetime import datetime
     
       merra2_dn = '/Users/adasilva/data/merra2/Y2023/M04/'
       aer_Nx = merra2_dn + '/MERRA2.tavg1_2d_aer_Nx.????????.nc4'
 
-      fluxnet_fn = '/Users/adasilva/data/brdf/fluxnet_stations.csv'
       traj_fn = '/Users/adasilva/data/merra2/DC8_20230426.nc'
 
       c = xr.open_dataset(traj_fn)
@@ -177,6 +277,8 @@ if __name__ == "__main__":
       
 def test_stations():
       
+      fluxnet_fn = '/Users/adasilva/data/brdf/fluxnet_stations.csv'
+
       stations = pd.read_csv('/Users/adasilva/data/brdf/fluxnet_stations.csv',
                              index_col=0)
 

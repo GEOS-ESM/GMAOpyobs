@@ -10,13 +10,19 @@ from datetime import datetime, timedelta
 
 class TLE(object):
 
-    def __init__(self,tle_filename):
+    """
+    Uses PyEphem to compute satellite sublon/sublat from a TLE file.
+    This code is not vectorized but seems good enough for government
+    business.
+    """
+    
+    def __init__(self,tleFilename):
         """
-        Loads TLE file.
+        Loads TLE file. Assumes 1 TLE per file.
         """
-        name = os.path.basename(tle_filename).split('.')[-1]
+        name = os.path.basename(tleFilename).split('.')[-1]
         tle = dict(name=name)
-        for line in open(tle_filename).readlines():
+        for line in open(tleFilename).readlines():
             if line[0] == '1': tle[1] = line.replace('\n','')
             if line[0] == '2': tle[2] = line.replace('\n','')
 
@@ -25,22 +31,23 @@ class TLE(object):
 
     def getSubpoint(self,t1,t2,dt):
         """
-        Returns 2-tuple with arrays of lons, lats (in degrees)
-        for a time interval [t1,t2] with time step dt.
+        Returns 3-tuple with arrays of times, lons, lats (in degrees)
+        for a time interval [t1,t2] with timestep dt.
 
         t1, t2: datetime, time interval
         dt    : timedelta, timestep
 
         """
-        sublon, sublat = [], []
+        times, sublon, sublat = [], [], []
         t = t1
         while t <= t2:
-            self.ephem.compute(ep.Date(t.isoformat(sep=' ').replace('-','/')))
+            self.ephem.compute(t)
+            times.append(t)
             sublon.append(np.rad2deg(self.ephem.sublong))
             sublat.append(np.rad2deg(self.ephem.sublat))
             t += dt
                        
-        return (np.array(sublon), np.array(sublat))
+        return (np.array(times), np.array(sublon), np.array(sublat))
 
 #.......................................................................
 
@@ -54,7 +61,7 @@ if __name__ == "__main__":
     t2 = datetime(2008,1,11,6,30,0)
     dt = timedelta(minutes=1)
 
-    sublon, sublat = tle.getSubpoint(t1,t2,dt)
+    times, sublon, sublat = tle.getSubpoint(t1,t2,dt)
 
     
                 
