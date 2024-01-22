@@ -1,12 +1,12 @@
 """
    Python interface to several Level 2 observing systems, mostly from EOS.
-This is a port to Python 3 from Python 2 sources. In doing the portion,
+This is a port to Python 3 from Python 2 sources.
 
 Packages that have been ignored
 -------------------------------
 
    lidar_l2.py    (interface to Pete's older lidar sampling)
-   oracles.py     (
+   oracles.py     
    dragon.py
    fpl.py
    g5_icartt.py
@@ -20,6 +20,16 @@ Packages that have been renamed
    calipso_lev2.py  renamed  calipso_l2.py
 
 """
+
+__version__ = '3.0.0'
+
+"""
+---------
+IMPORTANT: All imports at this level have been commented out to minimize
+---------  dependencies.  Dependencies are only triggered if a particular
+           submodule is imported, therefore portions of pyobs can be
+           exercised even if not all dependencies are satisfied.
+          
 
 from .aeronet   import AERONET_L2
 from .aura      import AURA_L2
@@ -69,6 +79,8 @@ from .sev03     import SEV03 # inconsistent class name; Level 2?
 #from .sgp4      import getTrack, dayPeriod # requires f2py extension
 
 from .toms      import TOMS_L2
+
+"""
 
 
 
