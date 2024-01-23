@@ -399,7 +399,7 @@ def trj_sampler():
                                 "                        - npzFile        Numpy NPZ file\n"+\
                                 "   inDataset            GrADS-style ctl or a shell-style wildcard string\n"+\
                                 "   iso_t1,iso_t2        optional beginning and ending time (ISO format)",
-                          version='1.0.1' )
+                          version='3.0.0' )
 
     parser.add_option("-a", "--algorithm", dest="method", default=method,
               help="Interpolation algorithm, one of linear, nearest (default=%s)"\
