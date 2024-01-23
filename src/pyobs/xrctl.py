@@ -16,7 +16,7 @@ from dateutil.relativedelta import relativedelta
     
 class XRctlError(Exception):
     """
-    Defines NC4ctl general exception errors.
+    Defines XRctl general exception errors.
     """
     def __init__(self, value):
         self.value = value
@@ -31,10 +31,12 @@ def open_mfdataset(paths,*args, time_range=None,**kwargs):
     is a GrADS-style ctl file, parses it generating a list of
     files that are then passed down to xr.open_mfdataset(). 
     """
+    #from netCDF4 import Dataset # only needed for hack below
     paths_ = paths
     if isinstance(paths,str):
         if paths_.split('.')[-1] in ('ctl','xdf', 'ddf'):  # GrADS style control file
                 paths_ = parse_ctl(paths,time_range)
+    #_nc = Dataset(paths_[0]) # hack to circumvent some bug in mfdataset, it seems to initialize netcdf.
     return xr.open_mfdataset(paths_,*args,**kwargs)
 
 #...........................................................................

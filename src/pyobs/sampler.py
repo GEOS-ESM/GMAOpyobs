@@ -11,6 +11,7 @@ import xarray as xr
 import pandas as pd
 
 from datetime import datetime, timedelta
+from dateutil.parser import parse as isoparser
 from glob import glob
 
 from . import xrctl as xc
@@ -220,7 +221,305 @@ class WPTRAJ(TRAJECTORY):
         super().__init__(times, lons, lats, *args, **kwargs)
         
 
-#......................................................................................
+#......................................  Station Sampler CLI ..........................................
+
+def stn_sampler():
+    
+    """
+    Parses command line and write files with resulting station sampling results. 
+    """
+
+    from optparse        import OptionParser
+
+    format = 'NETCDF4'
+    outFile = 'stn_sampler.nc'
+    method = 'linear'
+    
+#   Parse command line options
+#   --------------------------
+    parser = OptionParser(usage="Usage: %prog [OPTIONS] stnFile.csv inDataset [iso_t1 iso_t2]\n"+\
+                                "where: \n"+
+                                "   stnFile.csv          comma separated file with (iso_time,lon,lat)\n"+\
+                                "   inDataset            GrADS-style ctl or a shell-style wildcard string\n"+\
+                                "   iso_t1,iso_t2        optional beginning and ending time (ISO format)",
+                          version='3.0.0' )
+
+    parser.add_option("-o", "--output", dest="outFile", default=outFile,
+              help="Output NetCDF file name (default=%s)"\
+                          %outFile )
+
+    parser.add_option("-a", "--algorithm", dest="method", default=method,
+              help="Interpolation algorithm, one of linear, nearest (default=%s)"\
+                          %method)
+
+    parser.add_option("-V", "--vars", dest="Vars", default=None,
+              help="Variables to sample, comma delimited (default=All)")
+    
+    parser.add_option("-f", "--format", dest="format", default=format,
+              help="Output file format: one of NETCDF4, NETCDF4_CLASSIC, NETCDF3_64BIT,NETCDF3_CLASSIC (default=%s)"%format )
+
+    #parser.add_option("-I", "--isoTime",
+    #                  action="store_true", dest="isoTime",
+    #                  help="Include time in ISO format as well.")
+
+    parser.add_option("-v", "--verbose",
+                      action="store_true", dest="verbose",
+                      help="Verbose mode.")
+    
+    (options, args) = parser.parse_args()
+    
+    if len(args) == 4 :
+        stnFile, dataset, iso_t1, iso_t2 = args
+        t1, t2 = (isoparser(iso_t1), isoparser(iso_t2))
+    elif len(args) == 2 :
+        stnFile, dataset = args
+        t1, t2 = (None,None)
+    else:
+        parser.error("must have 2 or 4 arguments: stnFile inDataset [iso_t1 iso_t2]")
+
+    if options.Vars is not None:
+        options.Vars = options.Vars.split(',')
+
+    if options.format not in ["NETCDF4","NETCDF4_CLASSIC","NETCDF3_64BIT","NETCDF3_CLASSIC"]:
+        raise ValueError('Invalid format <%s>'%options.format)
+        
+    # Read coordinates from CSV file
+    # ------------------------------
+    df = pd.read_csv(stnFile, index_col=0)
+    stations = df.index.values
+    lons = df['lons'].values
+    lats = df['lats'].values
+
+    # Sample variables at station locations
+    # -------------------------------------
+    stn = STATION(stations,lons,lats,dataset,verbose=options.verbose)
+    ds = stn.sample(Variables=options.Vars,method=method)
+    if options.verbose:
+        print(ds)
+        print('- Writing',options.outFile)
+
+        
+    # Write out netcdf file
+    # ---------------------
+    ds.to_netcdf(options.outFile,format=options.format)
+
+#......................................  Trajectory Sampler CLI ..........................................
+
+def _getTrackTLE(tleFile,t1,t2,dt):
+    """
+    Get trajectory from TLE (.tle) file. It is assumed only 1 satellite per file.
+    """
+    from .tle import TLE
+    time, lon, lat = TLE(tleFile).getSubpoint(t1,t2,dt)
+    return (lon, lat, time)
+
+def _getTrackICT(ictFile,dt_secs):
+    """
+    Get trajectory from ICART (.ict) file.
+    """
+    from .icartt import ICARTT
+    m = ICARTT(ictFile)
+    lon, lat, tyme = m.Nav['Longitude'], m.Nav['Latitude'], m.Nav['Time']
+    mdt = (tyme[-1] - tyme[0]).total_seconds()/float(len(tyme)-1) # in seconds
+    idt = int(dt_secs/mdt+0.5)
+    return (lon[::idt], lat[::idt], tyme[::idt])
+
+def _getTrackHSRL(hsrlFile,dt_secs=60):
+    """
+    Get trajectory from HSRL HDF-5 file.
+    """
+    from .hsrl import HSRL
+    h = HSRL(hsrlFile,Nav_only=True)
+    lon, lat, tyme = h.lon[:].ravel(), h.lat[:].ravel(), h.tyme[:].ravel()
+    if dt_secs > 0:
+        dt = tyme[1] - tyme[0] 
+        idt = int(dt_secs/dt.total_seconds()+0.5)
+        return (lon[::idt], lat[::idt], tyme[::idt])
+    else:
+        idt = 1
+    return (lon[::idt], lat[::idt], tyme[::idt])
+
+def _getTrackCSV(csvFile):
+    """
+    Get trajectory from a CSV with (lon,lat,time) coordinates.
+    """
+    df = pd.read_csv(csvFile, index_col=0)
+    lon, lat, time = (df['lon'].values,df['lat'].values,pd.to_datetime(df.index).values)
+    return (lon,lat,time)   
+
+        
+    return ( np.array(lon), np.array(lat), np.array(tyme) )
+    
+def _getTrackNPZ(npzFile):
+    """
+    Get trajectory from a NPZ with (lon,lat,time) coordinates.
+    Notice that *time* is a datetime object.
+
+    Note: These are simple NPZ usually generated during Neural
+          Net or other type of python based utility. Not meant
+          for general consumption, but could be since NPZ files
+          are much more compact than CSV.
+
+    """
+    from .npz import NPZ
+    n = NPZ(npzFile)
+    if 'time' in n.__dict__:
+        return ( n.lon, n.lat, n.time)
+    elif 'tyme' in n.__dict__:
+        return ( n.lon, n.lat, n.tyme)
+    else:
+        raise ValueError('NPZ file has neither *time* nor *tyme* attribute.')
+
+def trj_sampler():
+    
+    """
+    Parses command line and write files with resulting trajectory sampling results. 
+    """
+
+    from .waypoint import WAYPOINT
+    from optparse        import OptionParser
+
+    format = 'NETCDF4'
+    rcFile  = 'trj_sampler.rc'
+    outFile = 'trj_sampler.nc'
+    dt_secs = 60
+    method = 'linear'
+    plane = 'DC8'
+
+#   Parse command line options
+#   --------------------------
+    parser = OptionParser(usage="Usage: %prog [OPTIONS] trjFile inDataset [iso_t1 iso_t2]|[takeOff_isoLocalTime(s)]\n"+\
+                                "where: \n"+
+                                "   trjFile              Trajecotry specification (time,lon,lat). One of these\n"+\
+                                "                        - csvFile        comman separated file\n"+\
+                                "                        - wpFile         waypoint file; in this case t1,t2,dt are \n"+\
+                                "                                         takeoff times\n"+\
+                                "                        - tleFile        two line element file (1 sat per file)\n"+\
+                                "                        - ictFile        ICARTT format file\n"+\
+                                "                        - npzFile        Numpy NPZ file\n"+\
+                                "   inDataset            GrADS-style ctl or a shell-style wildcard string\n"+\
+                                "   iso_t1,iso_t2        optional beginning and ending time (ISO format)",
+                          version='1.0.1' )
+
+    parser.add_option("-a", "--algorithm", dest="method", default=method,
+              help="Interpolation algorithm, one of linear, nearest (default=%s)"\
+                          %method)
+
+    parser.add_option("-o", "--output", dest="outFile", default=outFile,
+              help="Output NetCDF file (default=%s)"\
+                          %outFile )
+
+    parser.add_option("-f", "--format", dest="format", default=format,
+              help="Output file format: one of NETCDF4, NETCDF4_CLASSIC, NETCDF3_CLASSIC or NETCDF3_64BIT (default=%s)"%format )
+
+    parser.add_option("-p", "--plane", dest="plane", default='DC8',
+              help="aircraft: DC8, ER2, ... or 'snapshot' (default=%s)"%plane )
+
+    parser.add_option("-V", "--vars", dest="Vars", default=None,
+              help="Variables to sample, comma delimited (default=All)")
+    
+    parser.add_option("-t", "--trajectory", dest="traj", default=None,
+                      help="Trajectory file format: one of tle, ict, csv, wp, npz (default=trjFile extension except for wp)" )
+
+    parser.add_option("-d", "--dt_secs", dest="dt_secs", default=dt_secs,
+              type='int',
+              help="Timesetp in seconds for TLE sampling (default=%s)"%dt_secs )
+
+    #parser.add_option("-I", "--isoTime",
+    #                  action="store_true", dest="isoTime",
+    #                  help="Include ISO format time in output file.")
+
+    parser.add_option("-v", "--verbose",
+                      action="store_true", dest="verbose",
+                      help="Verbose mode.")
+
+    (options, args) = parser.parse_args()
+    
+    if options.traj == 'WP':
+        trjFile, dataset = args[0:2]
+        TakeOff = args[2:]
+    elif len(args) == 4:
+        trjFile, dataset, iso_t1, iso_t2 = args
+        t1, t2 = (isoparser(iso_t1), isoparser(iso_t2))
+        dt = timedelta(seconds=options.dt_secs)
+    elif len(args) == 2:
+        trjFile, dataset = args
+        t1, t2 = None, None
+    else:
+        parser.error("must have 2 or 4 arguments: tleFile|ictFile [iso_t1 iso_t2]")
+
+    if options.traj is None:
+        name, ext = os.path.splitext(trjFile)
+        options.traj = ext[1:]
+    options.traj = options.traj.upper()
+        
+    # Create consistent file name extension
+    # -------------------------------------
+    name, ext = os.path.splitext(options.outFile)
+    if 'NETCDF4' in options.format:
+        options.outFile = name + '.nc4'
+    elif 'NETCDF3' in options.format:
+        options.outFile = name + '.nc'
+    else:
+        raise ValueError('Invalid extension <%s>'%ext)
+
+    # Create trajectory
+    # -----------------
+    if options.traj == 'TLE':
+        if t1 is None:
+            raise ValueError('time range (t1,t2) must be specified when doing TLE sampling.')
+        lon, lat, time = _getTrackTLE(trjFile, t1, t2, dt)
+    elif options.traj == 'ICT':
+        lon, lat, time = _getTrackICT(trjFile,options.dt_secs)
+    elif options.traj == 'CSV':
+        lon, lat, time = _getTrackCSV(trjFile)
+    elif options.traj == 'WP':
+        pass # special handling
+    elif options.traj == 'NPZ':
+        lon, lat, time = _getTrackNPZ(trjFile)
+    elif options.traj == 'HSRL' or options.traj == 'H5': # deprecated, undocumented for now
+        lon, lat, time = _getTrackHSRL(trjFile,options.dt_secs)
+    else:
+        raise ValueError('cannot handle trajectory file format <%s>'%options.traj)
+
+
+    # Waypoints (several takeoff times)
+    # ---------------------------------
+    if options.traj == 'WP':
+        name, ext = os.path.splitext(options.outFile) # prepare to append to name
+        outFile = name + '.@city_@aircraft_@takeoff' + ext # template for addition
+        wp = WAYPOINT(trjFile, options.plane, verbose=options.verbose)
+        for takeoff in TakeOff:
+            outFile_ = outFile.replace('@city',wp.city).\
+                               replace('@aircraft',wp.plane).\
+                               replace('@takeoff',str(takeoff).replace(' ','T'))
+            df = wp.getTraj(takeoff)
+            time = df.index.values
+            lon = df['lon'].values
+            lat = df['lat'].values
+            trj = TRAJECTORY(time,lon,lat,dataset,verbose=options.verbose)
+            ds = trj.sample(Variables=options.Vars,method=method)
+
+            if options.verbose:
+                print('- Writing',outFile,'from',trjFile,'at takeoff',takeoff)
+
+            ds.to_netcdf(outFile_,format=options.format,compute=True)
+
+    # All else
+    # --------
+    else:
+        
+        trj = TRAJECTORY(time,lon,lat,dataset,verbose=options.verbose)
+        ds = trj.sample(Variables=options.Vars,method=method)
+        if options.verbose:
+            #print(ds)
+            print('- Writing',outFile,'from',trjFile,'(%s)'%options.traj)
+        
+        # Write out netcdf file
+        # ---------------------
+        ds.to_netcdf(options.outFile,format=options.format)
+
+#...................................... Simple Minded Testing ..........................................
 
 if __name__ == "__main__":
 

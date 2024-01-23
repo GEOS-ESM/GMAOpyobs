@@ -188,7 +188,7 @@ if __name__ == "__main__":
 
     # Instantiate waypoint
     # --------------------
-    wp = WAYPOINT(wpFile, options.plane, verbose=options.vernose)
+    wp = WAYPOINT(wpFile, options.plane, verbose=options.verbose)
 
     # Write out files
     # ---------------
