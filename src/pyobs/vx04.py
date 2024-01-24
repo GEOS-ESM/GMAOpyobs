@@ -1014,6 +1014,14 @@ def granules ( path, algo, sat, syn_time, coll='011', nsyn=8, verbose=False ):
     Algo = algo.split('_')[0]
     prod = 'AER{}'.format(Algo)
 
+    # Get sat_prod code
+    # ----------------
+    if sat.upper() == 'SNPP':
+        sat_prod = 'VNP' + prod
+    elif 'NOAA' in sat.upper():
+        sat_prod ='VN' + sat[-2:]
+
+
     # Determine synoptic time range
     # -----------------------------
     dt = timedelta(seconds = 12. * 60. * 60. / nsyn)
@@ -1027,8 +1035,8 @@ def granules ( path, algo, sat, syn_time, coll='011', nsyn=8, verbose=False ):
     while t < t2:
         if t >= t1:
             doy = t.timetuple()[7]
-            basen = "%s/%s/%s/%s/Level2/%04d/%03d/AER%s_L2_VIIRS_%s.A%04d%03d.%02d%02d.%s.*.nc"\
-                     %(path,prod,sat,coll,t.year,doy,Algo,sat,t.year,doy,t.hour,t.minute,coll)
+            basen = "%s/%s/%s/%04d/%03d/%s_L2_VIIRS_%s.A%04d%03d.%02d%02d.%s.*.nc"\
+                     %(path,sat_prod,coll,t.year,doy,prod,sat,t.year,doy,t.hour,t.minute,coll)
             try:
                 filen = glob(basen)[0]
                 Granules += [filen,]
