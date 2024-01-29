@@ -157,6 +157,8 @@ class G2GAOP(object):
         if vector and not self.vector:
             print('Warning: will not calculate PMOM because of inconsistent Mie Tables.')
             vector = False
+        else:
+            raise AOPError("not fully implemented yet, needs debugging")
         
         # All species on file or a subset
         # -------------------------------
@@ -247,6 +249,110 @@ class G2GAOP(object):
          
         return xr.Dataset(DA)
      
+    def getAOPext(self,Species=None,wavelength=None):
+        """
+        Returns an xarray Dataset with the following variables:
+
+        EXT:     aerosol extinction profile
+        SCA:     aerosol scattering profile
+        BSC:     aerosol backscatter profile
+        DEPOL:   aerosol depolarization ratio
+
+        On inout,
+        
+        Species:    None, str, or list. If None, all species on file,
+                    otherwise subset of species.
+                  
+        Wavelength: float, wavelength in nm.
+
+        TO DO: total attenuated backscatter, including molecular component
+
+        """
+
+        # All species on file or a subset
+        # -------------------------------
+        if Species is None:
+            Species = list(self.mt.keys())
+        if isinstance(Species,str):
+            Species = [Species,]
+
+        a = self.ds    # aerosol mixing ratio tracers
+
+        # GEOS files can be inconsistent when it comes to case
+        # ----------------------------------------------------
+        try:
+            dp = a['DELP'] 
+        except:
+            dp = a['delp']
+
+        # Handy arrays for extensive properties
+        # -------------------------------------
+        rh = a['RH']
+
+        # Relevant dimensions
+        # -------------------
+        space = rh.shape
+
+        ext, sca, bsc, depol1, depol2 = (np.zeros(space), np.zeros(space),
+                                         np.zeros(space), np.zeros(space),
+                                         np.zeros(space))
+
+        for s in Species:   # species
+
+            if self.verbose:
+                print('[] working on',s)
+            
+            Tracers = self.mt[s]['tracers']
+            mie = self.mt[s]['mie']
+
+            bin = 1
+            for q in Tracers:
+
+                if self.verbose:
+                    print('   -',q)
+
+                
+                q_conc = (a['AIRDENS'] * a[q]).values
+                ext_ = mie.getAOP('bext', bin, rh, wavelength=wavelength)
+                sca_ = mie.getAOP('bsca', bin, rh, wavelength=wavelength)
+                bsc_ = mie.getAOP('bbck', bin, rh, wavelength=wavelength)
+                p11_ = mie.getAOP('p11',  bin, rh, wavelength=wavelength)
+                p22_ = mie.getAOP('p22',  bin, rh, wavelength=wavelength)
+                
+                ext_ = ext_.values.squeeze() * q_conc
+                sca_ = sca_.values.squeeze() * q_conc
+                bsc_ = bsc_.values.squeeze() * q_conc
+                p11_ = p11_.values.squeeze() * q_conc
+                p22_ = p22_.values.squeeze() * q_conc
+
+                ext += ext_
+                sca += sca_
+                bsc += bsc_
+                depol1 += (p11_-p22_) * sca_
+                depol2 += (p11_+p22_) * sca_
+
+                bin += 1
+                
+        # Final normalization
+        # -------------------
+        ext *= 1000. # m-1 to km-1
+        sca *= 1000. # m-1 to km-1
+        bsc *= 1000. # m-1 to km-1
+        depol = depol1 / depol2
+
+        # Pack results into a Dataset
+        # ---------------------------
+        DA = dict(  EXT = xr.DataArray(ext,dims=rh.dims,coords=rh.coords),
+                    SCA = xr.DataArray(sca,dims=rh.dims,coords=rh.coords),
+                    BSC = xr.DataArray(bsc,dims=rh.dims,coords=rh.coords),
+                    DEPOL = xr.DataArray(depol,dims=rh.dims,coords=rh.coords)
+                 )
+
+        DA['DELP'] = dp
+        DA['AIRDENS'] = a['AIRDENS']
+        
+        return xr.Dataset(DA)
+     
 
     def getAOPintensive(self,Species=None,wavelength=None):
         """
@@ -286,8 +392,9 @@ def CLI_g2g_aop():
     # yaml.dump(rc,open('test.yml','w'))
 
     data = '/Users/adasilva/data/'
-    g = G2GAOP(data+'/sampled/*.nc',mieRootDir=data,verbose=True)
-    ds = g.getAOPrt(wavelength=550,vector=True)
+    g = G2GAOP(data+'/sampled/aer_Nv/*.nc',mieRootDir=data,verbose=True)
+    #ds = g.getAOPrt(wavelength=550)
+    ds = g.getAOPext(wavelength=550)
 
     return (g, ds)
 

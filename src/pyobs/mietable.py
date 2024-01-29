@@ -137,9 +137,7 @@ class MIETABLE(object):
       
       if name in self.AOPs:
          aop = self._getAOP(name, bin, wavelength=wavelength)
-         print('in getAOP, aop 1', aop.shape)
          aop = aop.interp(rh=rh)
-         print('in getAOP, aop 2', aop.shape)
 
       elif name == 'aot' :
          assert q_mass is not None, 'aot needs q_mass as input'
