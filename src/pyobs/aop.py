@@ -153,13 +153,14 @@ class G2GAOP(object):
 
         """
 
-
-        if vector and not self.vector:
-            print('Warning: will not calculate PMOM because of inconsistent Mie Tables.')
-            vector = False
-        else:
+        # This is not working yet
+        # -----------------------
+        if vector:
+            if not self.vector:
+                print('Warning: will not calculate PMOM because of inconsistent Mie Tables.')
+                vector = False            
             raise AOPError("not fully implemented yet, needs debugging")
-        
+       
         # All species on file or a subset
         # -------------------------------
         if Species is None:
@@ -180,7 +181,13 @@ class G2GAOP(object):
         # -------------------------------------
         rhodz = dp / GRAV
         dz = rhodz / a['AIRDENS']       # column thickness
-        rh = a['RH']
+
+        # Bound RH
+        # --------
+        rh = a['RH'].values
+        rh[rh<0] = 0.0
+        rh[rh>0.99] = 0.99
+        rh = xr.DataArray(rh,dims=dp.dims, coords=dp.coords)
 
         # Relevant dimensions
         # -------------------
@@ -285,9 +292,12 @@ class G2GAOP(object):
         except:
             dp = a['delp']
 
-        # Handy arrays for extensive properties
-        # -------------------------------------
+        # Bound RH
+        # --------
         rh = a['RH']
+        rh[rh<0] = 0.0
+        rh[rh>0.99] = 0.99
+        rh = xr.DataArray(rh,dims=dp.dims, coords=dp.coords)
 
         # Relevant dimensions
         # -------------------
@@ -393,8 +403,8 @@ def CLI_g2g_aop():
 
     data = '/Users/adasilva/data/'
     g = G2GAOP(data+'/sampled/aer_Nv/*.nc',mieRootDir=data,verbose=True)
-    #ds = g.getAOPrt(wavelength=550)
-    ds = g.getAOPext(wavelength=550)
+    ds = g.getAOPrt(wavelength=550)
+    #ds = g.getAOPext(wavelength=550)
 
     return (g, ds)
 
