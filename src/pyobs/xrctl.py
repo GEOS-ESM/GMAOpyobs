@@ -31,12 +31,18 @@ def open_mfdataset(paths,*args, time_range=None,**kwargs):
     is a GrADS-style ctl file, parses it generating a list of
     files that are then passed down to xr.open_mfdataset(). 
     """
-    #from netCDF4 import Dataset # only needed for hack below
+    from netCDF4 import Dataset # only needed for hack below
     paths_ = paths
     if isinstance(paths,str):
         if paths_.split('.')[-1] in ('ctl','xdf', 'ddf'):  # GrADS style control file
                 paths_ = parse_ctl(paths,time_range)
-    #_nc = Dataset(paths_[0]) # hack to circumvent some bug in mfdataset, it seems to initialize netcdf.
+        elif os.path.exists(paths_):
+            f = open(paths_,mode='rb')
+            head = f.read(4)
+            if head.upper() == 'DSET':
+                paths_ = parse_ctl(paths,time_range)
+                         
+    _nc = Dataset(paths_[0]) # hack to circumvent some bug in mfdataset, it seems to initialize netcdf.
     return xr.open_mfdataset(paths_,*args,**kwargs)
 
 #...........................................................................
@@ -252,10 +258,12 @@ def _gat2dt(gat):
 if __name__ == "__main__":
 
     ctlfile = '/Users/adasilva/data/merra2/ctl/tavg1_2d_aer_Nx.ctl'
+    ctlfile2 = '/Users/adasilva/data/merra2/ctl/tavg1_2d_aer_Nx'
 
     tbeg, tend = datetime(2023,4,7,0,30), datetime(2023,4,15,23,30)
     
     Files_all = parse_ctl(ctlfile)
+    Files_all2 = parse_ctl(ctlfile2)
 
     Files = parse_ctl(ctlfile, time_range=(tbeg,tend) )
 

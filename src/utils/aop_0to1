@@ -1,0 +1,51 @@
+#!/usr/bin/env python
+"""
+
+Convert aerosol optical tables from v0.0.0 to v1.0.0
+
+The versions of the LUT does refer to the revision of each table, but rather the structure of the netCDF files.
+
+v0.0.0: original file structure, e.g.
+
+	qext(radius, rh, lambda) 
+	pmom(nPol, nMom, radius, rh, lambda) 
+				
+v1.0.0: dimension ordering has been updated for cache optimization (use case: radiation and RT calculations). 
+            The following dimensions have been renamed: lambda --> channel, radius --> bin.
+			
+	qext(channel, bin, rh)
+	pmom(channel, bin, rh, nPol, nMom)
+
+
+"""
+
+import xarray as xr
+
+import sys
+import os
+
+if __name__ == "__main__":
+
+    if len(sys.argv)<3:
+        raise RuntimeError("Usage: out_dir aop_0to1 LUT_filename(s)")
+
+    outdir = sys.argv[1]
+    Files = sys.argv[2:]
+    os.system('mkdir -p '+outdir)
+
+    for lut in Files:
+
+        ds = xr.open_dataset(lut)
+        fn = os.path.basename(lut)
+
+        ds_ = ds.transpose('lambda','radius','rh','nPol','nMom',missing_dims="ignore").rename({'lambda':'channel','radius':'bin'})
+
+        lut_ = outdir + '/' + fn
+
+        print(lut_)
+        print(ds_)
+
+        ds_.to_netcdf(lut_)
+
+        
+        
