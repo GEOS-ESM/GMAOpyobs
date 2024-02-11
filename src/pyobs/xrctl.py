@@ -37,12 +37,16 @@ def open_mfdataset(paths,*args, time_range=None,**kwargs):
         if paths_.split('.')[-1] in ('ctl','xdf', 'ddf'):  # GrADS style control file
                 paths_ = parse_ctl(paths,time_range)
         elif os.path.exists(paths_):
-            f = open(paths_,mode='rb')
-            head = f.read(4)
-            if head.upper() == 'DSET':
+            head = open(paths_,mode='rb').read(4)  
+            #breakpoint()
+            if b'DSET' == head.upper():
                 paths_ = parse_ctl(paths,time_range)
-                         
-    _nc = Dataset(paths_[0]) # hack to circumvent some bug in mfdataset, it seems to initialize netcdf.
+        else:
+            raise XRctlError('Cannot find file '+paths_)
+            
+    if isinstance(paths_,(list,tuple)):          
+        _ = Dataset(paths_[0]) # hack to circumvent some bug in open_mfdataset, it seems to initialize netcdf.  
+        
     return xr.open_mfdataset(paths_,*args,**kwargs)
 
 #...........................................................................
@@ -256,6 +260,19 @@ def _gat2dt(gat):
 #...........................................................................
 
 if __name__ == "__main__":
+
+
+    fpctl = '/home/adasilva/opendap/fp/opendap/assim/inst3_3d_aer_Nv'
+    
+    tbeg, tend = datetime(2024,2,5,0), datetime(2024,2,10,0)
+    
+    Files = parse_ctl(fpctl, time_range=(tbeg,tend) )
+    print(Files)
+    
+    ds1 = open_mfdataset(fpctl,parallel=True,time_range=(tbeg,tend))
+    ds2 = open_mfdataset(Files,parallel=True)
+    
+def hold():
 
     ctlfile = '/Users/adasilva/data/merra2/ctl/tavg1_2d_aer_Nx.ctl'
     ctlfile2 = '/Users/adasilva/data/merra2/ctl/tavg1_2d_aer_Nx'
