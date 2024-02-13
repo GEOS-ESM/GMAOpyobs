@@ -28,18 +28,43 @@ except:
         'rate_of_turn':None,'turn_bank_angle':15.0,
         'warning':False},
 )
+
+def _greatCircle(startlong, endlong, startlat, endlat,nsegs):
+    """
+    Generate nsegs line segments between bounding coordinates using the great circle distance.
+    """
+
+    # calculate distance between points
+    g = pj.Geod(ellps='WGS84')
+    (az12, az21, dist) = g.inv(startlong, startlat, endlong, endlat)
+
+    # calculate line string along path with npts segments
+    lonlats = g.npts(startlong, startlat, endlong, endlat,nsegs-1)
+
+    # npts doesn't include start/end points, so prepend/append them
+    lonlats.insert(0, (startlong, startlat))
+    lonlats.append((endlong, endlat))
+
+    N = len(lonlats)
+    lon, lat = np.zeros(N), np.zeros(N)
+    for n in range(N):
+        lon[n], lat[n] = lonlats[n]
+
+    return (lon,lat)
     
 #..................................................................................................
 
 class WAYPOINT(object):
 
-    def __init__ (self, wpFile, plane, verbose=False ):
+    def __init__ (self, wpFile, plane, verbose=False, refine=1 ):
         """
         Loads CSV waypoint file. On input,
 
         plane: str, aircraft name as defined in module aircrafts.
                If plane='snapshot', a stationary trajectory at
                the takeoff time will be generated.
+
+        refine, int, number of segments in between each waypoint
         
         """
 
@@ -54,6 +79,23 @@ class WAYPOINT(object):
         self.N = self.wp.shape[0]
         self.plane = plane
 
+        # Use great circle distance to refine waypoints
+        # ---------------------------------------------
+        if refine > 1:
+            lon, lat = [], []
+            for n in range(self.N-1):
+                lon_, lat_ = _greatCircle(self.wp.lon[n],self.wp.lon[n+1],
+                                          self.wp.lat[n],self.wp.lat[n+1],refine)
+                lon.append(lon_[:-1])
+                lat.append(lat_[:-1])
+            lon.append(np.array([lon_[-1],]))
+            lat.append(np.array([lat_[-1],]))
+            lon = np.concatenate(lon)
+            lat = np.concatenate(lat)
+            #breakpoint()
+            self.wp = pd.DataFrame({'lon':lon, 'lat':lat})
+            self.N = self.wp.shape[0]
+            
         if self.verbose:
             print('- '+self.city+' is %s hours later than UTC'%self.utcOffset)
 
@@ -63,6 +105,9 @@ class WAYPOINT(object):
         Calculates trajectory for a given takeoff local time. On input,
 
         takeoff: str or time delta, local takeoff datetime in ISO format.
+
+        refine: float, factor for refining waypoints. Refine=10 will refine the waypoints
+                by adding 10 subintervals
 
         Returns DataFrame with trajecotry coordinates.
         
@@ -151,7 +196,7 @@ class WAYPOINT(object):
 
 
 #..................................................................................................
-if __name__ == "__main__":
+def CLI_wp2traj():
 
     plane = 'DC8'
     outFile = '@city_@aircraft_@takeoff.csv'
@@ -172,6 +217,9 @@ if __name__ == "__main__":
     parser.add_option("-f", "--format", dest="format", default=format,
               help="Output file format: one of 'csv' or 'netcdf' (default=%s)"%format )
 
+    parser.add_option("-r", "--refine", dest="refine", default=1,
+              help="Refine the waypoints with REFINE segments based on great circle distance (default=1)" )
+
 
     parser.add_option("-v", "--verbose",
                       action="store_true", dest="verbose",
@@ -188,9 +236,12 @@ if __name__ == "__main__":
 
     # Instantiate waypoint
     # --------------------
-    wp = WAYPOINT(wpFile, options.plane, verbose=options.verbose)
+    wp = WAYPOINT(wpFile, options.plane, refine=int(options.refine),verbose=options.verbose)
 
     # Write out files
     # ---------------
     for takeoff in TakeOff:
-        writeTraj(takeoff,self.outFile,self.format)
+        wp.writeTraj(takeoff,options.outFile,options.format)
+
+if __name__ == "__main__":
+    CLI_wp2traj()
