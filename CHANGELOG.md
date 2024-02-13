@@ -9,9 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added 
 
+- Module *waypoint* to handle waypoint files for flight modules
+- Module *sampler*, in pure python, including both station and 
+- Module *mietable* for handling GEOSmie tables
+- Module *aop*, first draft of a replaement to the old aod_calculator
+
+
+### Changed 
+
+- pyobs *__init__* method no longer loads submodules by default
+- stn_sample command line utility rewritten in terms of the new
+  *sampler* module
+- trj_sample command line utility rewritten in terms of the new
+  *sampler* module
+  - module *icartt* extebded with to_xarray() method.
+
 ### Fixed
 
-- Modernized mcd43.py by making use of xarray and cartopy map transforms.
+- Modernized mcd43.py by making use of xarray and cartopy map
+  transforms.
 
 ### Removed
 
@@ -21,7 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-### Changed
+### Changed 
 
 - converted active_aeronet.py to py3
 
