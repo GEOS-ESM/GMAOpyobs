@@ -2,9 +2,12 @@
    Class for reading ICARTT ASCII files.
 """
 
+import pandas as pd
+import xarray as xr
+import numpy as np
+
 from datetime import datetime, timedelta
 from numpy    import loadtxt, ones, NaN, concatenate, array, pi, cos, sin, arccos, zeros
-import numpy as np
 from glob     import glob
 import gzip
 import collections
@@ -14,6 +17,11 @@ from .config import Config
 MISSING = -99999.0
 ULOD    = -77777.0 # Upper Limit of Detection (LOD) flag
 LLOD    = -88888.0 # Lower Limit of Detection (LOD) flag
+
+ATTRS = ['FFI', 'PI', 'INSTITUTION', 'PRODUCT', 'CAMPAIGN', 'PI_CONTACT_INFO', 'PLATFORM', 'LOCATION',
+         'ASSOCIATED_DATA', 'INSTRUMENT_INFO', 'DATA_INFO', 'UNCERTAINTY', 'ULOD_FLAG', 'ULOD_VALUE',
+         'LLOD_FLAG', 'LLOD_VALUE', 'DM_CONTACT_INFO', 'PROJECT_INFO', 'STIPULATIONS_ON_USE', 'OTHER_COMMENTS',
+         'REVISION', 'RA']
 
 class ICARTT(object):
     """Reads ICARTT text files into Numpy arrays"""
@@ -61,7 +69,8 @@ class ICARTT(object):
         # ---------
         if FixUnits:
             for var in self.Units:
-                if self.Units[var].upper() == "FEET":
+                if self.Units[var].upper() == "FEET" or \
+                   self.Units[var].upper() == "ft" :
                     self.Units[var] = 'm'
                     self.__dict__[var] = 0.3048 * self.__dict__[var]
                 if self.Units[var].upper() == "KILOMETER" or \
@@ -92,9 +101,9 @@ class ICARTT(object):
                 self.Nav['Longitude'] = self.__dict__[var]
             if VAR in ('LATITUDE', 'LATITUDE_YANG', 'LATITUDE_DEG','FMS_LAT', 'GPS_LAT', 'LAT', 'GGLAT' ):
                 self.Nav['Latitude'] = self.__dict__[var]
-            if VAR in ('GPSALT', 'MSL_GPS_ALTITUDE_YANG', 'GPSALT_M', 'FMS_ALT_PRES', 'GPS_ALT', 'GGALT' ):
+            if VAR in ('GPSALT', 'MSL_GPS_ALTITUDE_YANG', 'GPSALT_M', 'FMS_ALT_PRES', 'GPS_ALT', 'GGALT','MSL_GPS_ALTITUDE'):
                 self.Nav['Altitude'] = self.__dict__[var]
-            if VAR in ('PRESSURE', 'PRESSURE_YANG', 'C_STATICPRESSURE', 'PSXC'):
+            if VAR in ('PRESSURE', 'PRESSURE_YANG', 'C_STATICPRESSURE', 'STATIC_PRESSURE','PSXC',):
                 self.Nav['Pressure'] = self.__dict__[var]
 
         # Navigation shorthands
@@ -116,6 +125,51 @@ class ICARTT(object):
 
             self.tyme = self.tyme[iGood]
             self._shorthands()
+
+#--
+    def to_xarray (self,**kwargs):
+        """
+        Return ICARTT object as a Xarray dataset.
+        """
+
+        # Coordinates
+        # -----------
+        coords = dict()
+        cLong =  dict(time='Time', lon='Longitude', lat='Latitude', prs='Pressure', alt='Altitude')
+        cUnits = dict(time=None, lon='degrees_east', lat='degrees_north', prs='hPa', alt='m')
+        for c in ('time','lon','lat','prs','alt'):
+            attrs = dict(long_name=cLong[c])
+            if cUnits[c] is not None:
+                attrs['Units'] = cUnits[c]
+            coords[c.lower()] = xr.DataArray(self.__dict__[c],dims=('time',), attrs=attrs)
+
+        # Data Variables
+        # --------------
+        data_vars = dict()
+        for var in self.Vars:
+            if var.upper() not in ('LON', 'LONGITUDE','LAT', 'LATITUDE', 'PRS','ALT'):
+                attrs = dict(long_name = self.Long[var].replace('_',' '))
+                try:
+                    attrs['units'] = self.Units[var]
+                except:
+                    pass
+                data_vars[var] = xr.DataArray(self.__dict__[var], dims=('time',), attrs=attrs)
+
+        # Global Attributes
+        # -----------------
+        attrs = dict(Conventions = 'ICARTT',
+                     BEGIN_DATE = self.beg_date.isoformat(), REVISION_DATE=self.rev_date.isoformat(),
+                    )
+        for a in self.__dict__:
+            if a in ATTRS:
+                attrs[a] = self.__dict__[a]
+                
+        # Create Xarray dataset
+        # ---------------------
+        ds = xr.Dataset(data_vars, coords=coords, attrs=attrs)
+
+        return ds
+        
 #--
     def _readManyFiles (self,Filenames,Alias=None):
         """
@@ -300,6 +354,8 @@ class ICARTT(object):
             self.Time_Mid = (self.__dict__[self.Vars[0]]+self.__dict__[self.Vars[1]])/2.
             self.Vars = self.Vars + ['Time_Mid',]
 
+        
+            
         # Find time variables
         # -------------------
         Tvar = []
@@ -321,7 +377,8 @@ class ICARTT(object):
         T0 = self.beg_date
         for tvar in Tvar:
             self.__dict__[tvar] = array([ T0+timedelta(seconds=t) for t in self.__dict__[tvar] ])
-
+            if tvar not in self.Long:
+                self.Long[tvar] = tvar.replace('_',' ')
             
         # Find representative time variable
         # ---------------------------------
@@ -338,6 +395,7 @@ class ICARTT(object):
         """
         Add navigation short hands: lon, lat, etc.
         """
+        self.time = self.Nav['Time']
         self.lon = self.Nav['Longitude']
         self.lat = self.Nav['Latitude']
         self.prs = self.Nav['Pressure']
