@@ -115,11 +115,11 @@ class TRAJECTORY(object):
         dataset: the input dataset, it can be one of these
                  xr.Dataset: an xarray dataset
                  string : either a GrASDS-style control file
-                          (must have extension .ctl or .xdf)
                           or a glob template (e.g., *.nc)
                  list,tuple: a list of file names
-        time_range: when using a GrADS templates, the time interval
-              to generate a list of files.
+        parallel: bool, whether to open dataset in parallel and return
+                  dask arrays.
+        verbose: bool, what it says.
 
         """
 
