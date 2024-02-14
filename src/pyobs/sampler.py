@@ -106,7 +106,7 @@ class STATION(object):
 
 class TRAJECTORY(object):
 
-    def __init__(self, times, lons, lats, dataset, verbose=False):
+    def __init__(self, times, lons, lats, dataset, parallel=True,verbose=False):
         """
         Specifies dataset to be sampled at obs location.
         On input,
@@ -126,6 +126,8 @@ class TRAJECTORY(object):
         self.verb = verbose
         self.times = xr.DataArray(times,dims='time')
         time_range = times.min(), times.max()
+        if isinstance(time_range[0],np.datetime64):
+            time_range = pd.to_datetime(time_range)
         
         # If dataset is an xarray dataset we are good to go
         # -------------------------------------------------
@@ -135,15 +137,16 @@ class TRAJECTORY(object):
         # If dataset is a list of files...
         # --------------------------------
         elif isinstance(dataset,(list,tuple)):
-            self.ds = xr.open_mfdataset(dataset,parallel=True)
+            self.ds = xr.open_mfdataset(dataset,parallel=parallel)
 
         # If datatset is a string it is either a GrADS-style ctl or
         # a glob type of template
         # ---------------------------------------------------------
         elif isinstance(dataset,str):
+
             # Special handles GrADS-style ctl if found
             # ----------------------------------------
-            self.ds = xc.open_mfdataset(dataset,parallel=True) # special handles GrADS-style ctl if found
+            self.ds = xc.open_mfdataset(dataset,time_range=time_range,parallel=parallel) # special handles GrADS-style ctl if found
 
         else:
             raise SamplerError("Invalid dataset specification.")

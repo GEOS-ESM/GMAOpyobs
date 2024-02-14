@@ -46,7 +46,7 @@ def open_mfdataset(paths,*args, time_range=None,**kwargs):
             
     if isinstance(paths_,(list,tuple)):          
         _ = Dataset(paths_[0]) # hack to circumvent some bug in open_mfdataset, it seems to initialize netcdf.  
-        
+      
     return xr.open_mfdataset(paths_,*args,lock=False,**kwargs)
 
 #...........................................................................
