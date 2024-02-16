@@ -1,7 +1,7 @@
 """
    Extends Xarray's open_mfdaset by recognizing GrADS-style control (ctl) files.
 
-   Note: CHSUB not supported. 
+   Note: CHSUB not supported yet. but should. 
 
 """
 
@@ -9,6 +9,8 @@ import os
 
 import xarray as xr
 import numpy  as np
+
+from glob import glob
 
 from datetime import datetime, timedelta
 from dateutil.parser import parse         as isoparser
@@ -25,7 +27,7 @@ class XRctlError(Exception):
 
 #...........................................................................
 
-def open_mfdataset(paths,*args, time_range=None,**kwargs):
+def open_mfdataset(paths,*args, time_range=None, lock=False, **kwargs):
     """
     Intercepts call to xarray open_mfdataset() and if *paths*
     is a GrADS-style ctl file, parses it generating a list of
@@ -38,16 +40,15 @@ def open_mfdataset(paths,*args, time_range=None,**kwargs):
                 paths_ = parse_ctl(paths,time_range)
         elif os.path.exists(paths_):
             head = open(paths_,mode='rb').read(4)  
-            #breakpoint()
             if b'DSET' == head.upper():
                 paths_ = parse_ctl(paths,time_range)
         else:
-            raise XRctlError('Cannot find file '+paths_)
+            paths_ = glob(paths_) # We need this here because of the netcdf hack
             
     if isinstance(paths_,(list,tuple)):          
         _ = Dataset(paths_[0]) # hack to circumvent some bug in open_mfdataset, it seems to initialize netcdf.  
       
-    return xr.open_mfdataset(paths_,*args,lock=False,**kwargs)
+    return xr.open_mfdataset(paths_,*args,lock=lock,**kwargs)
 
 #...........................................................................
 
@@ -272,7 +273,7 @@ if __name__ == "__main__":
     ds1 = open_mfdataset(fpctl,parallel=True,time_range=(tbeg,tend))
     ds2 = open_mfdataset(Files,parallel=True)
     
-def hold():
+def _hold():
 
     ctlfile = '/Users/adasilva/data/merra2/ctl/tavg1_2d_aer_Nx.ctl'
     ctlfile2 = '/Users/adasilva/data/merra2/ctl/tavg1_2d_aer_Nx'
