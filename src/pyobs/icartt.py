@@ -26,17 +26,22 @@ ATTRS = ['FFI', 'PI', 'INSTITUTION', 'PRODUCT', 'CAMPAIGN', 'PI_CONTACT_INFO', '
 class ICARTT(object):
     """Reads ICARTT text files into Numpy arrays"""
 
-    def __init__ (self,Filenames,Alias=None,FixUnits=True,Verbose=False,only_good=False):
+    def __init__ (self,Filenames, Alias=None, FixUnits=True, to_NaN=True,
+                       Verbose=False,only_good=False):
         """
         Loads one or more ICART text files, creating an ICART object.
         When entering many files, make sure they are in chronological
         order.
         
-        FixUnits --- Convert some enginering units to MKS
-
-        only_good --- filter out points where lat/lon is missing. Needed for trj_sampler.py
+        Filenames:  str, one or multiple file names; wild cards are fair game
+        Alias:      dict, used for changing variable names if so desired
+        FixUnits:   bool, convert some enginering units to MKS
+        to_NaN:     bool, convert missing values, LLOD, ULOD and other bad data to NaN
+        only_good:  bool, filter out points where lat/lon is missing. Needed for trj_sampler.py
+        
         """
 
+        self.to_NaN = to_NaN
         self.verb = Verbose
 
         # Many files
@@ -153,7 +158,10 @@ class ICARTT(object):
                     attrs['units'] = self.Units[var]
                 except:
                     pass
-                data_vars[var] = xr.DataArray(self.__dict__[var], dims=('time',), attrs=attrs)
+                x = self.__dict__[var]
+                if isinstance(x[0],np.float64):
+                    x = x.astype('float32') # to conserve memory
+                data_vars[var] = xr.DataArray(x, dims=('time',), attrs=attrs)
 
         # Global Attributes
         # -----------------
@@ -169,6 +177,40 @@ class ICARTT(object):
         ds = xr.Dataset(data_vars, coords=coords, attrs=attrs)
 
         return ds
+  
+    def to_netcdf(self, filename, ds=None, engine='netcdf4', format='NETCDF4',
+                        compression=True, complevel=2, **kwargs):
+        """
+        Convert to xarray and write netcdf file withn optional compression.
+        
+        filename:    str, netcdf file name
+        ds:          option xr.Dataset if it has already been generated.
+        engine:      str, default to  'netcdf4'
+        format:      str, defaults tp 'NETCDF4'
+        compression: uses zlib compression with level *complevel*
+        **kwargs:    passed to xarray to_netcdf() method
+        
+        """
+        
+        # Convert to xr.Dataset if *(ds* not proivided on input
+        # -----------------------------------------------------
+        if ds is None:
+            ds = self.to_xarray()
+            
+        # Create encoding for each variable
+        # ---------------------------------
+        if compression:
+            encode = {}
+            for v in ds.data_vars:
+            
+                # chunksizes = [ chunks[d] for d in ds_[v].dims ]
+                encode[v] = {'compression':'gzip', 'complevel':complevel,
+                              "zlib": True, "complevel": complevel}
+                         # 'chunksizes':chunksizes}
+    
+                ds.to_netcdf(filename,engine=engine,format=format,encoding=encode, **kwargs)
+        else:
+                ds.to_netcdf(filename,engine=engine,format=format,**kwargs)
         
 #--
     def _readManyFiles (self,Filenames,Alias=None):
@@ -234,7 +276,7 @@ class ICARTT(object):
             delim = None
         self.n_header, self.FFI = int(tokens[0]), int(tokens[1])
         if self.FFI != 1001:
-            raise ValueError("Only ICARTT File Format Index 1001 currently support; got %d"%self.FFI)
+            raise ValueError("Only ICARTT File Format Index 1001 currently supported; got %d"%self.FFI)
 
         self.PI = f.readline().replace('\n','').replace('\r','')
         self.INSTITUTION = f.readline().replace('\n','').replace('\r','')
@@ -306,14 +348,14 @@ class ICARTT(object):
         for rc in list(cf.keys()):
             self.__dict__[rc.upper()] = cf(rc)
         
-        # Read relevant columns from MAPSS granule
+        # Read relevant columns from ICARTT granule
         # ----------------------------------------
         formats = ()
         converters = {}
         i = 0
         for name in self.Vars:
-            converters[i] = lambda s: float(s or MISSING)
-            formats += ('f4',)
+            converters[i] = lambda s: np.float32(s or MISSING)
+            formats += (np.float32,)
             i += 1
 
         # Read the data
@@ -344,17 +386,16 @@ class ICARTT(object):
             v = ones(N)
             for j in range(N):
                 v[j] = data[j][i]
-            bad = (v==MISSING_)|(v==LLOD)|(v==ULOD)|(v<=BAD_)
-            v[bad] = NaN              # use NaN for bad data
-            self.__dict__[self.Vars[i]] = v
+            if self.to_NaN:
+                bad = (v==MISSING_)|(v==LLOD)|(v==ULOD)|(v<=BAD_)
+                v[bad] = NaN              # use NaN for bad data
+            self.__dict__[self.Vars[i]] = v 
 
         # For some merged files there is no mid time, so create one
         # ---------------------------------------------------------
         if (self.Vars[0].upper()=='TIME_START') and (self.Vars[1].upper()=='TIME_STOP'):
             self.Time_Mid = (self.__dict__[self.Vars[0]]+self.__dict__[self.Vars[1]])/2.
-            self.Vars = self.Vars + ['Time_Mid',]
-
-        
+            self.Vars = self.Vars + ['Time_Mid',]    
             
         # Find time variables
         # -------------------
@@ -401,7 +442,7 @@ class ICARTT(object):
         self.prs = self.Nav['Pressure']
         self.alt = self.Nav['Altitude']
 
-        #--
+    #--
     def fixNav(self, nav):
         """
         Given a possibly longer ICARTT object *nav* with (Longitude,Latitude,Altitude)
