@@ -110,7 +110,7 @@ if __name__ == "__main__":
         lut_ = outdir + '/' + fn + '4'
         print('- Writing out',lut_)
             
-        #ds_.to_netcdf(lut_,engine='netcdf4',format='NETCDF4',encoding=encode)     
-        ds_.to_netcdf(lut_)
+        ds_.to_netcdf(lut_,engine='netcdf4',format='NETCDF4',encoding=encode)     
+        #ds_.to_netcdf(lut_)
 
         
