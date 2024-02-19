@@ -226,7 +226,7 @@ class WPTRAJ(TRAJECTORY):
 
 #......................................  Station Sampler CLI ..........................................
 
-def stn_sampler():
+def CLI_stnSampler():
     
     """
     Parses command line and write files with resulting station sampling results. 
@@ -373,7 +373,8 @@ def _getTrackNPZ(npzFile):
     else:
         raise ValueError('NPZ file has neither *time* nor *tyme* attribute.')
 
-def trj_sampler():
+#................................................................................
+def CLI_trjSampler():
     
     """
     Parses command line and write files with resulting trajectory sampling results. 

@@ -11,10 +11,10 @@ v0.0.0: original file structure, e.g.
 	pmom(nPol, nMom, radius, rh, lambda) 
 				
 v1.0.0: dimension ordering has been updated for cache optimization (use case: radiation and RT calculations). 
-            The following dimensions have been renamed: lambda --> channel, radius --> bin.
+            The following dimensions have been renamed: lambda --> wavelength, radius --> bin.
 			
-	qext(channel, bin, rh)
-	pmom(channel, bin, rh, nPol, nMom)
+	qext(wavelength, bin, rh)
+	pmom(wavelength, bin, rh, p, m)
 
 
 """
@@ -91,8 +91,8 @@ if __name__ == "__main__":
         # Chunks for each dimension
         # --------------------------
         chunks = dict(ds_.dims)
-        chunks['channel'] = 1
-        chunks['p'] = 1
+        chunks['bin'] = 1
+        chunks['wavelength'] = 1
 
         # Create encoding for each variable
         # ---------------------------------
@@ -100,7 +100,7 @@ if __name__ == "__main__":
         for v in ds_.data_vars:
             
             chunksizes = [ chunks[d] for d in ds_[v].dims ]
-            encode[v] = {'compression':'gzip', 'complevel':2,
+            encode[v] = {#'compression':'gzip', 'complevel':2,
                          "zlib": True, "complevel": 2,
                          'chunksizes':chunksizes}
 

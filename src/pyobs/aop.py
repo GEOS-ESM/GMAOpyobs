@@ -4,6 +4,8 @@ mixing ratio files (aer_Nv) and GEOSmie optics tables.
 
 """
 
+__version__ = '1.0.0'
+
 import numpy  as np
 import xarray as xr
 import yaml
@@ -95,28 +97,31 @@ class AOPError(Exception):
 
 class G2GAOP(object):
 
-    def __init__ (self,aerFiles,varMap=None,mieRootDir=None,band=False,verbose=False):
+    def __init__ (self,aerFiles,config=None,mieRootDir=None,band=False,verbose=False):
         """
         Lazy loads GOCART mixing ratio *=(aer_NV) files and corresponding Mie tables.
 
         aerFiles:  str, list, or Dataset with aerosol tracers
-        varMap:    str or YAML file handle mapping GOCART variables to specific
-                   bins in Mie Tables. If None, uses internal default.
+        config:    str or YAML file handle with Mie Table file names and mapping of GOCART
+                   variables to specific bins in Mie Tables. If None, uses internal default.
         mieRootDir: str, prepend string to mieTable file names.
         band:       bool, by default monochromatic tables are loaded.
-                    If band is True, tables for radiation will be loaded instead.
+                    If band is True, tables for radiation bands will be loaded instead.
 
         """
 
-        if varMap is None:
-            varMap = G2G_MieMap
+        if config is None:
+            config = G2G_MieMap
             
         self.verbose = verbose
         if isinstance(aerFiles,xr.Dataset):
-            self.ds = aerFiles
+            self.aer = aerFiles
         else:
-            self.ds = xc.open_mfdataset(aerFiles)
-        self.mt = yaml.safe_load(varMap)
+            self.aer = xc.open_mfdataset(aerFiles)
+
+        # Load YAML Config File
+        # ---------------------
+        self.mieTable = yaml.safe_load(config)
 
         if mieRootDir is None:
             edir = ''
@@ -125,8 +130,8 @@ class G2GAOP(object):
 
         # Band or monochromatic files
         # ---------------------------
-        for s in self.mt:
-            m = self.mt[s]
+        for s in self.mieTable:
+            m = self.mieTable[s]
             if band:
                 m['mie'] = mt.MIETABLE(edir+m['bandFile'])
             else:
@@ -134,11 +139,11 @@ class G2GAOP(object):
 
         # Check consistency of Mie tables accross species
         # -----------------------------------------------
-        dims =  self.mt['DU']['mie'].getDims() 
+        dims =  self.mieTable['DU']['mie'].getDims() 
         self.vector = True
         self.p, self.m = (0,0)
-        for s in self.mt:
-           dims_ = self.mt[s]['mie'].getDims() # dimensions of Mie Tables, a dict
+        for s in self.mieTable:
+           dims_ = self.mieTable[s]['mie'].getDims() # dimensions of Mie Tables, a dict
            if dims_['p'] is None:
                self.vector = False  # if some species is missing pmom, cannot do vector RT
                print('Warning: PMOM is missing for '+s)
@@ -149,8 +154,8 @@ class G2GAOP(object):
                self.p, self.m = None, None
                print('Warning: cannot handle variable size phase matrix for PMOM')
                break
-           self.p = max(self.p,dims_['p'])
-           self.m = max(self.m,dims_['m'])
+           self.p = max(self.p,dims_['p']) # max number of entries in phase matrix
+           self.m = max(self.m,dims_['m']) # max number of moments in phase matrix
         
     def getAOPrt(self,Species=None,wavelength=None,vector=False):
         """
@@ -160,12 +165,15 @@ class G2GAOP(object):
         Species:  None, str, or list. If None, all species on file,
                   otherwise subset of species.
                   
-        Wavelength: float, wavelength in nm. 
+        Wavelength: float, wavelength in nm.
+
+        vector:     bool, whether to return full phase matrix or
+                    asymmetry parameter.
 
         """
 
-        # This is not working yet
-        # -----------------------
+        # Tables must have be consistent across species
+        # ---------------------------------------------
         if vector:
             if not self.vector:
                 print('Warning: will not calculate PMOM because of inconsistent Mie Tables.')
@@ -174,11 +182,11 @@ class G2GAOP(object):
         # All species on file or a subset
         # -------------------------------
         if Species is None:
-            Species = list(self.mt.keys())
+            Species = list(self.mieTable.keys())
         if isinstance(Species,str):
             Species = [Species,]
 
-        a = self.ds    # aerosol mixing ratio tracers
+        a = self.aer    # aerosol mixing ratio tracers
 
         # GEOS files can be inconsistent when it comes to case
         # ----------------------------------------------------
@@ -191,30 +199,24 @@ class G2GAOP(object):
         # -------------------------------------
         rhodz = dp / GRAV
         dz = rhodz / a['AIRDENS']       # column thickness
-
-        # Bound RH
-        # --------
-        rh = a['RH'].values
-        rh[rh<0] = 0.0
-        rh[rh>0.99] = 0.99
-        rh = xr.DataArray(rh,dims=dp.dims, coords=dp.coords)
-
+        rh = a['RH']
+        
         # Relevant dimensions
         # -------------------
         space = rh.shape
-        aot, ssa, g = np.zeros(space), np.zeros(space), np.zeros(space)
+        aot, sca, g = np.zeros(space), np.zeros(space), np.zeros(space)
         if vector:
             ns = np.prod(space)
             p, m = self.p, self.m
-            pmom = np.zeros(space+(p,m)).reshape((ns,p,m))
+            pmom = np.zeros((ns,p,m)) # flatten space dimensions for convenience
         
-        for s in Species:   # species
+        for s in Species:   # loop over species
 
             if self.verbose:
                 print('[] working on',s)
             
-            Tracers = self.mt[s]['tracers']
-            mie = self.mt[s]['mie']
+            Tracers = self.mieTable[s]['tracers']
+            mie = self.mieTable[s]['mie']
 
             bin = 1
             for q in Tracers:
@@ -223,52 +225,62 @@ class G2GAOP(object):
                     print('   -',q)
 
                 q_mass = rhodz * a[q]
-                aot_, ssa_, g_ = mie.getAOPscalar(bin, rh, q_mass, wavelength)
+                aot_   = mie.getAOP('aot',bin, rh, q_mass, wavelength).values
+                sca_   = mie.getAOP('sca',bin, rh, q_mass, wavelength).values
+                g_     = mie.getAOP('g',bin, rh, q_mass, wavelength).values
 
-                aot_ = aot_.values.squeeze()
-                ssa_ = ssa_.values.squeeze()
-                g_ = g_.values.squeeze()
-                
                 aot += aot_
-                scat_ = ssa_ * aot_  # scattering AOT
-                ssa += scat_         # accumulate scattering AOT here
-                g += g_ * scat_
+                sca += sca_    
+                g   += sca_ * g_ 
 
                 if vector:
-                    #breakpoint()
-                    pmom_ = mie.getAOP('pmom', bin, rh,
-                                       q_mass=q_mass, wavelength=wavelength)
-                    #breakpoint()
                     
-                    pmom_ = pmom_.values.squeeze() * scat_.reshape(space+(1,1))
+                    pmom_ = mie.getAOP('pmom', bin, rh, q_mass=q_mass,
+                                        wavelength=wavelength)
                     p_, m_ = pmom_.shape[-2:]
+                    pmom_ = pmom_.values.reshape((ns,p_,m_))
                     
                     pmom[:,:,:m_] += pmom_[:,:,:] # If species have fewer moments, pad wih zeros
+                else:
+
+                    g   += sca_ * g_ 
+
                     
                 bin += 1
                 
         # Final normalization of SSA and g
         # --------------------------------
-        g = g / ssa       # ssa here as TOTAL scattering AOT
+        ssa = sca / aot   
         if vector:
-             pmom = pmom / ssa.reshape(space+(1,1))
+             pmom = pmom / sca.reshape((ns,1,1))
              pmom = pmom.reshape(space+(p,m))
-        ssa = ssa / aot   # ssa is now single scattering albedo.
+        else:
+             g = g / sca      
+
+
+        A = dict (AOT = {'long_name':'Aerosol Optical Thickness', 'units':'1'},
+                  SSA = {'long_name':'Aerosol Single Scattering Albedo', 'units':'1'},
+                  G = {'long_name':'Aerosol Asymmetry Parameter', 'units':'1'},
+                  PMOM = {'long_name':'Aerosol Phase Matrix (non-zero elements)', 'units':'1'}
+                  )
 
         # Pack results into a Dataset
         # ---------------------------
-        DA = dict( AOT = xr.DataArray(aot,dims=rh.dims,coords=rh.coords),
-                    SSA = xr.DataArray(ssa,dims=rh.dims,coords=rh.coords),
-                    G = xr.DataArray(g,dims=rh.dims,coords=rh.coords)
+        DA = dict( AOT = xr.DataArray(aot,dims=rh.dims,coords=rh.coords,attrs=A['AOT']),
+                   SSA = xr.DataArray(ssa,dims=rh.dims,coords=rh.coords,attrs=A['SSA']),
                  )
 
         DA['DELP'] = dp
         DA['AIRDENS'] = a['AIRDENS']
-        
+
         if vector:
+            coords = dict(rh.coords).copy()
+            coords['p'] = mie.ds.coords['p']
             dims = space + ('p', 'm')
-            DA['pmom'] = DataArray(pmom, dims=rh.dims+('p','m') )
-         
+            DA['PMOM'] = DataArray(pmom, dims=rh.dims+('p','m'),coords=coords)
+        else:
+            DA['G'] = xr.DataArray(g,dims=rh.dims,coords=rh.coords)
+            
         return xr.Dataset(DA)
      
     def getAOPext(self,Species=None,wavelength=None):
@@ -294,11 +306,11 @@ class G2GAOP(object):
         # All species on file or a subset
         # -------------------------------
         if Species is None:
-            Species = list(self.mt.keys())
+            Species = list(self.mieTable.keys())
         if isinstance(Species,str):
             Species = [Species,]
 
-        a = self.ds    # aerosol mixing ratio tracers
+        a = self.aer    # aerosol mixing ratio tracers
 
         # GEOS files can be inconsistent when it comes to case
         # ----------------------------------------------------
@@ -307,12 +319,7 @@ class G2GAOP(object):
         except:
             dp = a['delp']
 
-        # Bound RH
-        # --------
         rh = a['RH']
-        rh[rh<0] = 0.0
-        rh[rh>0.99] = 0.99
-        rh = xr.DataArray(rh,dims=dp.dims, coords=dp.coords)
 
         # Relevant dimensions
         # -------------------
@@ -327,8 +334,8 @@ class G2GAOP(object):
             if self.verbose:
                 print('[] working on',s)
             
-            Tracers = self.mt[s]['tracers']
-            mie = self.mt[s]['mie']
+            Tracers = self.mieTable[s]['tracers']
+            mie = self.mieTable[s]['mie']
 
             bin = 1
             for q in Tracers:
@@ -338,17 +345,15 @@ class G2GAOP(object):
 
                 
                 q_conc = (a['AIRDENS'] * a[q]).values
-                ext_ = mie.getAOP('bext', bin, rh, wavelength=wavelength)
-                sca_ = mie.getAOP('bsca', bin, rh, wavelength=wavelength)
-                bsc_ = mie.getAOP('bbck', bin, rh, wavelength=wavelength)
-                p11_ = mie.getAOP('p11',  bin, rh, wavelength=wavelength)
-                p22_ = mie.getAOP('p22',  bin, rh, wavelength=wavelength)
-                
-                ext_ = ext_.values.squeeze() * q_conc
-                sca_ = sca_.values.squeeze() * q_conc
-                bsc_ = bsc_.values.squeeze() * q_conc
-                p11_ = p11_.values.squeeze() * q_conc
-                p22_ = p22_.values.squeeze() * q_conc
+                ext_ = mie.getAOP('bext', bin, rh, wavelength=wavelength).values
+                sca_ = mie.getAOP('bsca', bin, rh, wavelength=wavelength).values
+                bsc_ = mie.getAOP('bbck', bin, rh, wavelength=wavelength).values
+                p11_ = mie.getAOP('p11',  bin, rh, wavelength=wavelength).values
+                p22_ = mie.getAOP('p22',  bin, rh, wavelength=wavelength).values
+
+                ext_ = ext_ * q_conc
+                sca_ = sca_ * q_conc
+                bsc_ = bsc_ * q_conc
 
                 ext += ext_
                 sca += sca_
@@ -365,12 +370,20 @@ class G2GAOP(object):
         bsc *= 1000. # m-1 to km-1
         depol = depol1 / depol2
 
+        # Attributes
+        # ----------
+        A = dict (EXT = {'long_name':'Aerosol Extinction Coefficient', 'units':'km-1'},
+                  SCA = {'long_name':'Aerosol Scattering Coefficient', 'units':'km-1'},
+                  BSC = {'long_name':'Aerosol Backscatter Coefficient', 'units':'km-1'},
+                  DEPOL = {'long_name':'Depolarization Ratio', 'units':'1'}
+                  )
+        
         # Pack results into a Dataset
         # ---------------------------
-        DA = dict(  EXT = xr.DataArray(ext,dims=rh.dims,coords=rh.coords),
-                    SCA = xr.DataArray(sca,dims=rh.dims,coords=rh.coords),
-                    BSC = xr.DataArray(bsc,dims=rh.dims,coords=rh.coords),
-                    DEPOL = xr.DataArray(depol,dims=rh.dims,coords=rh.coords)
+        DA = dict(  EXT = xr.DataArray(ext.astype('float32'),dims=rh.dims,coords=rh.coords,attrs=A['EXT']),
+                    SCA = xr.DataArray(sca.astype('float32'),dims=rh.dims,coords=rh.coords,attrs=A['SCA']),
+                    BSC = xr.DataArray(bsc.astype('float32'),dims=rh.dims,coords=rh.coords,attrs=A['BSC']),
+                    DEPOL = xr.DataArray(depol.astype('float32'),dims=rh.dims,coords=rh.coords,attrs=A['DEPOL'])
                  )
 
         DA['DELP'] = dp
@@ -382,7 +395,7 @@ class G2GAOP(object):
     def getAOPintensive(self,Species=None,wavelength=None):
         """
         Returns an xarray Dataset with intensive properties.
-        
+
         Species:  None, str, or list. If None, all species on file,
                   otherwise subset of emissions.
                   
@@ -409,29 +422,134 @@ class G2GAOP(object):
 
 #....................................................................................
 
-def CLI_g2g_aop():
+def CLI_aop():
     """
-    Command line interface
+    Parses command line and write files with Aerosol Optical Properties.
+    """
+
+    import sys
+    import os
+    
+    from optparse        import OptionParser
+
+    format = 'NETCDF4'
+    config = None   # use internal config.
+    outYAML = 'aop.yaml'
+    outFile = 'aop_%{w}nm.nc4'
+    aop = 'ext'
+    rootDir = './'
+    wavelengths='550'
+
+#   Parse command line options
+#   --------------------------
+    parser = OptionParser(usage="Usage: %prog [OPTIONS] aerDataset [iso_t1 iso_t2]\n"+\
+                                "   aerDataset          GrADS-style ctl or a shell-style wildcard string\n"+\
+                                "                       with aerosol mixing ratios, either gridded or sampled"+\
+                                "   iso_t1,iso_t2       optional beginning and ending time (ISO format)",
+                          version=__version__ )
+
+    parser.add_option("-a", "--aop", dest="aop", default='ext',
+              help="AOP collection, one of 'rt' or'ext' (default=%s)"%aop)
+    
+    parser.add_option("-c", "--config", dest="inYAML", default=config,
+              help="optional built in configuration (default='internal')")
+
+    parser.add_option("-d", "--dump",
+                      action="store_true", dest="dump",
+                      help="Dumps internal YAML configuration to stdout and stops.")
+
+    parser.add_option("-f", "--format", dest="format", default=format,
+              help="Output file format: one of NETCDF4, NETCDF4_CLASSIC, NETCDF3_CLASSIC or NETCDF3_64BIT (default=%s)"%format )
+
+    parser.add_option("-o", "--output", dest="outFile", default=outFile,
+              help="Output NetCDF file name; use %%{w} as a placeholder for wavelength (default=%s)"\
+                          %outFile )
+
+    parser.add_option("-r", "--root", dest="rootDir", default=rootDir,
+              help="Root directory for MieTables (default=%s)"\
+                          %rootDir )
+
+    parser.add_option("-V", "--vector",
+                      action="store_true", dest="vector",
+                      help="Vector mode.")
+
+    parser.add_option("-v", "--verbose",
+                      action="store_true", dest="verbose",
+                      help="Verbose mode.")
+
+    parser.add_option("-w", "--wavelengths", dest="wavelengths", default=wavelengths,
+              help="Comma separated wavelengths (default=%s)"\
+                          %wavelengths )
+
+    (options, args) = parser.parse_args()
+    
+    if options.dump:
+        print(G2G_MieMap)
+        sys.exit(0)
+
+    if len(args) == 1:
+        aerDataset = args[0]
+        t1, t2 = None, None
+    elif len(args) == 3:
+        aerDataset, t1, t2 = args
+        t1, t2 = None, None
+    else:
+        parser.error("must have 1 or 3 arguments: aerDataset [iso_t1 iso_t2]")
+
+        
+    # Create consistent file name extension
+    # -------------------------------------
+    name, ext = os.path.splitext(options.outFile)
+    if 'NETCDF4' in options.format:
+        options.outFile = name + '.nc4'
+    elif 'NETCDF3' in options.format:
+        options.outFile = name + '.nc'
+    else:
+        raise ValueError('Invalid extension <%s>'%ext)
+
+
+    # Compute AOPs
+    # ------------
+    aer = xc.open_mfdataset(aerDataset,parallel=True) 
+    g = G2GAOP(aer,mieRootDir=options.rootDir,verbose=options.verbose)
+    for w_ in options.wavelengths.split(','):
+        w = float(w_)
+        if options.aop == 'ext':
+            ds = g.getAOPext(wavelength=w)
+        elif options.aop == 'rt':
+            ds = g.getAOPrt(wavelength=w,vector=options.vector)
+        else:
+            print(options.aop)
+            raise AOPError('Unknow AOP option '+options.aop)
+
+        filename = options.outFile.replace('%{w}',w_)
+        if options.verbose:
+            print('Writing',filename)
+        ds.to_netcdf(filename)  # TO DO: Chunking and compression
+    
+#....................................................................................
+def Test_g2g_aop():
+    """
+    Simple tests.
     """
 
     # yaml.dump(rc,open('test.yml','w'))
 
     data = '/Users/adasilva/data/'
-    aer_Nv = '/Users/adasilva/data/sampled/CAMP2Ex-GEOS-MODISonly-aer-Nv-P3B_Model_*.nc'
+    aer_Nv = '/Users/adasilva/data/sampled/aer_Nv/CAMP2Ex-GEOS-MODISonly-aer-Nv-P3B_Model_*.nc'
     
     aer = xr.open_mfdataset(aer_Nv) # still having trouble with parallel
 
     g = G2GAOP(aer,mieRootDir=data,verbose=True)
-    ds = g.getAOPrt(wavelength=550,vector=True)
+    rts = None # g.getAOPrt(wavelength=550,vector=False)
+    rtv = g.getAOPrt(wavelength=550,vector=True)
+    ext = None # g.getAOPext(wavelength=550)
 
-    #g = G2GAOP(data+'/sampled/*aer-Nv*.nc',mieRootDir=data,verbose=True)
-    #ds = g.getAOPext(wavelength=550)
-
-    return (g, ds)
+    return (g, rts, rtv, ext)
 
 if __name__ == "__main__":
 
-    g, ds = CLI_g2g_aop
+    g, rts, rtv, ext = Test_g2g_aop
 
 
 

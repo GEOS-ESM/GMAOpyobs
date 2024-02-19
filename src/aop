@@ -3,5 +3,5 @@
    Station sampler command line utility
 """
 
-from pyobs.sampler import CLI_stnSampler
-CLI_stnSampler()
+from pyobs.aop import CLI_aop
+CLI_aop()

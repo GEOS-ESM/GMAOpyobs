@@ -3,5 +3,5 @@
    Trajectory sampler command line utility
 """
 
-from pyobs.sampler import trj_sampler
-trj_sampler()
+from pyobs.sampler import CLI_trjSampler
+CLI_trjSampler()
