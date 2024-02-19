@@ -1,5 +1,6 @@
 *~
 *.nc
+*.nc4
 *.npz
 /cmake/
 /@cmake/
