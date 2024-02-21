@@ -13,8 +13,8 @@ v0.0.0: original file structure, e.g.
 v1.0.0: dimension ordering has been updated for cache optimization (use case: radiation and RT calculations). 
             The following dimensions have been renamed: lambda --> wavelength, radius --> bin.
 			
-	qext(wavelength, bin, rh)
-	pmom(wavelength, bin, rh, p, m)
+	qext(bin,wavelength, rh)
+	pmom(bin,wavelength, rh, p, m)
 
 
 """
