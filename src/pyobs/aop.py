@@ -451,8 +451,8 @@ def CLI_aop():
     parser.add_option("-a", "--aop", dest="aop", default='ext',
               help="AOP collection, one of 'rt' or'ext' (default=%s)"%aop)
     
-    parser.add_option("-c", "--config", dest="inYAML", default=config,
-              help="optional built in configuration (default='internal')")
+    parser.add_option("-c", "--config", dest="config", default=None,
+              help="optional configuration YAML file (default='buit-in')")
 
     parser.add_option("-d", "--dump",
                       action="store_true", dest="dump",
@@ -507,11 +507,15 @@ def CLI_aop():
     else:
         raise ValueError('Invalid extension <%s>'%ext)
 
+    if options.config is not None:
+        config = open(options.config,'r')
+    else:
+        config = None
 
     # Compute AOPs
     # ------------
     aer = xc.open_mfdataset(aerDataset,parallel=True) 
-    g = G2GAOP(aer,mieRootDir=options.rootDir,verbose=options.verbose)
+    g = G2GAOP(aer,config=config,mieRootDir=options.rootDir,verbose=options.verbose)
     for w_ in options.wavelengths.split(','):
         w = float(w_)
         if options.aop == 'ext':

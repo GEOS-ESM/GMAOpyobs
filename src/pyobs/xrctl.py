@@ -34,9 +34,12 @@ def open_mfdataset(paths,*args, time_range=None, lock=False, **kwargs):
     files that are then passed down to xr.open_mfdataset(). 
     """
     from netCDF4 import Dataset # only needed for hack below
+    opendap = False
     paths_ = paths
     if isinstance(paths,str):
-        if paths_.split('.')[-1] in ('ctl','xdf', 'ddf'):  # GrADS style control file
+        if 'http' in paths_[:4]:
+            opendap = True
+        elif paths_.split('.')[-1] in ('ctl','xdf', 'ddf'):  # GrADS style control file
                 paths_ = parse_ctl(paths,time_range)
         elif os.path.exists(paths_):
             head = open(paths_,mode='rb').read(4)  
@@ -46,9 +49,12 @@ def open_mfdataset(paths,*args, time_range=None, lock=False, **kwargs):
             paths_ = glob(paths_) # We need this here because of the netcdf hack
             
     if isinstance(paths_,(list,tuple)):          
-        _ = Dataset(paths_[0]) # hack to circumvent some bug in open_mfdataset, it seems to initialize netcdf.  
-      
-    return xr.open_mfdataset(paths_,*args,lock=lock,**kwargs)
+        _ = Dataset(paths_[0])    # hack to circumvent some bug in open_mfdataset, it seems to initialize netcdf.
+
+    if opendap:
+        return xr.open_dataset(paths_)
+    else:
+        return xr.open_mfdataset(paths_,*args,lock=lock,**kwargs)
 
 #...........................................................................
 
