@@ -277,9 +277,14 @@ class Vx04_L2(object):
        # ---------------------------------------------------
        if self.algo in ['DB_LAND','DB_DEEP']:
            if self.algo == 'DB_LAND':
-               iGood = self.sfc_reflectance[:,0].mask & ~self.sfc_reflectance[:,1].mask & ~self.sfc_reflectance[:,2].mask
+               iGood = self.Spectral_Surface_Reflectance[:,0].mask & \
+                       ~self.Spectral_Surface_Reflectance[:,1].mask & \
+                       ~self.Spectral_Surface_Reflectance[:,2].mask
            elif self.algo == 'DB_DEEP':
-               iGood = ~self.sfc_reflectance[:,0].mask & ~self.sfc_reflectance[:,1].mask & ~self.sfc_reflectance[:,2].mask
+               iGood = ~self.Spectral_Surface_Reflectance[:,0].mask & \
+                       ~self.Spectral_Surface_Reflectance[:,1].mask & \
+                       ~self.Spectral_Surface_Reflectance[:,2].mask
+
            for sds in self.SDS:
                rank = len(self.__dict__[sds].shape)
                if rank == 1:
