@@ -159,8 +159,8 @@ translate_sat = {'Suomi-NPP': 'SNPP'}
 
 KX = dict ( SNPP_DT_OCEAN = 337,
             SNPP_DT_LAND  = 336,
-            SNPP_DB_OCEAN  = 335,
-            SNPP_DB_DEEP   = 334,
+            SNPP_DB_OCEAN  = 334,
+            SNPP_DB_DEEP   = 335,
             SNPP_DB_LAND  = 333, 
           )
 
