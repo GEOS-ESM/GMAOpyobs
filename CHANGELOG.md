@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 ### Fixed
+- fixed granules search in vx04.py to use updates to VIIRS path logic
+- added a DB_DEEP retrieval.  splits up land retrievals into the 2 pathways - one that uses the 412 surface channel and one that does not
 
 ### Removed
 
