@@ -1,0 +1,7 @@
+#!/usr/bin/env python
+"""
+   Trajectory sampler command line utility
+"""
+
+from pyobs.sampler import CLI_trjSampler
+CLI_trjSampler()

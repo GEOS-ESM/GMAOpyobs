@@ -1,5 +1,8 @@
 *~
+*.hdf
+*.h5
 *.nc
+*.nc4
 *.npz
 /cmake/
 /@cmake/
