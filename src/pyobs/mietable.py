@@ -144,13 +144,13 @@ class MIETABLE(object):
 
       if wavelength is not None:
           wavelength_ = wavelength / 1e9 # User species nm, tables use m
-          
+
       bin_ = bin - 1
       if 'wavelength' in self.ds[name].dims:
          assert wavelength_ is not None, \
                 'wavelength should be provided to get variable ' \
                 + name + ' in file ' + filename
-         wavelength_ = min(max(wavelength, self.min_wavelength), self.max_wavelength)
+         wavelength_ = min(max(wavelength_, self.min_wavelength), self.max_wavelength)
          da = self.ds[name].isel({'bin':[bin_]}).interp({'wavelength': [wavelength_]})
       else:
          da = self.ds[name].isel({'bin':[bin_]})
