@@ -32,7 +32,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   *sampler* module 
 - trj_sample command line utility rewritten in terms of the new 
   *sampler* module 
-  - module *icartt* extebded with to_xarray() method. 
+  - module *icartt* extebded with to_xarray() method.
+  - mietables.py wavelength bug fix (nm to m unit conversion)
 
 ### Fixed 
 
