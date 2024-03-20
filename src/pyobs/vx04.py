@@ -90,7 +90,7 @@ SDS = dict (
                'Precipitable_Water')
         )
 # NOTE: DEEP BLUE does not have cloud information in their files.
-
+SDS['DB_DEEP'] = SDS['DB_LAND']
 
 
 # AOD Channels
@@ -102,6 +102,8 @@ CHANNELS = dict (
                    DT_SREF = ( 480., 670., 2250. ),
                    DB_SREF = (412., 488., 670. ),
                 )
+
+CHANNELS['DB_DEEP'] = CHANNELS['DB_LAND']
 
 ALIAS = dict (  Longitude = 'lon',
                 Latitude = 'lat',
@@ -155,9 +157,10 @@ BAD, MARGINAL, GOOD, BEST = ( 0, 1, 2, 3 ) # DT QA marks
 translate_sat = {'Suomi-NPP': 'SNPP'}
 
 
-KX = dict ( SNPP_DT_OCEAN = 336,
-            SNPP_DT_LAND  = 335,
+KX = dict ( SNPP_DT_OCEAN = 337,
+            SNPP_DT_LAND  = 336,
             SNPP_DB_OCEAN  = 334,
+            SNPP_DB_DEEP   = 335,
             SNPP_DB_LAND  = 333, 
           )
 
@@ -166,6 +169,7 @@ KT = dict ( AOD = 45, )
 IDENT = dict ( SNPP_DT_OCEAN = 'vsnppdto',
                SNPP_DT_LAND  = 'vsnppdtl',
                SNPP_DB_OCEAN  = 'vsnppdbo',
+               SNPP_DB_DEEP  = 'vsnppdbd',
                SNPP_DB_LAND  = 'vsnppdbl',
           )
 
@@ -195,7 +199,7 @@ class Vx04_L2(object):
                  of files and directories.  Directories are
                  transversed recursively. If a non Vx04 Level 2
                  file is encountered, it is simply ignored.
-         algo -- Algorithm: DT_LAND, DT_OCEAN, DB_LAND or DB_OCEAN
+         algo -- Algorithm: DT_LAND, DT_OCEAN, DB_LAND, DB_DEEP or DB_OCEAN
 
        Optional parameters:
          syn_type  --- synoptic time
@@ -214,8 +218,8 @@ class Vx04_L2(object):
 
        """
 
-       if algo not in ('DT_LAND', 'DT_OCEAN', 'DB_LAND', 'DB_OCEAN'):
-           raise ValueError("invalid algorithm "+algo+" --- must be DT_LAND, DT_OCEAN, DB_LAND, DB_OCEAN")
+       if algo not in ('DT_LAND', 'DT_OCEAN', 'DB_LAND', 'DB_DEEP', 'DB_OCEAN'):
+           raise ValueError("invalid algorithm "+algo+" --- must be DT_LAND, DT_OCEAN, DB_LAND, DB_DEEP, or DB_OCEAN")
 
 #      Initially are lists of numpy arrays for each granule
 #      ------------------------------------------------
@@ -267,6 +271,29 @@ class Vx04_L2(object):
            except:
                print("Failed concatenating "+sds)
 
+       # separate DB_LAND and DB_DEEP
+       # DB_LAND == 412 surface reflectance not used so not reported
+       # DB_DEEP == all surface relfecntace channels are used & reported
+       # ---------------------------------------------------
+       if self.algo in ['DB_LAND','DB_DEEP']:
+           if self.algo == 'DB_LAND':
+               iGood = self.Spectral_Surface_Reflectance[:,0].mask & \
+                       ~self.Spectral_Surface_Reflectance[:,1].mask & \
+                       ~self.Spectral_Surface_Reflectance[:,2].mask
+           elif self.algo == 'DB_DEEP':
+               iGood = ~self.Spectral_Surface_Reflectance[:,0].mask & \
+                       ~self.Spectral_Surface_Reflectance[:,1].mask & \
+                       ~self.Spectral_Surface_Reflectance[:,2].mask
+
+           for sds in self.SDS:
+               rank = len(self.__dict__[sds].shape)
+               if rank == 1:
+                   self.__dict__[sds] = self.__dict__[sds][iGood]
+               elif rank == 2:
+                   self.__dict__[sds] = self.__dict__[sds][iGood,:]
+               else:
+                   raise IndexError('invalid rank=%d'%rank)           
+           
        
        # Determine index of "good" observations
        # --------------------------------------
@@ -274,7 +301,7 @@ class Vx04_L2(object):
            self.iGood = (self.Land_Ocean_Quality_Flag == BEST) & (~self.Corrected_Optical_Depth_Land.mask[:,1])
        elif self.algo == 'DT_OCEAN':
            self.iGood = (self.Land_Ocean_Quality_Flag > BAD) & (~self.Effective_Optical_Depth_Average_Ocean.mask[:,1])
-       elif self.algo == 'DB_LAND':
+       elif self.algo in ['DB_LAND','DB_DEEP']:
            self.iGood = self.Aerosol_Optical_Thickness_QA_Flag_Land > BAD # for now
        elif self.algo == 'DB_OCEAN':
            self.iGood = self.Aerosol_Optical_Thickness_QA_Flag_Ocean == BEST
@@ -344,7 +371,7 @@ class Vx04_L2(object):
        self.kx = KX[self.sat+'_'+self.algo]
        self.ident = IDENT[self.sat+'_'+self.algo]
        self.channels = np.array(CHANNELS[self.algo])
-       if Surface == 'LAND':
+       if Surface in ['LAND','DEEP']:
            self.sChannels = CHANNELS["{}_SREF".format(Algo)]   # LAND surface reflectivity (not the same as algo)           
 
        if 'DB' in self.algo:
@@ -356,7 +383,7 @@ class Vx04_L2(object):
 
        # Concatenate AOD channels for Deep Blue
        # --------------------------------------
-       if self.algo == 'DB_LAND':
+       if self.algo in ['DB_LAND','DB_DEEP']:
            try:
                self.aod = np.ones((self.nobs,4))
                self.aod[:,0] = self.aod3ch[:,0]
@@ -1000,7 +1027,7 @@ def granules ( path, algo, sat, syn_time, coll='011', nsyn=8, verbose=False ):
     On input,
 
     path      ---  mounting point for the MxD04 Level 2 files
-    algo      ---  either DT_LAND, DT_OCEAN, DB_LAND or DB_OCEAN
+    algo      ---  either DT_LAND, DT_OCEAN, DB_LAND, DB_DEEP or DB_OCEAN
     sat       ---  SNPP
     syn_time  ---  synoptic time (timedate format)
 
@@ -1013,6 +1040,14 @@ def granules ( path, algo, sat, syn_time, coll='011', nsyn=8, verbose=False ):
     # -----------------
     Algo = algo.split('_')[0]
     prod = 'AER{}'.format(Algo)
+
+    # Get sat_prod code
+    # ----------------
+    if sat.upper() == 'SNPP':
+        sat_prod = 'VNP' + prod
+    elif 'NOAA' in sat.upper():
+        sat_prod ='VN' + sat[-2:]
+
 
     # Determine synoptic time range
     # -----------------------------
@@ -1027,8 +1062,8 @@ def granules ( path, algo, sat, syn_time, coll='011', nsyn=8, verbose=False ):
     while t < t2:
         if t >= t1:
             doy = t.timetuple()[7]
-            basen = "%s/%s/%s/%s/Level2/%04d/%03d/AER%s_L2_VIIRS_%s.A%04d%03d.%02d%02d.%s.*.nc"\
-                     %(path,prod,sat,coll,t.year,doy,Algo,sat,t.year,doy,t.hour,t.minute,coll)
+            basen = "%s/%s/%s/%04d/%03d/%s_L2_VIIRS_%s.A%04d%03d.%02d%02d.%s.*.nc"\
+                     %(path,sat_prod,coll,t.year,doy,prod,sat,t.year,doy,t.hour,t.minute,coll)
             try:
                 filen = glob(basen)[0]
                 Granules += [filen,]
