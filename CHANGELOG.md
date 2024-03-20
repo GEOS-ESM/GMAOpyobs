@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Module *waypoint* to handle waypoint files for flight modules
 - Module *sampler*, in pure python, including both station and 
 - Module *mietable* for handling GEOSmie tables
-- Module *aop*, first draft of a replaement to the old aod_calculator
+- Module *aop*, first draft of a replacement to the old aod_calculator
 
 
 ### Changed 
