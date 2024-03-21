@@ -1,0 +1,116 @@
+#!/usr/bin/env python
+"""
+
+Convert aerosol optical tables from v0.0.0 to v1.0.0
+
+The versions of the LUT does refer to the revision of each table, but rather the structure of the netCDF files.
+
+v0.0.0: original file structure, e.g.
+
+	qext(radius, rh, lambda) 
+	pmom(nPol, nMom, radius, rh, lambda) 
+				
+v1.0.0: dimension ordering has been updated for cache optimization (use case: radiation and RT calculations). 
+            The following dimensions have been renamed: lambda --> wavelength, radius --> bin.
+			
+	qext(bin,wavelength, rh)
+	pmom(bin,wavelength, rh, p, m)
+
+
+"""
+
+import xarray as xr
+import numpy  as np
+
+import sys
+import os
+
+if __name__ == "__main__":
+
+    if len(sys.argv)<3:
+        raise RuntimeError("Usage: out_dir aop_0to1 LUT_filename(s)")
+
+    outdir = sys.argv[1]
+    Files = sys.argv[2:]
+    os.system('mkdir -p '+outdir)
+
+    for lut in Files:
+
+        print('Working on',lut)
+
+        ds = xr.open_dataset(lut)
+
+        # Change order of dimensions, renaming some of them
+        # --------------------------------------------------
+#        ds_ = ds.transpose('radius','lambda','nPol','nMom','rh',missing_dims="ignore").\
+        ds_ = ds.transpose('radius','lambda','rh','nPol','nMom',missing_dims="ignore").\
+                 rename({'lambda':'wavelength','radius':'bin'})
+
+        if 'nPol' in ds.dims:
+            ds_ = ds_.rename({'nPol':'p','nMom':'m'})
+            has_mom = True
+        else:
+            has_mom = False
+        
+        # In v0 lambda was wavelength, in v1 we make a clear distinctioon
+        # between wavelength and channel (which is a dimension)
+        # -----------------------------------------------------
+        ds_['channel'] = xr.DataArray(np.arange(ds_.dims['wavelength']),
+                                      dims=('wavelength',),
+                                      attrs={'long_name':'Channel Number', 'units':'1'})
+     
+        # Similarly for bin
+        # -----------------
+        ds_['rEffDry'] = ds_['bin'][:]
+        ds_['bin'] = xr.DataArray(np.arange(ds_.dims['bin']),
+                                      dims=('bin',),
+                                      attrs={'long_name':'Bin Number', 'units':'1'})
+
+        # p, m deserves a coordinate variable
+        # -----------------------------------
+        if has_mom:
+            ds_['m'] = xr.DataArray(np.arange(ds_.dims['m']),
+                                dims=('m',),
+                                attrs={'long_name':'Moments of Phase Matrix', 'units':'1'})
+            
+            p = np.array([11, 12, 33, 34, 22, 44]).astype('int')
+            n = ds_.dims['p']
+            ds_['p'] = xr.DataArray(p[:n],
+                                    dims=('p',),
+                                    attrs={'long_name':'Nonzero Elements in Phase Matrix', 'units':'1'})
+        
+        
+        # Recast 1D variables as coordinates
+        # ----------------------------------
+        for v in ds_.data_vars:
+            if len(ds_[v].shape) == 1:
+                ds_.coords[v] = ds_[v]
+                       
+        print(ds_)
+
+        # Chunks for each dimension
+        # --------------------------
+        chunks = dict(ds_.dims)
+        chunks['bin'] = 1
+        chunks['wavelength'] = 1
+
+        # Create encoding for each variable
+        # ---------------------------------
+        encode = {}
+        for v in ds_.data_vars:
+            
+            chunksizes = [ chunks[d] for d in ds_[v].dims ]
+            encode[v] = {#'compression':'gzip', 'complevel':2,
+                         "zlib": True, "complevel": 2,
+                         'chunksizes':chunksizes}
+
+        # Write out revised dataset
+        # -------------------------
+        fn = os.path.basename(lut)
+        lut_ = outdir + '/' + fn + '4'
+        print('- Writing out',lut_)
+            
+        ds_.to_netcdf(lut_,engine='netcdf4',format='NETCDF4',encoding=encode)     
+        #ds_.to_netcdf(lut_)
+
+        
