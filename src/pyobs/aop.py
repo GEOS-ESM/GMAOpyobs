@@ -4,7 +4,7 @@ mixing ratio files (aer_Nv) and GEOSmie optics tables.
 
 """
 
-__version__ = '1.0.0'
+__version__ = '1.1.0'
 
 import numpy  as np
 import xarray as xr
@@ -32,6 +32,14 @@ DU:
     - DU003
     - DU004
     - DU005
+  shapefactor: 1.4
+  rhod:
+    - 2500
+    - 2650
+    - 2650
+    - 2650
+    - 2650
+
 
 SS:
   monoFile: ExtData/chemistry/AerosolOptics/v1.0.0/x/optics_SS.v3_3.nc4
@@ -42,6 +50,14 @@ SS:
     - SS003
     - SS004
     - SS005
+  shapefactor: 1
+  rhod:
+    - 2200
+    - 2200
+    - 2200
+    - 2200
+    - 2200
+
 
 OC:
   monoFile: ExtData/chemistry/AerosolOptics/v1.0.0/x/optics_OC.v1_3.nc4
@@ -49,6 +65,10 @@ OC:
   tracers:
     - OCPHOBIC
     - OCPHILIC
+  shapefactor: 1
+  rhod:
+    - 1800
+    - 1800
 
 BC:
   monoFile: ExtData/chemistry/AerosolOptics/v1.0.0/x/optics_BC.v1_3.nc4
@@ -56,19 +76,30 @@ BC:
   tracers:
     - BCPHOBIC
     - BCPHILIC
+  shapefactor: 1
+  rhod:
+    - 1800
+    - 1800
 
 BR:
   monoFile: ExtData/chemistry/AerosolOptics/v1.0.0/x/optics_BRC.v1_5.nc4
   bandFile: ExtData/chemistry/AerosolOptics/v1.0.0/x/opticsBands_BRC.v1_5.RRTMG.nc4
   tracers:
-    - BRPHOBIC
-    - BRPHILIC
+    - BRCPHOBIC
+    - BRCPHILIC
+  shapefactor: 1
+  rhod:
+    - 1800
+    - 1800
 
 SU:
   monoFile: ExtData/chemistry/AerosolOptics/v1.0.0/x/optics_SU.v1_3.nc4
   bandFile: ExtData/chemistry/AerosolOptics/v1.0.0/x/opticsBands_SU.v1_3.RRTMG.nc4
   tracers:
     - SO4
+  shapefactor: 1
+  rhod:
+    - 1700
     
 NI:
   monoFile: ExtData/chemistry/AerosolOptics/v1.0.0/x/optics_NI.v2_5.nc4
@@ -77,6 +108,11 @@ NI:
     - NO3AN1
     - NO3AN2
     - NO3AN3
+  shapefactor: 1
+  rhod:
+    - 1725
+    - 2200
+    - 2650
 
 """
 
@@ -157,7 +193,7 @@ class G2GAOP(object):
            self.p = max(self.p,dims_['p']) # max number of entries in phase matrix
            self.m = max(self.m,dims_['m']) # max number of moments in phase matrix
         
-    def getAOPrt(self,Species=None,wavelength=None,vector=False):
+    def getAOPrt(self,Species=None,wavelength=None,vector=False,fixrh=None):
         """
         Returns an xarray Dataset with (aot,ssa,g) if vector is
         False, otherwise (aot,ssa,g,pmon) if vector is True.
@@ -200,6 +236,17 @@ class G2GAOP(object):
         rhodz = dp / GRAV
         dz = rhodz / a['AIRDENS']       # column thickness
         rh = a['RH']
+
+        # Check FIXRH option
+        # --------------------------
+        if fixrh is not None:
+            fixrh = float(fixrh)
+            print('fixrh: ',fixrh)
+            if(fixrh >= 0.):
+                if(fixrh > 1.):
+                   print("Your --RH > 1, must be between 0 - 1; exit and fix")
+                   exit()
+                rh = rh*0.0+fixrh
         
         # Relevant dimensions
         # -------------------
@@ -283,7 +330,7 @@ class G2GAOP(object):
             
         return xr.Dataset(DA)
      
-    def getAOPext(self,Species=None,wavelength=None):
+    def getAOPext(self,Species=None,wavelength=None,fixrh=None):
         """
         Returns an xarray Dataset with the following variables:
 
@@ -320,6 +367,18 @@ class G2GAOP(object):
             dp = a['delp']
 
         rh = a['RH']
+
+        # Check FIXRH option
+        # --------------------------
+        if fixrh is not None:
+            fixrh = float(fixrh)
+            print('Fixed RH = ',fixrh)
+            if(fixrh >= 0.):
+                if(fixrh > 1.):
+                   print("Your --RH > 1, must be between 0 - 1; exit and fix")
+                   exit()
+                rh = rh*0.0+fixrh
+        print(rh.values)
 
         # Relevant dimensions
         # -------------------
@@ -419,6 +478,123 @@ class G2GAOP(object):
 
         raise AOPError("not implemented yet")
 
+    def getPM(self,Species=None,wavelength=None,pmsize=None,fixrh=None,aerodynamic=False):
+        """
+        Returns an xarray Dataset with particulate matter smaller than the size given.
+
+        Species:  None, str, or list. If None, all species on file,
+                  otherwise subset of emissions.
+                  
+        Wavelength: float, wavelength in nm. 
+    
+        PMsize: float, particle diameter threshold in microns. If None, the total PM is calculated.
+
+        """
+
+        # All species on file or a subset
+        # -------------------------------
+        if Species is None:
+            Species = list(self.mieTable.keys())
+        if isinstance(Species,str):
+            Species = [Species,]
+
+        a = self.aer    # aerosol mixing ratio tracers
+
+        # Determine PM Threshold
+        # -------------------------------
+
+        print('PM Threshold = ',pmsize) 
+        if pmsize is None:
+            pmsize = 99999 #A ridiculous value is chosen such that the threshold is larger than any aerosol particle
+        rPM = float(pmsize)/2 #convert diameter to radius
+        print('rPM=', rPM)
+        # GEOS files can be inconsistent when it comes to case
+        # ----------------------------------------------------
+        try:
+            dp = a['DELP'] 
+        except:
+            dp = a['delp']
+
+        rh = a['RH']
+
+        # Check FIXRH option
+        # --------------------------
+        if fixrh is not None:
+            fixrh = float(fixrh)
+            print('Fixed RH = ',fixrh)
+            if(fixrh >= 0.):
+                if(fixrh > 1.):
+                   print("Your --RH > 1, must be between 0 - 1; exit and fix")
+                   exit()
+                rh = rh*0.0+fixrh
+
+        # Relevant dimensions
+        # -------------------
+        space = rh.shape
+
+        pm = (np.zeros(space))
+        for s in Species:   # species
+
+            if self.verbose:
+                print('[] working on',s)
+            
+            Tracers = self.mieTable[s]['tracers']
+            mie = self.mieTable[s]['mie']
+
+            bin = 1
+            for q in Tracers:
+
+                if self.verbose:
+                    print('   -',q)
+
+                
+                q_conc = (a['AIRDENS'] * a[q]).values * 1000000000 #convert units to kg/m3
+                #rhod is not in all of the standard optics files, and is temporarily added in the yaml portion of the code. 
+                #rhod_ = mie.getAOP('rhod',  bin, rh, wavelength=wavelength).values
+                rhod_ = self.mieTable[s]['rhod'][bin-1]
+                rLow_ = mie.getBinInfo('rLow', bin)*1000000
+                rUp_ = mie.getBinInfo('rUp', bin)*1000000
+                rEff_ = mie.getAOP('rEff', bin, rh, wavelength=wavelength).values*1000000
+                rEff_zero = mie.getBinInfo('rEffDry', bin)*1000000
+		#If necessary, compute the aerodynamic particle radius
+                if aerodynamic:
+                    rLow_ = rLow_ * np.sqrt((rhod_/1000)/self.mieTable[s]['shapefactor'])
+                    rUp_ = rUp_ * np.sqrt((rhod_/1000)/self.mieTable[s]['shapefactor'])
+                #Find fraction of bin 
+                print(rUp_)
+                if(rUp_ < rPM):
+                        fPM = 1.0
+                else:
+                        if(rLow_ < rPM):        	
+                                fPM = np.log(rPM/rLow_) / np.log(rUp_/rLow_)
+                        else:
+                                fPM = 0.0
+                print('fPM= ', fPM)
+                #Compute Growth Factor based on RH based on code from GEOS Chem (https://wiki.seas.harvard.edu/geos-chem/index.php/Particulate_matter_in_GEOS-Chem), this is not the same calculation as the GEOSmie optics files.
+                growthfactor= 1 + (((np.squeeze(rEff_) / np.squeeze(rEff_zero))**3 - 1) * (997 / rhod_))
+                #Compute PM
+                pm_ = q_conc * growthfactor * fPM
+                pm += pm_
+
+                bin += 1
+                
+
+        # Attributes
+        # ----------
+        A = dict (PM = {'long_name':'Particulate Matter', 'units':'kg m-3'}
+                  )
+        
+        # Pack results into a Dataset
+        # ---------------------------
+        DA = dict(  PM = xr.DataArray(pm.astype('float32'),dims=rh.dims,coords=rh.coords,attrs=A['PM'])
+                 )
+
+        DA['DELP'] = dp
+        DA['AIRDENS'] = a['AIRDENS']
+        
+        return xr.Dataset(DA)
+        #raise AOPError("not implemented yet")
+
 
 #....................................................................................
 
@@ -439,6 +615,9 @@ def CLI_aop():
     aop = 'ext'
     rootDir = './'
     wavelengths='550'
+    fixrh = None
+    d_pm = None
+    aerodynamic = False
 
 #   Parse command line options
 #   --------------------------
@@ -449,7 +628,7 @@ def CLI_aop():
                           version=__version__ )
 
     parser.add_option("-a", "--aop", dest="aop", default='ext',
-              help="AOP collection, one of 'rt' or'ext' (default=%s)"%aop)
+              help="AOP collection, one of 'rt' or 'ext' or 'pm' (default=%s)"%aop)
     
     parser.add_option("-c", "--config", dest="config", default=None,
               help="optional configuration YAML file (default='buit-in')")
@@ -480,6 +659,17 @@ def CLI_aop():
     parser.add_option("-w", "--wavelengths", dest="wavelengths", default=wavelengths,
               help="Comma separated wavelengths (default=%s)"\
                           %wavelengths )
+
+    parser.add_option("--rh", dest="fixrh", default=fixrh,
+              help="If specified use provided RH (0-1) in calculations")
+
+
+    parser.add_option("--aerodynamic", dest="aerodynamic", default=False,
+              help="If set to true, an aerodynamic diameter will be used to compute PM. This option is only valid for --aop=pm.")
+
+    parser.add_option("-s","--size", dest="d_pm", default=None,
+              help="The threshold diameter size used to compute PM in units of microns (example 2.5 for PM2.5). This option is only valid for --aop=pm.")
+
 
     (options, args) = parser.parse_args()
     
@@ -512,6 +702,8 @@ def CLI_aop():
     else:
         config = None
 
+
+
     # Compute AOPs
     # ------------
     aer = xc.open_mfdataset(aerDataset,parallel=True) 
@@ -519,9 +711,11 @@ def CLI_aop():
     for w_ in options.wavelengths.split(','):
         w = float(w_)
         if options.aop == 'ext':
-            ds = g.getAOPext(wavelength=w)
+            ds = g.getAOPext(wavelength=w,fixrh=options.fixrh)
         elif options.aop == 'rt':
             ds = g.getAOPrt(wavelength=w,vector=options.vector)
+        elif options.aop == 'pm':
+            ds = g.getPM(wavelength=w,pmsize=options.d_pm,fixrh=options.fixrh,aerodynamic=options.aerodynamic)
         else:
             print(options.aop)
             raise AOPError('Unknow AOP option '+options.aop)
@@ -539,21 +733,23 @@ def Test_g2g_aop():
 
     # yaml.dump(rc,open('test.yml','w'))
 
-    data = '/Users/adasilva/data/'
-    aer_Nv = '/Users/adasilva/data/sampled/aer_Nv/CAMP2Ex-GEOS-MODISonly-aer-Nv-P3B_Model_*.nc'
-    
+    data = '/discover/nobackup/acollow/aeroeval/opticsfiles/AerosolOptics/'
+    #aer_Nv = '/Users/adasilva/data/sampled/aer_Nv/CAMP2Ex-GEOS-MODISonly-aer-Nv-P3B_Model_*.nc'
+    aer_Nv = '/discover/nobackup/acollow/CAMP2Ex/sampled/P3B/MODISonly/2019-09-*/CAMP2Ex-GEOS-MODISonly-aer-Nv-P3B_Model_201909*_R0.nc'
+
     aer = xr.open_mfdataset(aer_Nv) # still having trouble with parallel
-
+    print('aer is loaded')
     g = G2GAOP(aer,mieRootDir=data,verbose=True)
-    rts = None # g.getAOPrt(wavelength=550,vector=False)
-    rtv = g.getAOPrt(wavelength=550,vector=True)
-    ext = None # g.getAOPext(wavelength=550)
-
-    return (g, rts, rtv, ext)
+    print('g is done')
+    #rts = None # g.getAOPrt(wavelength=550,vector=False)
+    #rtv = g.getAOPrt(wavelength=550,vector=True)
+    #ext = None # g.getAOPext(wavelength=550)
+    pm = g.getPM(wavelength=550,pmsize=2.5,verbose=True)
+    return (pm)
 
 if __name__ == "__main__":
 
-    g, rts, rtv, ext = Test_g2g_aop
+    pm = Test_g2g_aop
 
 
 
