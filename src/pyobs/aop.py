@@ -378,7 +378,6 @@ class G2GAOP(object):
                    print("Your --RH > 1, must be between 0 - 1; exit and fix")
                    exit()
                 rh = rh*0.0+fixrh
-        print(rh.values)
 
         # Relevant dimensions
         # -------------------
@@ -503,11 +502,10 @@ class G2GAOP(object):
         # Determine PM Threshold
         # -------------------------------
 
-        print('PM Threshold = ',pmsize) 
         if pmsize is None:
             pmsize = 99999 #A ridiculous value is chosen such that the threshold is larger than any aerosol particle
         rPM = float(pmsize)/2 #convert diameter to radius
-        print('rPM=', rPM)
+
         # GEOS files can be inconsistent when it comes to case
         # ----------------------------------------------------
         try:
@@ -561,7 +559,7 @@ class G2GAOP(object):
                     rLow_ = rLow_ * np.sqrt((rhod_/1000)/self.mieTable[s]['shapefactor'])
                     rUp_ = rUp_ * np.sqrt((rhod_/1000)/self.mieTable[s]['shapefactor'])
                 #Find fraction of bin 
-                print(rUp_)
+
                 if(rUp_ < rPM):
                         fPM = 1.0
                 else:
@@ -569,7 +567,7 @@ class G2GAOP(object):
                                 fPM = np.log(rPM/rLow_) / np.log(rUp_/rLow_)
                         else:
                                 fPM = 0.0
-                print('fPM= ', fPM)
+
                 #Compute Growth Factor based on RH based on code from GEOS Chem (https://wiki.seas.harvard.edu/geos-chem/index.php/Particulate_matter_in_GEOS-Chem), this is not the same calculation as the GEOSmie optics files.
                 growthfactor= 1 + (((np.squeeze(rEff_) / np.squeeze(rEff_zero))**3 - 1) * (997 / rhod_))
                 #Compute PM
