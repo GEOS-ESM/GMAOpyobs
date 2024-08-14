@@ -12,9 +12,9 @@
       channel          (w) channel number
       wavelengths      (w) wavelengths        [m]
       rh               (r) RH values   [fraction]
-      rLow             (b) Dry upper radius [m]
+      rLow             (b) Dry lower radius [m]
       rEffDry          (b) Dry Effective radius [m]
-      rUp              (b) Dry lower radius [m]
+      rUp              (b) Dry upper radius [m]
       p                (p) Non-zero elements of phase matrix
       m                (p) Moments of phase matrix
 
