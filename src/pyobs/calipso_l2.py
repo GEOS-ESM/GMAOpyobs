@@ -88,7 +88,9 @@ class CALIPSO_L2(object):
                 
             except:
                 print("Failed concatenating "+name)
-     
+
+     self.time = array(self.time)
+
      # Determine index of "good" observations
      # --------------------------------------
      pass # to do
