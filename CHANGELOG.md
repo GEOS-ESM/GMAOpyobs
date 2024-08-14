@@ -13,6 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed 
 
+- aop.py *getAOPrt* phase function now being correctly normalized 
+  by total scattering
+
 ### Removed 
 
 # [v1.1.0] 2024-03-20

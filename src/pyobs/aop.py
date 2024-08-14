@@ -45,7 +45,7 @@ SS:
 
 OC:
   monoFile: ExtData/chemistry/AerosolOptics/v1.0.0/x/optics_OC.v1_3.nc4
-  bandFile: ExtData/chemistry/AerosolOptics/v1.0.0/x/opticsBands_OC.v1_3.RRTMG.nc4 
+  bandFile: ExtData/chemistry/AerosolOptics/v1.0.0/x/opticsBands_OC.v1_3.RRTMG.nc4
   tracers:
     - OCPHOBIC
     - OCPHILIC
@@ -69,7 +69,7 @@ SU:
   bandFile: ExtData/chemistry/AerosolOptics/v1.0.0/x/opticsBands_SU.v1_3.RRTMG.nc4
   tracers:
     - SO4
-    
+
 NI:
   monoFile: ExtData/chemistry/AerosolOptics/v1.0.0/x/optics_NI.v2_5.nc4
   bandFile: ExtData/chemistry/AerosolOptics/v1.0.0/x/opticsBands_NI.v2_5.RRTMG.nc4
@@ -112,7 +112,7 @@ class G2GAOP(object):
 
         if config is None:
             config = G2G_MieMap
-            
+
         self.verbose = verbose
         if isinstance(aerFiles,xr.Dataset):
             self.aer = aerFiles
@@ -139,7 +139,7 @@ class G2GAOP(object):
 
         # Check consistency of Mie tables accross species
         # -----------------------------------------------
-        dims =  self.mieTable['DU']['mie'].getDims() 
+        dims =  self.mieTable['DU']['mie'].getDims()
         self.vector = True
         self.p, self.m = (0,0)
         for s in self.mieTable:
@@ -156,7 +156,7 @@ class G2GAOP(object):
                break
            self.p = max(self.p,dims_['p']) # max number of entries in phase matrix
            self.m = max(self.m,dims_['m']) # max number of moments in phase matrix
-        
+
     def getAOPrt(self,Species=None,wavelength=None,vector=False):
         """
         Returns an xarray Dataset with (aot,ssa,g) if vector is
@@ -164,7 +164,7 @@ class G2GAOP(object):
 
         Species:  None, str, or list. If None, all species on file,
                   otherwise subset of species.
-                  
+
         Wavelength: float, wavelength in nm.
 
         vector:     bool, whether to return full phase matrix or
@@ -177,8 +177,8 @@ class G2GAOP(object):
         if vector:
             if not self.vector:
                 print('Warning: will not calculate PMOM because of inconsistent Mie Tables.')
-                vector = False            
-        
+                vector = False
+
         # All species on file or a subset
         # -------------------------------
         if Species is None:
@@ -191,7 +191,7 @@ class G2GAOP(object):
         # GEOS files can be inconsistent when it comes to case
         # ----------------------------------------------------
         try:
-            dp = a['DELP'] 
+            dp = a['DELP']
         except:
             dp = a['delp']
 
@@ -200,7 +200,7 @@ class G2GAOP(object):
         rhodz = dp / GRAV
         dz = rhodz / a['AIRDENS']       # column thickness
         rh = a['RH']
-        
+
         # Relevant dimensions
         # -------------------
         space = rh.shape
@@ -209,12 +209,12 @@ class G2GAOP(object):
             ns = np.prod(space)
             p, m = self.p, self.m
             pmom = np.zeros((ns,p,m)) # flatten space dimensions for convenience
-        
+
         for s in Species:   # loop over species
 
             if self.verbose:
                 print('[] working on',s)
-            
+
             Tracers = self.mieTable[s]['tracers']
             mie = self.mieTable[s]['mie']
 
@@ -230,32 +230,32 @@ class G2GAOP(object):
                 g_     = mie.getAOP('g',bin, rh, q_mass, wavelength).values
 
                 aot += aot_
-                sca += sca_    
-                g   += sca_ * g_ 
+                sca += sca_
+                g   += sca_ * g_
 
                 if vector:
-                    
+
                     pmom_ = mie.getAOP('pmom', bin, rh, q_mass=q_mass,
                                         wavelength=wavelength)
                     p_, m_ = pmom_.shape[-2:]
-                    pmom_ = pmom_.values.reshape((ns,p_,m_))
-                    
+                    pmom_ = pmom_.values.reshape((ns,p_,m_)) * sca_.reshape((ns,1,1))
+
                     pmom[:,:,:m_] += pmom_[:,:,:] # If species have fewer moments, pad wih zeros
                 else:
 
-                    g   += sca_ * g_ 
+                    g   += sca_ * g_
 
-                    
+
                 bin += 1
-                
+
         # Final normalization of SSA and g
         # --------------------------------
-        ssa = sca / aot   
+        ssa = sca / aot
         if vector:
              pmom = pmom / sca.reshape((ns,1,1))
              pmom = pmom.reshape(space+(p,m))
         else:
-             g = g / sca      
+             g = g / sca
 
 
         A = dict (AOT = {'long_name':'Aerosol Optical Thickness', 'units':'1'},
@@ -280,9 +280,9 @@ class G2GAOP(object):
             DA['PMOM'] = DataArray(pmom, dims=rh.dims+('p','m'),coords=coords)
         else:
             DA['G'] = xr.DataArray(g,dims=rh.dims,coords=rh.coords)
-            
+
         return xr.Dataset(DA)
-     
+
     def getAOPext(self,Species=None,wavelength=None):
         """
         Returns an xarray Dataset with the following variables:
@@ -293,10 +293,10 @@ class G2GAOP(object):
         DEPOL:   aerosol depolarization ratio
 
         On inout,
-        
+
         Species:    None, str, or list. If None, all species on file,
                     otherwise subset of species.
-                  
+
         Wavelength: float, wavelength in nm.
 
         TO DO: total attenuated backscatter, including molecular component
@@ -315,7 +315,7 @@ class G2GAOP(object):
         # GEOS files can be inconsistent when it comes to case
         # ----------------------------------------------------
         try:
-            dp = a['DELP'] 
+            dp = a['DELP']
         except:
             dp = a['delp']
 
@@ -333,7 +333,7 @@ class G2GAOP(object):
 
             if self.verbose:
                 print('[] working on',s)
-            
+
             Tracers = self.mieTable[s]['tracers']
             mie = self.mieTable[s]['mie']
 
@@ -343,7 +343,7 @@ class G2GAOP(object):
                 if self.verbose:
                     print('   -',q)
 
-                
+
                 q_conc = (a['AIRDENS'] * a[q]).values
                 ext_ = mie.getAOP('bext', bin, rh, wavelength=wavelength).values
                 sca_ = mie.getAOP('bsca', bin, rh, wavelength=wavelength).values
@@ -362,7 +362,7 @@ class G2GAOP(object):
                 depol2 += (p11_+p22_) * sca_
 
                 bin += 1
-                
+
         # Final normalization
         # -------------------
         ext *= 1000. # m-1 to km-1
@@ -377,7 +377,7 @@ class G2GAOP(object):
                   BSC = {'long_name':'Aerosol Backscatter Coefficient', 'units':'km-1'},
                   DEPOL = {'long_name':'Depolarization Ratio', 'units':'1'}
                   )
-        
+
         # Pack results into a Dataset
         # ---------------------------
         DA = dict(  EXT = xr.DataArray(ext.astype('float32'),dims=rh.dims,coords=rh.coords,attrs=A['EXT']),
@@ -388,9 +388,9 @@ class G2GAOP(object):
 
         DA['DELP'] = dp
         DA['AIRDENS'] = a['AIRDENS']
-        
+
         return xr.Dataset(DA)
-     
+
 
     def getAOPintensive(self,Species=None,wavelength=None):
         """
@@ -398,13 +398,13 @@ class G2GAOP(object):
 
         Species:  None, str, or list. If None, all species on file,
                   otherwise subset of emissions.
-                  
-        Wavelength: float, wavelength in nm. 
+
+        Wavelength: float, wavelength in nm.
 
         """
         raise AOPError("not implemented yet")
-        
-    
+
+
     def getAOP(self,what,Species=None,wavelength=None):
         """
         Returns an xarray Dataset with the aerosol aerosol optical
@@ -413,8 +413,8 @@ class G2GAOP(object):
         what:     str, list with AOPs to calculate
         Species:  None, str, or list. If None, all species on file,
                   otherwise subset of emissions.
-        Wavelength: float, wavelength in nm. 
-        
+        Wavelength: float, wavelength in nm.
+
         """
 
         raise AOPError("not implemented yet")
@@ -429,7 +429,7 @@ def CLI_aop():
 
     import sys
     import os
-    
+
     from optparse        import OptionParser
 
     format = 'NETCDF4'
@@ -450,7 +450,7 @@ def CLI_aop():
 
     parser.add_option("-a", "--aop", dest="aop", default='ext',
               help="AOP collection, one of 'rt' or'ext' (default=%s)"%aop)
-    
+
     parser.add_option("-c", "--config", dest="config", default=None,
               help="optional configuration YAML file (default='buit-in')")
 
@@ -482,7 +482,7 @@ def CLI_aop():
                           %wavelengths )
 
     (options, args) = parser.parse_args()
-    
+
     if options.dump:
         print(G2G_MieMap)
         sys.exit(0)
@@ -496,7 +496,7 @@ def CLI_aop():
     else:
         parser.error("must have 1 or 3 arguments: aerDataset [iso_t1 iso_t2]")
 
-        
+
     # Create consistent file name extension
     # -------------------------------------
     name, ext = os.path.splitext(options.outFile)
@@ -514,7 +514,7 @@ def CLI_aop():
 
     # Compute AOPs
     # ------------
-    aer = xc.open_mfdataset(aerDataset,parallel=True) 
+    aer = xc.open_mfdataset(aerDataset,parallel=True)
     g = G2GAOP(aer,config=config,mieRootDir=options.rootDir,verbose=options.verbose)
     for w_ in options.wavelengths.split(','):
         w = float(w_)
@@ -530,7 +530,7 @@ def CLI_aop():
         if options.verbose:
             print('Writing',filename)
         ds.to_netcdf(filename)  # TO DO: Chunking and compression
-    
+
 #....................................................................................
 def Test_g2g_aop():
     """
@@ -541,7 +541,7 @@ def Test_g2g_aop():
 
     data = '/Users/adasilva/data/'
     aer_Nv = '/Users/adasilva/data/sampled/aer_Nv/CAMP2Ex-GEOS-MODISonly-aer-Nv-P3B_Model_*.nc'
-    
+
     aer = xr.open_mfdataset(aer_Nv) # still having trouble with parallel
 
     g = G2GAOP(aer,mieRootDir=data,verbose=True)
@@ -557,8 +557,8 @@ if __name__ == "__main__":
 
 
 
-    
 
-    
 
-    
+
+
+
