@@ -249,13 +249,26 @@ class G2GAOP(object):
                 bin += 1
 
         # Final normalization of SSA and g
+        # protect against divide by zero
+        # this can happen if you ask for the AOP of an individual species
+        # and its' concentration in a layer is zero        
         # --------------------------------
-        ssa = sca / aot
+        ssa = np.empty(space)
+        ssa[:] = np.nan
+        I = np.where(aot != 0.0)
+        ssa[I] = sca[I] / aot[I]
+
         if vector:
-             pmom = pmom / sca.reshape((ns,1,1))
+             I = np.where(sca.reshape((ns) != 0.0))[0]
+             pmom[I,:,:] = pmom[I,:,:] / sca.reshape((ns,1,1))[I,:,:]
+             I = np.where(sca.reshape((ns) == 0.0))[0]
+             pmom[I,:,:] = np.nan
              pmom = pmom.reshape(space+(p,m))
         else:
-             g = g / sca
+             I = np.where(sca != 0.0)
+             g[I] = g[I] / sca[I]
+             I = np.where(sca == 0.0)
+             g[I] = np.nan
 
 
         A = dict (AOT = {'long_name':'Aerosol Optical Thickness', 'units':'1'},
@@ -368,7 +381,15 @@ class G2GAOP(object):
         ext *= 1000. # m-1 to km-1
         sca *= 1000. # m-1 to km-1
         bsc *= 1000. # m-1 to km-1
-        depol = depol1 / depol2
+
+        # protect against divide by zero
+        # this can happen if you ask for the AOP of an individual species
+        # and its' concentration in a layer is zero
+        # -----------------------------------------
+        depol = np.empty(space)
+        depol[:] = np.nan
+        I = np.where(depol2 != 0.0)
+        depol[I] = depol1[I] / depol2[I]
 
         # Attributes
         # ----------
