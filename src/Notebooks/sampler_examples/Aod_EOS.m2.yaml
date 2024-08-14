@@ -1,0 +1,41 @@
+# Default YAML file mapping GOCART tracers in aer_Nv and the optics files
+# -----------------------------------------------------------------------
+#
+# GEOS Aerosol Mie table Definition for each of species.
+# The order of the tracers correspond to the bins in the optics netcdf files.
+#
+
+DU:
+  monoFile: ExtData/chemistry/AerosolOptics/v1.0.0/x/optics_DU.v14_2.nc4
+  tracers:
+    - DU001
+    - DU002
+    - DU003
+    - DU004
+    - DU005
+
+SS:
+  monoFile: ExtData/chemistry/AerosolOptics/v1.0.0/x/optics_SS.v3_3.nc4
+  tracers:
+    - SS001
+    - SS002
+    - SS003
+    - SS004
+    - SS005
+
+OC:
+  monoFile: ExtData/chemistry/AerosolOptics/v1.0.0/x/optics_OC.v1_3.nc4
+  tracers:
+    - OCPHOBIC
+    - OCPHILIC
+
+BC:
+  monoFile: ExtData/chemistry/AerosolOptics/v1.0.0/x/optics_BC.v1_3.nc4
+  tracers:
+    - BCPHOBIC
+    - BCPHILIC
+
+SU:
+  monoFile: ExtData/chemistry/AerosolOptics/v1.0.0/x/optics_SU.v1_3.nc4
+  tracers:
+    - SO4
