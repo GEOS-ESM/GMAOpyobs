@@ -139,9 +139,11 @@ class G2GAOP(object):
 
         # Check consistency of Mie tables accross species
         # -----------------------------------------------
-        dims =  self.mieTable['DU']['mie'].getDims()
+        # start with last species read
+        dims =  self.mieTable[s]['mie'].getDims()
         self.vector = True
         self.p, self.m = (0,0)
+        # loop through species and compare dims
         for s in self.mieTable:
            dims_ = self.mieTable[s]['mie'].getDims() # dimensions of Mie Tables, a dict
            if dims_['p'] is None:
