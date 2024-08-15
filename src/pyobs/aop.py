@@ -241,12 +241,10 @@ class G2GAOP(object):
         # --------------------------
         if fixrh is not None:
             fixrh = float(fixrh)
-            print('fixrh: ',fixrh)
-            if(fixrh >= 0.):
-                if(fixrh > 1.):
-                   print("Your --RH > 1, must be between 0 - 1; exit and fix")
-                   exit()
-                rh = rh*0.0+fixrh
+            if (fixrh<0.0) or (fixrh>1.0):
+                raise ValueError("Your fixrh is {}, it must be between 0 - 1".format(fixrh))
+            else:
+                rh[:] = fixrh
         
         # Relevant dimensions
         # -------------------
@@ -372,12 +370,10 @@ class G2GAOP(object):
         # --------------------------
         if fixrh is not None:
             fixrh = float(fixrh)
-            print('Fixed RH = ',fixrh)
-            if(fixrh >= 0.):
-                if(fixrh > 1.):
-                   print("Your --RH > 1, must be between 0 - 1; exit and fix")
-                   exit()
-                rh = rh*0.0+fixrh
+            if (fixrh<0.0) or (fixrh>1.0):
+                raise ValueError("Your fixrh is {}, it must be between 0 - 1".format(fixrh))
+            else:
+                rh[:] = fixrh
 
         # Relevant dimensions
         # -------------------
@@ -477,14 +473,12 @@ class G2GAOP(object):
 
         raise AOPError("not implemented yet")
 
-    def getPM(self,Species=None,wavelength=None,pmsize=None,fixrh=None,aerodynamic=False):
+    def getPM(self,Species=None,pmsize=None,fixrh=None,aerodynamic=False):
         """
-        Returns an xarray Dataset with particulate matter smaller than the size given.
+        Returns an xarray Dataset with total aerosol mass smaller than the prescribed size.
 
         Species:  None, str, or list. If None, all species on file,
                   otherwise subset of emissions.
-                  
-        Wavelength: float, wavelength in nm. 
     
         PMsize: float, particle diameter threshold in microns. If None, the total PM is calculated.
 
@@ -501,9 +495,8 @@ class G2GAOP(object):
 
         # Determine PM Threshold
         # -------------------------------
-
         if pmsize is None:
-            pmsize = 99999 #A ridiculous value is chosen such that the threshold is larger than any aerosol particle
+            rPM = None 
         rPM = float(pmsize)/2 #convert diameter to radius
 
         # GEOS files can be inconsistent when it comes to case
@@ -519,12 +512,10 @@ class G2GAOP(object):
         # --------------------------
         if fixrh is not None:
             fixrh = float(fixrh)
-            print('Fixed RH = ',fixrh)
-            if(fixrh >= 0.):
-                if(fixrh > 1.):
-                   print("Your --RH > 1, must be between 0 - 1; exit and fix")
-                   exit()
-                rh = rh*0.0+fixrh
+            if (fixrh<0.0) or (fixrh>1.0):
+                raise ValueError("Your fixrh is {}, it must be between 0 - 1".format(fixrh))
+            else:
+                rh[:] = fixrh
 
         # Relevant dimensions
         # -------------------
@@ -546,23 +537,26 @@ class G2GAOP(object):
                     print('   -',q)
 
                 
-                q_conc = (a['AIRDENS'] * a[q]).values * 1000000000 #convert units to kg/m3
+                q_conc = (a['AIRDENS'] * a[q]).values * 1000000000 #Aerosol concentration converted to units of kg/m3
                 #rhod is not in all of the standard optics files, and is temporarily added in the yaml portion of the code. 
                 #rhod_ = mie.getAOP('rhod',  bin, rh, wavelength=wavelength).values
-                rhod_ = self.mieTable[s]['rhod'][bin-1]
-                rLow_ = mie.getBinInfo('rLow', bin)*1000000
-                rUp_ = mie.getBinInfo('rUp', bin)*1000000
-                rEff_ = mie.getAOP('rEff', bin, rh, wavelength=wavelength).values*1000000
-                rEff_zero = mie.getBinInfo('rEffDry', bin)*1000000
+                rhod_ = self.mieTable[s]['rhod'][bin-1] #Dry aerosol density
+                rLow_ = mie.getBinInfo('rLow', bin)*1000000 #Lower bound of the bin's radius converted to microns
+                rUp_ = mie.getBinInfo('rUp', bin)*1000000 #Upper bound of the bin's radius converted to microns
+                rEff_ = mie.getAOP('rEff', bin, rh, wavelength=None).values*1000000 #Effective radius at the specified humidity converted to microns
+                rEff_zero = mie.getBinInfo('rEffDry', bin)*1000000 #Effective radius at a relative humidity of 0% converted to microns
 		#If necessary, compute the aerodynamic particle radius
+                #shape factor accounts for changes in the particle's dragging coefficient (see https://doi.org/10.1029/2002JD002485 for more info)
                 if aerodynamic:
-                    rLow_ = rLow_ * np.sqrt((rhod_/1000)/self.mieTable[s]['shapefactor'])
-                    rUp_ = rUp_ * np.sqrt((rhod_/1000)/self.mieTable[s]['shapefactor'])
+                    rLow_ = rLow_ * np.sqrt((rhod_/1000)/self.mieTable[s]['shapefactor']) #this equation requires rhod to be in units of g/cm^3
+                    rUp_ = rUp_ * np.sqrt((rhod_/1000)/self.mieTable[s]['shapefactor']) #this equation requires rhod to be in units of g/cm^3
                 #Find fraction of bin 
-
-                if(rUp_ < rPM):
-                        fPM = 1.0
+                if rPM is None:
+                    fPM = 1.0
                 else:
+                    if(rUp_ < rPM):
+                        fPM = 1.0
+                    else:
                         if(rLow_ < rPM):        	
                                 fPM = np.log(rPM/rLow_) / np.log(rUp_/rLow_)
                         else:
@@ -713,7 +707,7 @@ def CLI_aop():
         elif options.aop == 'rt':
             ds = g.getAOPrt(wavelength=w,vector=options.vector)
         elif options.aop == 'pm':
-            ds = g.getPM(wavelength=w,pmsize=options.d_pm,fixrh=options.fixrh,aerodynamic=options.aerodynamic)
+            ds = g.getPM(pmsize=options.d_pm,fixrh=options.fixrh,aerodynamic=options.aerodynamic)
         else:
             print(options.aop)
             raise AOPError('Unknow AOP option '+options.aop)
