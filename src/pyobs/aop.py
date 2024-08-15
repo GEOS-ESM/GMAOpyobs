@@ -556,7 +556,7 @@ class G2GAOP(object):
         # -------------------
         space = rh.shape
 
-        pm = (np.zeros(space))
+        pm = np.zeros(space)
         for s in Species:   # species
 
             if self.verbose:
