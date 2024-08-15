@@ -624,9 +624,15 @@ class G2GAOP(object):
                 bin += 1
                 
 
+        # convert from kg m-3 to micrograms m-3
+        # a more common unit for PM concentration
+        # ---------------------------------------
+        pm = pm*1e9
+
+
         # Attributes
         # ----------
-        A = dict (PM = {'long_name':'Particulate Matter', 'units':'kg m-3'}
+        A = dict (PM = {'long_name':'Particulate Matter', 'units':'microgram m-3'}
                   )
         
         # Pack results into a Dataset
