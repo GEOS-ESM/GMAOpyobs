@@ -24,6 +24,7 @@ G2G_MieMap = """
 #
 #  rhod: particle density in kg m-3
 #  shapefactor: factor that accounts for aerodynamic resistance of non-spherical particles
+#               this is used to calculate the aerodynamic radius for PM calculations when the aerodymic flag is turned on
 #               see the following reference for further documentation
 #               GMAO Office Note No. 22 (Version 1.1): 
 #               Collow, A., V. Buchard, M. Chin, P. Colarco, A. Darmenov, and A. da Silva, 2023. 
