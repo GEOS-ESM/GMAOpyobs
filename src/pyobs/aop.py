@@ -571,16 +571,26 @@ class G2GAOP(object):
                 if self.verbose:
                     print('   -',q)
 
-                
-                q_conc = (a['AIRDENS'] * a[q]).values * 1000000000 #Aerosol concentration converted to units of kg/m3
-                #rhod is not in all of the standard optics files, and is temporarily added in the yaml portion of the code. 
-                #rhod_ = mie.getAOP('rhod',  bin, rh, wavelength=wavelength).values
-                rhod_ = self.mieTable[s]['rhod'][bin-1] #Dry aerosol density
-                rLow_ = mie.getBinInfo('rLow', bin)*1000000 #Lower bound of the bin's radius converted to microns
-                rUp_ = mie.getBinInfo('rUp', bin)*1000000 #Upper bound of the bin's radius converted to microns
-                rEff_ = mie.getAOP('rEff', bin, rh, wavelength=None).values*1000000 #Effective radius at the specified humidity converted to microns
-                rEff_zero = mie.getBinInfo('rEffDry', bin)*1000000 #Effective radius at a relative humidity of 0% converted to microns
-		#If necessary, compute the aerodynamic particle radius
+
+                # Aerosol mass concentration in kg/m3                
+                q_conc = (a['AIRDENS'] * a[q]).values
+  
+                # Dry aerosol density in kg m-3
+                # rhod is not in all of the standard optics files, and is for now read from the yaml config 
+                # rhod_ = mie.getAOP('rhod',  bin, rh, wavelength=wavelength).values
+                rhod_ = self.mieTable[s]['rhod'][bin-1] 
+
+                # Lower and upper bound of the bin's radius converted from meters to microns
+                rLow_ = mie.getBinInfo('rLow', bin)*1000000 
+                rUp_ = mie.getBinInfo('rUp', bin)*1000000 
+
+                # Effective radius at the specified humidity converted from meters to microns
+                rEff_ = mie.getAOP('rEff', bin, rh, wavelength=None).values*1000000 
+
+                # Effective radius at a relative humidity of 0% converted from meters to microns
+                rEff_zero = mie.getBinInfo('rEffDry', bin)*1000000 
+
+                #If necessary, compute the aerodynamic particle radius
                 #shape factor accounts for changes in the particle's dragging coefficient (see https://doi.org/10.1029/2002JD002485 for more info)
                 if aerodynamic:
                     rLow_ = rLow_ * np.sqrt((rhod_/1000)/self.mieTable[s]['shapefactor']) #this equation requires rhod to be in units of g/cm^3
