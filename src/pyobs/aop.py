@@ -530,8 +530,9 @@ class G2GAOP(object):
         # Determine PM Threshold
         # -------------------------------
         if pmsize is None:
-            rPM = None 
-        rPM = float(pmsize)/2 #convert diameter to radius
+            rPM = None
+        else: 
+            rPM = float(pmsize)/2 #convert diameter to radius
 
         # GEOS files can be inconsistent when it comes to case
         # ----------------------------------------------------
