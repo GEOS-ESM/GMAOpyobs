@@ -20,8 +20,14 @@ from .constants import MAPL_GRAV as GRAV
 G2G_MieMap = """
 #
 # GEOS Aerosol Mie table Definition for each of species.
-# The order of the tracers correspond to the bins in the optics netcdf files.
+# The order of the tracers and rhod correspond to the bins in the optics netcdf files.
 #
+#  rhod: particle density in kg m-3
+#  shapefactor: factor that accounts for aerodynamic resistance of non-spherical particles
+#               see the following reference for further documentation
+#               GMAO Office Note No. 22 (Version 1.1): 
+#               Collow, A., V. Buchard, M. Chin, P. Colarco, A. Darmenov, and A. da Silva, 2023. 
+#               Supplemental Documentation for GEOS Aerosol Products
 
 DU:
   monoFile: ExtData/chemistry/AerosolOptics/v1.0.0/x/optics_DU.v15_3.nc4
