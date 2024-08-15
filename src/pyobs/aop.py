@@ -590,25 +590,33 @@ class G2GAOP(object):
                 # Effective radius at a relative humidity of 0% converted from meters to microns
                 rEff_zero = mie.getBinInfo('rEffDry', bin)*1000000 
 
-                #If necessary, compute the aerodynamic particle radius
-                #shape factor accounts for changes in the particle's dragging coefficient (see https://doi.org/10.1029/2002JD002485 for more info)
+                # If necessary, compute the aerodynamic particle radius
+                # shape factor accounts for changes in the particle's dragging coefficient (see https://doi.org/10.1029/2002JD002485 for more info)
                 if aerodynamic:
-                    rLow_ = rLow_ * np.sqrt((rhod_/1000)/self.mieTable[s]['shapefactor']) #this equation requires rhod to be in units of g/cm^3
-                    rUp_ = rUp_ * np.sqrt((rhod_/1000)/self.mieTable[s]['shapefactor']) #this equation requires rhod to be in units of g/cm^3
-                #Find fraction of bin 
+                    # convert rhod from kg m-3 to g cm-3
+                    rLow_ = rLow_ * np.sqrt((rhod_/1000)/self.mieTable[s]['shapefactor']) 
+                    rUp_ = rUp_ * np.sqrt((rhod_/1000)/self.mieTable[s]['shapefactor']) 
+
+                # Find fraction of bin that is below the threshhold
                 if rPM is None:
+                    # getting total PM
                     fPM = 1.0
                 else:
-                    if(rUp_ < rPM):
+                    if(rUp_ <= rPM):
                         fPM = 1.0
                     else:
-                        if(rLow_ < rPM):        	
+                        if(rLow_ < rPM):
+                                # in log space get the fraction of the radius bin range covered         	
                                 fPM = np.log(rPM/rLow_) / np.log(rUp_/rLow_)
                         else:
                                 fPM = 0.0
 
-                #Compute Growth Factor based on RH based on code from GEOS Chem (https://wiki.seas.harvard.edu/geos-chem/index.php/Particulate_matter_in_GEOS-Chem), this is not the same calculation as the GEOSmie optics files.
-                growthfactor= 1 + (((np.squeeze(rEff_) / np.squeeze(rEff_zero))**3 - 1) * (997 / rhod_))
+                # Compute the hygroscopic growth factor based on RH 
+                # this is based on a formulation from GEOS Chem 
+                # (https://wiki.seas.harvard.edu/geos-chem/index.php/Particulate_matter_in_GEOS-Chem)
+                # this is not the same hygroscopic growth factor that is in the GEOSmie optics files.
+                rhow = 997.0  # density of water at 25 C and 1 atm in kg m-3
+                growthfactor= 1 + (((np.squeeze(rEff_) / np.squeeze(rEff_zero))**3 - 1) * (rhow / rhod_))
                 #Compute PM
                 pm_ = q_conc * growthfactor * fPM
                 pm += pm_
@@ -630,7 +638,6 @@ class G2GAOP(object):
         DA['AIRDENS'] = a['AIRDENS']
         
         return xr.Dataset(DA)
-        #raise AOPError("not implemented yet")
 
 
 #....................................................................................
