@@ -765,7 +765,7 @@ def CLI_aop():
         if options.aop == 'ext':
             ds = g.getAOPext(wavelength=w,fixrh=options.fixrh)
         elif options.aop == 'rt':
-            ds = g.getAOPrt(wavelength=w,vector=options.vector)
+            ds = g.getAOPrt(wavelength=w,vector=options.vector,fixrh=options.fixrh)
         elif options.aop == 'pm':
             ds = g.getPM(pmsize=options.d_pm,fixrh=options.fixrh,aerodynamic=options.aerodynamic)
         else:
@@ -802,7 +802,7 @@ def Test_g2g_aop():
     #rts = None # g.getAOPrt(wavelength=550,vector=False)
     #rtv = g.getAOPrt(wavelength=550,vector=True)
     #ext = None # g.getAOPext(wavelength=550)
-    pm = g.getPM(wavelength=550,pmsize=2.5,verbose=True)
+    pm = g.getPM(pmsize=2.5)
     return (pm)
 
 if __name__ == "__main__":
