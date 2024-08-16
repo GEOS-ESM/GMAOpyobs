@@ -18,6 +18,7 @@ ALIAS = dict (
                                                           Longitude = 'lon' ,
                                                    Profile_UTC_Time = 'Time',
                                                            Pressure = 'plev',
+                                       Surface_Elevation_Statistics = 'surfelev',
                                                         Temperature = 'T',
                                   Total_Backscatter_Coefficient_532 = 'tback',
                      Total_Backscatter_Coefficient_Uncertainty_532  = 'tback_err',
