@@ -645,6 +645,59 @@ class G2GAOP(object):
         
         return xr.Dataset(DA)
 
+    def getVertCoord(self):
+        """
+        Returns an xarray Dataset of GEOS vertical coordinates derived from DELP and AIRDENS
+        Useful for plotting and comparing to observations
+
+        Z = mid-level altitude above surface in km
+        DZ = level thickness in km
+        """
+
+
+        # GEOS files can be inconsistent when it comes to case
+        # ----------------------------------------------------
+        try:
+            dp = self.aer['DELP']
+        except:
+            dp = self.aer['delp']
+
+        # Get layer thicnkness from DELP & AIRDENS
+        # DELP: Pa = kg m-1 s-2
+        # AIRDENS: kg m-3
+        # GRAV: m s-2
+        # -----------------------------------------
+        rhodz = dp / GRAV
+        dz = rhodz / self.aer['AIRDENS']       # column thickness in m
+
+        # add up the thicknesses to get edge level altitudes
+        npts, nlev = dz.shape
+        ze = np.array([dz[:,i:].sum(axis=1) for i in range(nlev)]) 
+        # append surface level, altitude = 0
+        ze = np.append(ze,np.zeros([1,npts]),axis=0)
+        # transpose to get npts, nlev again
+        ze = ze.T
+        # convert from m to km
+        ze = ze*1e-3
+
+        # get mid-level altitudes
+        z = (ze[:,:-1] + ze[:,1:])*0.5
+
+        # Attributes
+        # ----------
+        A = dict (Z = {'long_name':'mid-level atltitude above surface', 'units':'km'},
+                  DZ = {'long_name':'level altitude thickness', 'units':'km'}
+                  )
+
+        # Pack results into a Dataset
+        # ---------------------------
+        DA = dict(  Z = xr.DataArray(z.astype('float32'),dims=dp.dims,coords=dp.coords,attrs=A['Z']),
+                    DZ = xr.DataArray(dz.astype('float32'),dims=dp.dims,coords=dp.coords,attrs=A['DZ'])
+                 )
+
+        return xr.Dataset(DA)
+
+        
 
 #....................................................................................
 
