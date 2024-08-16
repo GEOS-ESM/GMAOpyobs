@@ -4,7 +4,8 @@
 """
 
 import os
-from pyhdf import SD
+from pyhdf import SD, HDF
+import pyhdf.VS
 from glob     import glob
 from   numpy    import ones, concatenate, array,linspace,arange
 from   datetime import date, datetime, timedelta
@@ -202,6 +203,26 @@ class CALIPSO_L2(object):
                     self.__dict__[v].append(data[0:self.keep,:])
               else:
                     self.__dict__[v].append(data[:,:])
+
+
+        # read altitude from metadata
+        # only need to do this once:
+        if not hasattr(self,'alt'):
+            hdf = HDF.HDF(filename)
+            vs  = hdf.vstart()
+            meta = vs.attach("metadata")
+            lidar_alt_field = meta.field('Lidar_Data_Altitudes')
+            record_index = 0
+            all_data = meta.read(meta._nrecs)[record_index]
+            self.alt = array(all_data[lidar_alt_field._idx])
+
+            meta.detach()
+            vs.end()
+            hdf.close()
+
+
+        # clean up
+        f.end()
           
 #---
    def writeg(self,aer,syn_time,nsyn=8,filename=None,dir='.',expid='calipso_lev2',Verb=1):
