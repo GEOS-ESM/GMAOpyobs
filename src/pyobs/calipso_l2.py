@@ -104,7 +104,8 @@ class CALIPSO_L2(object):
      # ----------------------------------------------
 #    Alias = ALIAS.keys()
      for name in self.Names:
-         print('shape', name,array(self.__dict__[name]).shape)
+         if self.verb:
+             print('shape', name,array(self.__dict__[name]).shape)
          if name in SDS:
              self.__dict__[ALIAS[name]] = self.__dict__[name]
      
@@ -193,7 +194,8 @@ class CALIPSO_L2(object):
                 self.time.append(datetime(year,month,day,hh,mm,ss))
                               
           else:
-              print('v', v)
+              if self.verb:
+                  print('v', v)
               sd = f.select(v)
               
               data  = sd.get()  # most of parameter : data = (nobs) or (nobs,km) except L2 feature type(nobs,km,4)
