@@ -7,7 +7,8 @@ import os
 from pyhdf import SD, HDF
 import pyhdf.VS
 from glob     import glob
-from   numpy    import ones, concatenate, array,linspace,arange
+import numpy as np
+from   numpy    import concatenate, array,linspace,arange
 from   datetime import date, datetime, timedelta
 MISSING = -9999.0
 
@@ -151,56 +152,72 @@ class CALIPSO_L2(object):
 
         f = SD.SD(filename)
 
-#       for group in self.SDS.keys():
         for name in self.SDS:
-          v = name
+            v = name
 
 #      ------------------------------------------------------------------
 #            Temperory:
 
-          if v == 'Profile_UTC_Time':
-              sd = f.select(v)
-              Time  = sd.get()
-              nobs  = len(Time)
+            if v == 'Profile_UTC_Time':
+                sd = f.select(v)
+                Time  = sd.get()
+                nobs  = len(Time)
               
-              nymd  = ones(nobs).astype('int')
-              nhms  = ones(nobs).astype('int')
-              self.__dict__[v].append(Time)       # time as on file
-              for i in range(nobs):
-                yymmdd = Time[i,1]   # 3 times reported, choose the middle
-                nymd0 = int(Time[i,1])               
-                nd    = Time[i,1] - nymd0
-                nd0   = nd * 24.0
-                hh    = int(nd0)
-                nd1   = nd0 - hh
-                nd2   = nd1 * 60
-                mm    = int(nd2)
-                nd3   = nd2 - mm
-                nd4   = nd3 * 60
-                ss    = int(nd4)
+                nymd  = np.ones(nobs).astype('int')
+                nhms  = np.ones(nobs).astype('int')
+                self.__dict__[v].append(Time)       # time as on file
+                for i in range(nobs):
+                    yymmdd = Time[i,1]   # 3 times reported, choose the middle
+                    nymd0 = int(Time[i,1])               
+                    nd    = Time[i,1] - nymd0
+                    nd0   = nd * 24.0
+                    hh    = int(nd0)
+                    nd1   = nd0 - hh
+                    nd2   = nd1 * 60
+                    mm    = int(nd2)
+                    nd3   = nd2 - mm
+                    nd4   = nd3 * 60
+                    ss    = int(nd4)
                                 
-                nymd[i]  = 20000000 + nymd0
-                nhms[i]  = ((hh * 100) + mm) * 100 + ss
+                    nymd[i]  = 20000000 + nymd0
+                    nhms[i]  = ((hh * 100) + mm) * 100 + ss
                 
-                self.nymd.append(nymd)
-                self.nhms.append(nhms)
+                    self.nymd.append(nymd)
+                    self.nhms.append(nhms)
                 
-                year = int(nymd[i]/10000)
-                month = int((nymd[i] - 10000*year)/100)
-                day = nymd[i] - (year*10000 + month * 100) 
-                self.time.append(datetime(year,month,day,hh,mm,ss))
+                    year = int(nymd[i]/10000)
+                    month = int((nymd[i] - 10000*year)/100)
+                    day = nymd[i] - (year*10000 + month * 100) 
+                    self.time.append(datetime(year,month,day,hh,mm,ss))
                               
-          else:
-              if self.verb:
-                  print('v', v)
-              sd = f.select(v)
+            else:
+                if self.verb:
+                    print('v', v)
+                sd = f.select(v)
               
-              data  = sd.get()  # most of parameter : data = (nobs) or (nobs,km) except L2 feature type(nobs,km,4)
-              if v == 'Temperature':
-                  data = data + 273.15
+                data  = sd.get()  # most of parameter : data = (nobs) or (nobs,km) except L2 feature type(nobs,km,4)
+                if v == 'Temperature':
+                    data = data + 273.15
+
+                # Read attributes.
+                attrs       = sd.attributes(full=1)
+                fva         = attrs["fillvalue"]
+                fillvalue   = fva[0]
+                ua          = attrs["units"]
+                units       = ua[0]
+                vra         = attrs["valid_range"]
+                valid_range = vra[0].split('...')
+
+                # Filter fill value and valid range. See Table 66 (p. 116) from [1]
+                data = np.ma.array(data,mask= data == fillvalue)
+  
+                # Apply the valid_range attribute.
+                invalid = (data < float(valid_range[0])) | (data > float(valid_range[1]))
+                data.mask[invalid] = True
+                sd.end()
 
 
-              self.__dict__[v].append(data[:,:])
+                self.__dict__[v].append(data)
 
 
         # read altitude from metadata
@@ -257,7 +274,7 @@ class CALIPSO_L2(object):
 
 #      GEOS-5 edge pressure [Pa]
 #      ------------------------- 
-       pe = ones((im,jm,km+1)) 
+       pe = np.ones((im,jm,km+1)) 
        pe[:,:,0] = ptop
        for k in range(aer.km):
            pe[:,:,k+1] = pe[:,:,k] + aer.read('delp',nymd=nymd,nhms=nhms)[:,:,k]   
@@ -265,7 +282,7 @@ class CALIPSO_L2(object):
 
 #      GEOS-5 mid-level pressure [Pa]
 #      -----------------------------
-       plev = ones((im,jm,km)) # mid-level pressure [Pa]
+       plev = np.ones((im,jm,km)) # mid-level pressure [Pa]
        plev[:,:,0] = ptop + aer.read('delp',nymd=nymd,nhms=nhms)[:,:,0]/2. 
        for k in range(aer.km-1):  
            plev[:,:,k+1] = plev[:,:,k] + aer.read('delp',nymd=nymd,nhms=nhms)[:,:,k]/2.\
@@ -301,7 +318,7 @@ class CALIPSO_L2(object):
 
        # QA filtering
        # ------------
-       I_bad = ones(self.tback.shape) # bad data
+       I_bad = np.ones(self.tback.shape) # bad data
        I_bad = False
        
        # Time filter of data
@@ -335,7 +352,7 @@ class CALIPSO_L2(object):
 #....................................................................
 
 def _timefilter ( t, t1, t2, a, I_bad ):
-    filler = MISSING * ones(a.shape[1:])
+    filler = MISSING * np.ones(a.shape[1:])
     b = a.copy()
     for i in range(len(t)):
         if (t[i]<t1) or (t[i]>=t2):
