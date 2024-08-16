@@ -35,20 +35,16 @@ class CALIPSO_L2(object):
     Base class for generic CALIPSO object.
    """
 
-   def __init__ (self,Path,keep=None,Verbose=0,only_good=True):
+   def __init__ (self,Path,Verbose=0,only_good=True):
      """
        Creates an CALIPSO object defining the attributes corresponding
        to the SDS's on input.
-        The optional parameter *keep* is used to specify the number of scan
-        lines (from the left of the swath) to keep. This is needed for
-        coping with the row anomaly problem.
 
      """
 
      #  Initially are lists of numpy arrays for each granule
      # ----------------------------------------------------
      self.verb = Verbose
-     self.keep = keep
      self.SDS = SDS
 
      # Variable names
@@ -201,11 +197,10 @@ class CALIPSO_L2(object):
               
               data  = sd.get()  # most of parameter : data = (nobs) or (nobs,km) except L2 feature type(nobs,km,4)
               if v == 'Temperature':
-               data = data + 273.15
-              if self.keep != None:
-                    self.__dict__[v].append(data[0:self.keep,:])
-              else:
-                    self.__dict__[v].append(data[:,:])
+                  data = data + 273.15
+
+
+              self.__dict__[v].append(data[:,:])
 
 
         # read altitude from metadata
