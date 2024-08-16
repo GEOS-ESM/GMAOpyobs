@@ -20,8 +20,15 @@ from .constants import MAPL_GRAV as GRAV
 G2G_MieMap = """
 #
 # GEOS Aerosol Mie table Definition for each of species.
-# The order of the tracers correspond to the bins in the optics netcdf files.
+# The order of the tracers and rhod correspond to the bins in the optics netcdf files.
 #
+#  rhod: particle density in kg m-3
+#  shapefactor: factor that accounts for aerodynamic resistance of non-spherical particles
+#               this is used to calculate the aerodynamic radius for PM calculations when the aerodymic flag is turned on
+#               see the following reference for further documentation
+#               GMAO Office Note No. 22 (Version 1.1): 
+#               Collow, A., V. Buchard, M. Chin, P. Colarco, A. Darmenov, and A. da Silva, 2023. 
+#               Supplemental Documentation for GEOS Aerosol Products
 
 DU:
   monoFile: ExtData/chemistry/AerosolOptics/v1.0.0/x/optics_DU.v15_3.nc4
@@ -523,8 +530,9 @@ class G2GAOP(object):
         # Determine PM Threshold
         # -------------------------------
         if pmsize is None:
-            rPM = None 
-        rPM = float(pmsize)/2 #convert diameter to radius
+            rPM = None
+        else: 
+            rPM = float(pmsize)/2 #convert diameter to radius
 
         # GEOS files can be inconsistent when it comes to case
         # ----------------------------------------------------
@@ -548,7 +556,7 @@ class G2GAOP(object):
         # -------------------
         space = rh.shape
 
-        pm = (np.zeros(space))
+        pm = np.zeros(space)
         for s in Species:   # species
 
             if self.verbose:
@@ -563,34 +571,52 @@ class G2GAOP(object):
                 if self.verbose:
                     print('   -',q)
 
-                
-                q_conc = (a['AIRDENS'] * a[q]).values * 1000000000 #Aerosol concentration converted to units of kg/m3
-                #rhod is not in all of the standard optics files, and is temporarily added in the yaml portion of the code. 
-                #rhod_ = mie.getAOP('rhod',  bin, rh, wavelength=wavelength).values
-                rhod_ = self.mieTable[s]['rhod'][bin-1] #Dry aerosol density
-                rLow_ = mie.getBinInfo('rLow', bin)*1000000 #Lower bound of the bin's radius converted to microns
-                rUp_ = mie.getBinInfo('rUp', bin)*1000000 #Upper bound of the bin's radius converted to microns
-                rEff_ = mie.getAOP('rEff', bin, rh, wavelength=None).values*1000000 #Effective radius at the specified humidity converted to microns
-                rEff_zero = mie.getBinInfo('rEffDry', bin)*1000000 #Effective radius at a relative humidity of 0% converted to microns
-		#If necessary, compute the aerodynamic particle radius
-                #shape factor accounts for changes in the particle's dragging coefficient (see https://doi.org/10.1029/2002JD002485 for more info)
+
+                # Aerosol mass concentration in kg/m3                
+                q_conc = (a['AIRDENS'] * a[q]).values
+  
+                # Dry aerosol density in kg m-3
+                # rhod is not in all of the standard optics files, and is for now read from the yaml config 
+                # rhod_ = mie.getAOP('rhod',  bin, rh, wavelength=wavelength).values
+                rhod_ = self.mieTable[s]['rhod'][bin-1] 
+
+                # Lower and upper bound of the bin's radius converted from meters to microns
+                rLow_ = mie.getBinInfo('rLow', bin)*1000000 
+                rUp_ = mie.getBinInfo('rUp', bin)*1000000 
+
+                # Effective radius at the specified humidity converted from meters to microns
+                rEff_ = mie.getAOP('rEff', bin, rh, wavelength=None).values*1000000 
+
+                # Effective radius at a relative humidity of 0% converted from meters to microns
+                rEff_zero = mie.getBinInfo('rEffDry', bin)*1000000 
+
+                # If necessary, compute the aerodynamic particle radius
+                # shape factor accounts for changes in the particle's dragging coefficient (see https://doi.org/10.1029/2002JD002485 for more info)
                 if aerodynamic:
-                    rLow_ = rLow_ * np.sqrt((rhod_/1000)/self.mieTable[s]['shapefactor']) #this equation requires rhod to be in units of g/cm^3
-                    rUp_ = rUp_ * np.sqrt((rhod_/1000)/self.mieTable[s]['shapefactor']) #this equation requires rhod to be in units of g/cm^3
-                #Find fraction of bin 
+                    # convert rhod from kg m-3 to g cm-3
+                    rLow_ = rLow_ * np.sqrt((rhod_/1000)/self.mieTable[s]['shapefactor']) 
+                    rUp_ = rUp_ * np.sqrt((rhod_/1000)/self.mieTable[s]['shapefactor']) 
+
+                # Find fraction of bin that is below the threshhold
                 if rPM is None:
+                    # getting total PM
                     fPM = 1.0
                 else:
-                    if(rUp_ < rPM):
+                    if(rUp_ <= rPM):
                         fPM = 1.0
                     else:
-                        if(rLow_ < rPM):        	
+                        if(rLow_ < rPM):
+                                # in log space get the fraction of the radius bin range covered         	
                                 fPM = np.log(rPM/rLow_) / np.log(rUp_/rLow_)
                         else:
                                 fPM = 0.0
 
-                #Compute Growth Factor based on RH based on code from GEOS Chem (https://wiki.seas.harvard.edu/geos-chem/index.php/Particulate_matter_in_GEOS-Chem), this is not the same calculation as the GEOSmie optics files.
-                growthfactor= 1 + (((np.squeeze(rEff_) / np.squeeze(rEff_zero))**3 - 1) * (997 / rhod_))
+                # Compute the hygroscopic growth factor based on RH 
+                # this is based on a formulation from GEOS Chem 
+                # (https://wiki.seas.harvard.edu/geos-chem/index.php/Particulate_matter_in_GEOS-Chem)
+                # this is not the same hygroscopic growth factor that is in the GEOSmie optics files.
+                rhow = 997.0  # density of water at 25 C and 1 atm in kg m-3
+                growthfactor= 1 + (((np.squeeze(rEff_) / np.squeeze(rEff_zero))**3 - 1) * (rhow / rhod_))
                 #Compute PM
                 pm_ = q_conc * growthfactor * fPM
                 pm += pm_
@@ -598,9 +624,15 @@ class G2GAOP(object):
                 bin += 1
                 
 
+        # convert from kg m-3 to micrograms m-3
+        # a more common unit for PM concentration
+        # ---------------------------------------
+        pm = pm*1e9
+
+
         # Attributes
         # ----------
-        A = dict (PM = {'long_name':'Particulate Matter', 'units':'kg m-3'}
+        A = dict (PM = {'long_name':'Particulate Matter', 'units':'microgram m-3'}
                   )
         
         # Pack results into a Dataset
@@ -612,7 +644,6 @@ class G2GAOP(object):
         DA['AIRDENS'] = a['AIRDENS']
         
         return xr.Dataset(DA)
-        #raise AOPError("not implemented yet")
 
 
 #....................................................................................
@@ -734,7 +765,7 @@ def CLI_aop():
         if options.aop == 'ext':
             ds = g.getAOPext(wavelength=w,fixrh=options.fixrh)
         elif options.aop == 'rt':
-            ds = g.getAOPrt(wavelength=w,vector=options.vector)
+            ds = g.getAOPrt(wavelength=w,vector=options.vector,fixrh=options.fixrh)
         elif options.aop == 'pm':
             ds = g.getPM(pmsize=options.d_pm,fixrh=options.fixrh,aerodynamic=options.aerodynamic)
         else:
@@ -771,7 +802,7 @@ def Test_g2g_aop():
     #rts = None # g.getAOPrt(wavelength=550,vector=False)
     #rtv = g.getAOPrt(wavelength=550,vector=True)
     #ext = None # g.getAOPext(wavelength=550)
-    pm = g.getPM(wavelength=550,pmsize=2.5,verbose=True)
+    pm = g.getPM(pmsize=2.5)
     return (pm)
 
 if __name__ == "__main__":

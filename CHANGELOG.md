@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 # [Unreleased] 2024-04-19 Modified by A.Collow
 
 ### Added 
--pm class to aop.py
+- pm class to aop.py - with some additional comments
 ### Changed 
 
 ### Fixed 
