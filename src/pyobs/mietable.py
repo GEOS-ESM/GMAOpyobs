@@ -12,9 +12,9 @@
       channel          (w) channel number
       wavelengths      (w) wavelengths        [m]
       rh               (r) RH values   [fraction]
-      rLow             (b) Dry upper radius [m]
+      rLow             (b) Dry lower radius [m]
       rEffDry          (b) Dry Effective radius [m]
-	  rUp              (b) Dry lower radius [m]
+      rUp              (b) Dry upper radius [m]
       p                (p) Non-zero elements of phase matrix
       m                (p) Moments of phase matrix
 
@@ -115,6 +115,14 @@ class MIETABLE(object):
       self.min_wavelength = min(wavelengths)
       self.max_wavelength = max(wavelengths)
       self.nbins           = len(bin)
+
+
+   #--
+   def getBinInfo(self,name,bin):
+       """
+       Return one-dimension fields from the optics files that are a function of bin
+       """   
+       return self.ds.coords[name].values[bin-1]
 
    #--
    def getDims(self):
