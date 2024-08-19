@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added 
 - pm class to aop.py - with some additional comments
+- G2GAOP can not take a string as the config file variable input
+- add a function to sampler that can append a vertical coordinate to a sampled dataset
 ### Changed 
 
 ### Fixed 
