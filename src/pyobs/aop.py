@@ -29,6 +29,8 @@ G2G_MieMap = """
 #               GMAO Office Note No. 22 (Version 1.1): 
 #               Collow, A., V. Buchard, M. Chin, P. Colarco, A. Darmenov, and A. da Silva, 2023. 
 #               Supplemental Documentation for GEOS Aerosol Products
+#  pmconversion: additional factor for unaccounted aerosol species. was implemented to allow for sulfate to represent missing ammonium in MERRA-2.
+#              pmconversion = 1.3756 for SU for MERRA-2, otherwise = 1
 
 DU:
   monoFile: ExtData/chemistry/AerosolOptics/v1.0.0/x/optics_DU.v15_3.nc4
@@ -46,6 +48,7 @@ DU:
     - 2650
     - 2650
     - 2650
+  pmconversion: 1
 
 
 SS:
@@ -64,6 +67,7 @@ SS:
     - 2200
     - 2200
     - 2200
+  pmconversion: 1
 
 
 OC:
@@ -76,6 +80,7 @@ OC:
   rhod:
     - 1800
     - 1800
+  pmconversion: 1
 
 BC:
   monoFile: ExtData/chemistry/AerosolOptics/v1.0.0/x/optics_BC.v1_3.nc4
@@ -87,6 +92,7 @@ BC:
   rhod:
     - 1800
     - 1800
+  pmconversion: 1
 
 BR:
   monoFile: ExtData/chemistry/AerosolOptics/v1.0.0/x/optics_BRC.v1_5.nc4
@@ -98,6 +104,7 @@ BR:
   rhod:
     - 1800
     - 1800
+  pmconversion: 1
 
 SU:
   monoFile: ExtData/chemistry/AerosolOptics/v1.0.0/x/optics_SU.v1_3.nc4
@@ -107,6 +114,7 @@ SU:
   shapefactor: 1
   rhod:
     - 1700
+  pmconversion: 1 
 
 NI:
   monoFile: ExtData/chemistry/AerosolOptics/v1.0.0/x/optics_NI.v2_5.nc4
@@ -120,6 +128,7 @@ NI:
     - 1725
     - 2200
     - 2650
+  pmconversion: 1
 
 """
 
@@ -519,6 +528,8 @@ class G2GAOP(object):
     
         PMsize: float, particle diameter threshold in microns. If None, the total PM is calculated.
 
+	Please see m2_pm25.yaml and g2g_pm25.yaml for example yaml configurations.
+
         """
 
         # All species on file or a subset
@@ -621,7 +632,7 @@ class G2GAOP(object):
                 rhow = 997.0  # density of water at 25 C and 1 atm in kg m-3
                 growthfactor= 1 + (((np.squeeze(rEff_) / np.squeeze(rEff_zero))**3 - 1) * (rhow / rhod_))
                 #Compute PM
-                pm_ = q_conc * growthfactor * fPM
+                pm_ = q_conc * growthfactor * fPM * self.mieTable[s]['pmconversion']
                 pm += pm_
 
                 bin += 1
