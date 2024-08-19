@@ -46,6 +46,7 @@ DU:
     - 2650
     - 2650
     - 2650
+  pmconversion: 1
 
 
 SS:
@@ -64,6 +65,7 @@ SS:
     - 2200
     - 2200
     - 2200
+  pmconversion: 1
 
 
 OC:
@@ -76,6 +78,7 @@ OC:
   rhod:
     - 1800
     - 1800
+  pmconversion: 1
 
 BC:
   monoFile: ExtData/chemistry/AerosolOptics/v1.0.0/x/optics_BC.v1_3.nc4
@@ -87,17 +90,19 @@ BC:
   rhod:
     - 1800
     - 1800
+  pmconversion: 1
 
-BR:
-  monoFile: ExtData/chemistry/AerosolOptics/v1.0.0/x/optics_BRC.v1_5.nc4
-  bandFile: ExtData/chemistry/AerosolOptics/v1.0.0/x/opticsBands_BRC.v1_5.RRTMG.nc4
-  tracers:
-    - BRCPHOBIC
-    - BRCPHILIC
-  shapefactor: 1
-  rhod:
-    - 1800
-    - 1800
+#BR:
+#  monoFile: ExtData/chemistry/AerosolOptics/v1.0.0/x/optics_BRC.v1_5.nc4
+#  bandFile: ExtData/chemistry/AerosolOptics/v1.0.0/x/opticsBands_BRC.v1_5.RRTMG.nc4
+#  tracers:
+#    - BRCPHOBIC
+#    - BRCPHILIC
+#  shapefactor: 1
+#  rhod:
+#    - 1800
+#    - 1800
+#  pmconversion: 1
 
 SU:
   monoFile: ExtData/chemistry/AerosolOptics/v1.0.0/x/optics_SU.v1_3.nc4
@@ -107,19 +112,21 @@ SU:
   shapefactor: 1
   rhod:
     - 1700
+  pmconversion: 1.3756
 
 NI:
   monoFile: ExtData/chemistry/AerosolOptics/v1.0.0/x/optics_NI.v2_5.nc4
   bandFile: ExtData/chemistry/AerosolOptics/v1.0.0/x/opticsBands_NI.v2_5.RRTMG.nc4
   tracers:
     - NO3AN1
-    - NO3AN2
-    - NO3AN3
+#    - NO3AN2
+#    - NO3AN3
   shapefactor: 1
   rhod:
     - 1725
-    - 2200
-    - 2650
+#    - 2200
+#    - 2650
+  pmconversion: 1
 
 """
 
@@ -618,7 +625,9 @@ class G2GAOP(object):
                 rhow = 997.0  # density of water at 25 C and 1 atm in kg m-3
                 growthfactor= 1 + (((np.squeeze(rEff_) / np.squeeze(rEff_zero))**3 - 1) * (rhow / rhod_))
                 #Compute PM
-                pm_ = q_conc * growthfactor * fPM
+                #The PM conversion is 1 for all species except sulfate. A factor of 1.3756 is needed 
+                #to convert the sulfate ion to ammonium sulfate.
+                pm_ = q_conc * growthfactor * fPM * self.mieTable[s]['pmconversion']
                 pm += pm_
 
                 bin += 1
