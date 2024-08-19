@@ -8,7 +8,6 @@ from pyhdf import SD, HDF
 import pyhdf.VS
 from glob     import glob
 import numpy as np
-from   numpy    import concatenate, array,linspace,arange
 from   datetime import date, datetime, timedelta
 MISSING = -9999.0
 
@@ -83,12 +82,12 @@ class CALIPSO_L2(object):
      # ----------------------------------------
      for name in self.Names:
             try:
-                self.__dict__[name] = concatenate(self.__dict__[name])
+                self.__dict__[name] = np.ma.concatenate(self.__dict__[name])
                 
             except:
                 print("Failed concatenating "+name)
 
-     self.time = array(self.time)
+     self.time = np.array(self.time)
 
      # Determine index of "good" observations
      # --------------------------------------
@@ -103,7 +102,7 @@ class CALIPSO_L2(object):
 #    Alias = ALIAS.keys()
      for name in self.Names:
          if self.verb:
-             print('shape', name,array(self.__dict__[name]).shape)
+             print('shape', name,np.array(self.__dict__[name]).shape)
          if name in SDS:
              self.__dict__[ALIAS[name]] = self.__dict__[name]
      
@@ -209,12 +208,17 @@ class CALIPSO_L2(object):
                 valid_range = vra[0].split('...')
 
                 # Filter fill value and valid range. See Table 66 (p. 116) from [1]
-                data = np.ma.array(data,mask= data == fillvalue)
+                data = np.ma.array(data)
+                data.mask = data == fillvalue
   
                 # Apply the valid_range attribute.
-                invalid = (data < float(valid_range[0])) | (data > float(valid_range[1]))
+                # sometimes the upper limit is not defined, so just try
+                try:
+                    invalid = (data < float(valid_range[0])) | (data > float(valid_range[1]))
+                except:
+                    invalid = (data < float(valid_range[0]))    
                 data.mask[invalid] = True
-                sd.end()
+                sd.endaccess()
 
 
                 self.__dict__[v].append(data)
@@ -229,7 +233,7 @@ class CALIPSO_L2(object):
             lidar_alt_field = meta.field('Lidar_Data_Altitudes')
             record_index = 0
             all_data = meta.read(meta._nrecs)[record_index]
-            self.alt = array(all_data[lidar_alt_field._idx])
+            self.alt = np.array(all_data[lidar_alt_field._idx])
 
             meta.detach()
             vs.end()
@@ -262,8 +266,8 @@ class CALIPSO_L2(object):
        im = aer.im
        jm = aer.jm
       
-       glon = linspace(-180.,180.,im,endpoint=False)
-       glat = linspace(-90.,90.,jm)
+       glon = np.linspace(-180.,180.,im,endpoint=False)
+       glat = np.linspace(-90.,90.,jm)
       
        nymd = 10000 * syn_time.year + 100 * syn_time.month  + syn_time.day
        nhms = 10000 * syn_time.hour + 100 * syn_time.minute + syn_time.second
@@ -310,7 +314,7 @@ class CALIPSO_L2(object):
 #      Create the file
 #      ---------------
        f = GFIO()
-       glevs=arange(km)
+       glevs=np.arange(km)
        f.create(filename, vname, nymd, nhms,
                 lon=glon, lat=glat, levs=glevs, levunits='hPa',
                 vtitle=vtitle, vunits=vunits,kmvar=kmvar,amiss=MISSING,
