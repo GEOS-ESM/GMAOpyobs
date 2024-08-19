@@ -12,8 +12,8 @@
 #  pmconversion: a conversion factor of 1.3756 is used to convert the sulfate ion to ammonium nitrate
 
 DU:
-  monoFile: ExtData/chemistry/AerosolOptics/v1.0.0/x/optics_DU.v15_3.nc4
-  bandFile: ExtData/chemistry/AerosolOptics/v1.0.0/x/opticsBands_DU.v15_3.RRTMG.nc4
+  monoFile: ExtData/chemistry/AerosolOptics/v1.0.0/x/optics_DU.v14_2.nc4
+  bandFile: ExtData/chemistry/AerosolOptics/v1.0.0/x/opticsBands_DU.v14_2.RRTMG.nc4
   tracers:
     - DU001
     - DU002
