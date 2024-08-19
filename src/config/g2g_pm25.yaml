@@ -1,4 +1,4 @@
-# 
+#
 # GEOS Aerosol Mie table Definition for each of species.
 # This example is for calculating PM2.5 concentrations for a nominal GOCART-2G Model Configuration.
 # Note that the two largest Nitrate bins should not be included in the calculation of PM2.5.
@@ -11,7 +11,7 @@
 #               GMAO Office Note No. 22 (Version 1.1):
 #               Collow, A., V. Buchard, M. Chin, P. Colarco, A. Darmenov, and A. da Silva, 2023.
 #               Supplemental Documentation for GEOS Aerosol Products
-#   pmconversion: additional factor for unaccounted aerosol species. was implemented to allow for sulfate to represent missing ammonium in MERRA-2.  
+#   pmconversion: additional factor for unaccounted aerosol species. was implemented to allow for sulfate to represent missing ammonium in MERRA-2.
 #                 For a nominal GOCART-2G simulation pmconversion = 1 for all species.
 
 DU:
