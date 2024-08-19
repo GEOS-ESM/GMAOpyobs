@@ -1,0 +1,19 @@
+#!/bin/csh -f
+#
+# Install script for systems that don't have  cmake. 
+# No F2PY codes will be compiled or instaled
+# 
+#
+
+source @env/g5_modules # to be sure
+mkdir -p install/bin
+mkdir -p install/lib/Python
+cd src
+
+set bins=(active_aeronet  aop  csBinner  stn_sampler  trj_sampler  wp2traj)
+foreach name ($bins)
+    cp $name ../install/bin 
+end
+
+cp -r pyobs ../install/lib/Python
+ 
