@@ -155,6 +155,9 @@ class G2GAOP(object):
 
         if config is None:
             config = G2G_MieMap
+        elif type(config) is str:
+            # get a file handle
+            config = open(config)
 
         self.verbose = verbose
         if isinstance(aerFiles,xr.Dataset):
