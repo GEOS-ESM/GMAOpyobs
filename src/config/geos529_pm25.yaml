@@ -28,7 +28,6 @@ DU:
     - 2650
   pmconversion: 1
 
-
 SS:
   monoFile: ExtData/chemistry/AerosolOptics/v1.0.0/x/optics_SS.v3_3.nc4
   bandFile: ExtData/chemistry/AerosolOptics/v1.0.0/x/opticsBands_SS.v3_3.RRTMG.nc4
@@ -101,5 +100,3 @@ NH4:
   rhod:
     - 1725
   pmconversion: 1
-
-
