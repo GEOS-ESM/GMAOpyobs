@@ -29,6 +29,8 @@ G2G_MieMap = """
 #               GMAO Office Note No. 22 (Version 1.1): 
 #               Collow, A., V. Buchard, M. Chin, P. Colarco, A. Darmenov, and A. da Silva, 2023. 
 #               Supplemental Documentation for GEOS Aerosol Products
+#  pmconversion: additional factor for unaccounted aerosol species. was implemented to allow for sulfate to represent missing ammonium in MERRA-2.
+#              pmconversion = 1.3756 for SU for MERRA-2, otherwise = 1
 
 DU:
   monoFile: ExtData/chemistry/AerosolOptics/v1.0.0/x/optics_DU.v15_3.nc4
@@ -112,7 +114,7 @@ SU:
   shapefactor: 1
   rhod:
     - 1700
-  pmconversion: 1.3756
+  pmconversion: 1 
 
 NI:
   monoFile: ExtData/chemistry/AerosolOptics/v1.0.0/x/optics_NI.v2_5.nc4
