@@ -5,7 +5,6 @@
 # 
 #
 
-source @env/g5_modules # to be sure
 mkdir -p install/bin
 mkdir -p install/lib/Python
 cd src
