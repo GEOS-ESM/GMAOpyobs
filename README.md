@@ -101,9 +101,9 @@ to the cmake line.
 make -j6 install
 ```
 
-## How to build GMAOpyobs on Non-GMAO Systems
+## How to build GMAOpyobs on Other Systems
 
-Compilation of f2py codes is currently not supported for non-GMAO systems.
+Building of f2py codes is not implemented for systems not supported by GMAO.
 
 #### Use git to clone the repository
 
@@ -115,6 +115,8 @@ git clone git@github.com:GEOS-ESM/GMAOpyobs.git
 ```
 ./lite_install
 ```
+
+Add the directory `install/lib/PYTHON` to your `PYTHONPATH` environment variable.
 
 ## Contributing
 
