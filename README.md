@@ -14,11 +14,11 @@ such as ODS or GFIO.
 GMAOpyobs no longer supports Python 2.7.
 
 
-## How to build GMAOpyobs on a GMAO Supported System 
+## How to build GMAOpyobs on a GMAO supported system 
 
-### Preliminary Steps
+### Preliminary steps
 
-#### Load Build Modules
+#### Load build modules
 
 In your `.bashrc` or `.tcshrc` or other rc file add a line:
 
@@ -60,7 +60,7 @@ mepo clone git@github.com:GEOS-ESM/GMAOpyobs.git
 
 #### Building and installing GMAOpyobs
 
-##### Load Compiler, MPI Stack, and Baselibs
+##### Load compiler, MPI stack, and baselibs
 On tcsh:
 ```
 source @env/g5_modules
@@ -69,15 +69,20 @@ or on bash:
 ```
 source @env/g5_modules.sh
 ```
+##### One-step build
+Run the cmake_it script
+`./cmake_it`
 
-##### Create Build Directory
+##### Multi-step build
+
+###### Create build directory
 We currently do not allow in-source builds of GEOSgcm. So we must make a directory:
 ```
 mkdir build
 ```
 The advantages of this is that you can build both a Debug and Release version with the same clone if desired.
 
-##### Run CMake
+###### Run cmake
 CMake generates the Makefiles needed to build the model.
 ```
 cd build
@@ -89,19 +94,19 @@ This will install to a directory parallel to your `build` directory. If you pref
 ```
 and CMake will install there.
 
-###### Building with Debugging Flags
+####### Building with debugging flags
 To build with debugging flags add:
 ```
 -DCMAKE_BUILD_TYPE=Debug
 ```
 to the cmake line.
 
-##### Build and Install with Make
+##### Build and install with make
 ```
 make -j6 install
 ```
 
-## How to build GMAOpyobs on Other Systems
+## How to build GMAOpyobs on other systems
 
 Building of f2py codes is not implemented for systems not supported by GMAO.
 
@@ -111,7 +116,7 @@ Building of f2py codes is not implemented for systems not supported by GMAO.
 git clone git@github.com:GEOS-ESM/GMAOpyobs.git
 ```
 
-##### Run the Install Script
+##### Run the install script
 ```
 ./lite_install
 ```
