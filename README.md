@@ -71,7 +71,7 @@ source @env/g5_modules.sh
 ```
 #### One-step build
 Run the cmake_it script
-`./cmake_it`
+```./cmake_it```
 
 #### Multi-step build
 
