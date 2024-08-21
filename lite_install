@@ -1,18 +1,27 @@
-#!/bin/csh -f
+#!/bin/bash -f
 #
-# Install script for systems that don't have  cmake. 
-# No F2PY codes will be compiled or instaled
+# Install script for systems that are not supported by GMAO. 
+# No F2PY codes will be compiled or installed
 # 
 #
 
 mkdir -p install/bin
 mkdir -p install/lib/Python
+
 cd src
 
-set bins=(active_aeronet  aop  csBinner  stn_sampler  trj_sampler  wp2traj)
-foreach name ($bins)
-    cp $name ../install/bin 
-end
+filelist=`ls`
+
+for name in $filelist
+do
+    if [ ! -d $name ] 
+    then
+        if [ -x $name ] 
+        then
+            cp $name ../install/bin 
+        fi
+    fi
+done
 
 cp -r pyobs ../install/lib/Python
  
