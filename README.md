@@ -119,7 +119,7 @@ Building of f2py codes is not implemented for systems not supported by GMAO.
 git clone git@github.com:GEOS-ESM/GMAOpyobs.git
 ```
 
-#### Install
+#### Install GMAOpyobs
 Run the lite_install script
 ```
 ./lite_install
