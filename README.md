@@ -69,11 +69,14 @@ or on bash:
 ```
 source @env/g5_modules.sh
 ```
-#### One-step build
+#### One-step default build
 Run the cmake_it script
-```./cmake_it```
+```
+./cmake_it
+```
 
 #### Multi-step build
+Follow these instructions for managing multi-version builds, or custom builds.
 
 ##### Create build directory
 We currently do not allow in-source builds of GEOSgcm. So we must make a directory:
