@@ -6,7 +6,7 @@
 implementing interfaces to several of satellite and ground-based
 observing systems. The main design philosophy is to make it as *pure
 Python* as possible, with *f2py* only when absolutely necessary. In
-partocular, it should contain any dependence on external libraries
+particular, it should not contain any dependence on external libraries
 such as ODS or GFIO.
 
 ## Python 3 only
@@ -14,7 +14,7 @@ such as ODS or GFIO.
 GMAOpyobs no longer supports Python 2.7.
 
 
-## How to build GMAOpyobs
+## How to build GMAOpyobs on a GMAO Supported System 
 
 ### Preliminary Steps
 
@@ -99,6 +99,21 @@ to the cmake line.
 ##### Build and Install with Make
 ```
 make -j6 install
+```
+
+## How to build GMAOpyobs on Non-GMAO Systems
+
+Compilation of f2py codes is currently not supported for non-GMAO systems.
+
+#### Use git to clone the repository
+
+```
+git clone git@github.com:GEOS-ESM/GMAOpyobs.git
+```
+
+##### Run the Install Script
+```
+./lite_install
 ```
 
 ## Contributing
