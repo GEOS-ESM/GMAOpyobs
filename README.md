@@ -49,7 +49,7 @@ module load GEOSenv
 ```
 which obtains the latest `git`, `CMake`, etc. modules needed to build.
 
-#### Use mepo to clone the repository
+### Use mepo to clone the repository
 
 [Mepo](https://github.com/GEOS-ESM/mepo) is a multiple repository tool available on github.
 
@@ -58,9 +58,9 @@ mepo clone git@github.com:GEOS-ESM/GMAOpyobs.git
 ```
 
 
-#### Building and installing GMAOpyobs
+### Building and installing GMAOpyobs
 
-##### Load compiler, MPI stack, and baselibs
+#### Load compiler, MPI stack, and baselibs
 On tcsh:
 ```
 source @env/g5_modules
@@ -69,20 +69,20 @@ or on bash:
 ```
 source @env/g5_modules.sh
 ```
-##### One-step build
+#### One-step build
 Run the cmake_it script
 `./cmake_it`
 
-##### Multi-step build
+#### Multi-step build
 
-###### Create build directory
+##### Create build directory
 We currently do not allow in-source builds of GEOSgcm. So we must make a directory:
 ```
 mkdir build
 ```
 The advantages of this is that you can build both a Debug and Release version with the same clone if desired.
 
-###### Run cmake
+##### Run cmake
 CMake generates the Makefiles needed to build the model.
 ```
 cd build
@@ -94,14 +94,14 @@ This will install to a directory parallel to your `build` directory. If you pref
 ```
 and CMake will install there.
 
-####### Building with debugging flags
+##### Building with debugging flags
 To build with debugging flags add:
 ```
 -DCMAKE_BUILD_TYPE=Debug
 ```
 to the cmake line.
 
-##### Build and install with make
+### Compile and install with make
 ```
 make -j6 install
 ```
@@ -116,7 +116,8 @@ Building of f2py codes is not implemented for systems not supported by GMAO.
 git clone git@github.com:GEOS-ESM/GMAOpyobs.git
 ```
 
-##### Run the install script
+##### Install
+Run the lite_install script
 ```
 ./lite_install
 ```
