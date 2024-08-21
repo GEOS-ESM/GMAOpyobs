@@ -1,5 +1,5 @@
 """
-Reads Level 2 MOD04/MYD04 granules for a single day and returns a
+Reads Level 2 tropomaer granules for a single day and returns a
 single object with the relevant data.
 
 This software is hereby placed in the public domain.
@@ -10,7 +10,7 @@ import os
 import sys
 from numpy    import zeros, ones, sqrt, std, mean, unique,\
                      concatenate, where, array, linspace,\
-                     shape, arange, interp
+                     shape, arange, interp, reshape, repeat
 from datetime import date, datetime, timedelta
 from glob     import glob
 
@@ -21,21 +21,18 @@ try:
 except:
     pass
 
-from pyhdf.SD import SD, HDF4Error
-
-from .bits import BITS
+import netCDF4 as nc
 
 #---  
 
-DATE_START = datetime(1993,1,1,0,0,0)
+DATE_START = datetime(2010,1,1,0,0,0)
 
 SDS = dict (
-      META = ('longitude', 'latitude', 
-              'time','delta_time',
+      GEODATA = ('longitude', 'latitude', 
 #tro           'latitude_bounds','longitude_bounds',
               'viewing_zenith_angle', 'viewing_azimuth_angle',
-              'solar_zenith_angle',  'solar_azimuth_angle')
-      TROPO = ('FinalAerosolAbsOpticalDepth',
+              'solar_zenith_angle',  'solar_azimuth_angle'),
+      SCIDATA = ('FinalAerosolAbsOpticalDepth',
                'FinalAerosolLayerHeight',
                'FinalAerosolOpticalDepth',
                'FinalAerosolSingleScattAlb',
@@ -47,12 +44,10 @@ SDS = dict (
                'UVAerosolIndex',
                'VIIRS_confidently_clear',
                'CloudFraction')
+        )
 
 CHANNELS = dict (
                   TROPO = ( 354, 388, 500 ),
-#                  LAND = ( 470, 550, 660 ),
-#                  OCEAN = ( 470, 550, 660, 870, 1200, 1600, 2100 ),
-#                   DEEP = ( 412, 470, 550, 660 ), # file has 550 separate
                    SREF = ( 354, 388 ),
                 )
 
@@ -64,52 +59,38 @@ ALIAS = dict (  longitude = 'lon',
                 solar_azimuth_angle = 'SolarAzimuth',
                 FinalAerosolOpticalDepth = 'aod',
                 FinalAerosolAbsOpticalDepth = 'aod_abs',  #absorption AOD
-                FinalAerosolLayerHeight = 'alh'  #new,
-                FinalAerosolSingleScattAlb = 'ssa'  
+                FinalAerosolLayerHeight = 'alh',
+                FinalAerosolSingleScattAlb = 'ssa',  
                 CloudFraction = 'cloud',
                 FinalAlgorithmFlags= 'qa_flag',
-                FinalAlgorithmFlagsACA = 'qa_flag_aca'
+                FinalAlgorithmFlagsACA = 'qa_flag_aca',
                 Reflectivity = 'reflectance',
-                NormRadiance = 'normradiance'
-                Residue = 'residue'
-                UVAerosolIndex = 'UVAI'
-                VIIRS_confidently_clear = 'viirs',
+                NormRadiance = 'normradiance',
+                Residue = 'residue',
+                UVAerosolIndex = 'UVAI',
+                VIIRS_confidently_clear = 'viirs'
              )
 
-BAD, MARGINAL, GOOD, BEST = ( 0, 1, 2, 3 ) # QA marks
+BEST = 0 # QA marks
 
-KX = dict ( TerraOCEAN = 301,
-            TerraLAND  = 302,
-            TerraDEEP  = 310,
-            AquaOCEAN  = 311, 
-            AquaLAND   = 312,
-            AquaDEEP   = 320,
-          )
+KX =  341
 
 KT = dict ( AOD = 45, )
 
-IDENT = dict ( TerraOCEAN = 'modo',
-               TerraLAND  = 'modl',
-               TerraDEEP  = 'modd',
-               AquaOCEAN  = 'mydo',
-               AquaLAND   = 'mydl',
-               AquaDEEP   = 'mydd'
-          )
 
 MISSING = 999.999
 
 #...........................................................................
 
-class MxD04_L2(object):
+class TROPOMAER_L2(object):
     """
-    This class implements the MODIS Level 2 AEROSOL products, usually
-    referred to as MOD04 (TERRA satellite) and MYD04 (AQUA satellite).
+    This class implements the TROPOMI Level 2 AEROSOL products..
     """
 
-    def __init__ (self,Path,Algo,syn_time=None,nsyn=8,Verb=0,
+    def __init__ (self,Path,syn_time=None,nsyn=8,Verb=0,
                   only_good=True,SDS=SDS,alias=None):
        """
-       Reads individual granules or a full day of Level 2 MOD04/MYD04 files
+       Reads individual granules or a full day of Level 2 TROPOMAER files
        present on a given *Path* and returns a single object with
        all data concatenated for a given algorithm. On input, 
 
@@ -118,7 +99,6 @@ class MxD04_L2(object):
                  of files and directories.  Directories are
                  transversed recursively. If a non MOD04/MYD04 Level 2
                  file is encountered, it is simply ignored.
-         Algo -- Algorithm: LAND, OCEAN or DEEP (for Deep Blue)
 
        Optional parameters:
          syn_type  --- synoptic time
@@ -128,22 +108,18 @@ class MxD04_L2(object):
                  0 - really quiet (default)
                  1 - Warns if invalid file is found
                  2 - Prints out non-zero number of aerosols in each file.
-         SDS      --- Variables to be read from MODIS hdf files.  Must 
+         SDS      --- Variables to be read from TROPOMI nc files.  Must 
                       be a dictionary with keys 'META' and Algo
          ALIAS    --- dictionary of alises for SDSs
 
        """
 
-       if Algo not in ('LAND', 'OCEAN', 'DEEP'):
-           raise ValueError("invalid algorithm "+Algo+" --- must be LAND, OCEAN or DEEP")
-
 #      Initially are lists of numpy arrays for each granule
 #      ------------------------------------------------
        self.verb = Verb
-       self.sat  = None # Satellite name
+       self.sat  = 'TROPOMI' # Satellite name
        self.col  = None # collection, e.g., 005
-       self.algo = Algo
-       self.SDS = SDS['META'] + SDS[Algo]
+       self.SDS = SDS.copy()
 
        # Add/Substitute some aliases if given
        # ------------------------------------
@@ -154,7 +130,7 @@ class MxD04_L2(object):
 
        # Create empty lists for SDS to be read from file
        # -----------------------------------------------
-       for name in self.SDS:
+       for name in self.SDS['GEODATA']+self.SDS['SCIDATA']:
            self.__dict__[name] = []
 
        # Read each granule, appending them to the list
@@ -168,86 +144,72 @@ class MxD04_L2(object):
            Path = [Path, ]
        self._readList(Path)
 
+       # Read TROPOMI Time variable 
+       self.SDS['GEODATA']+=('Scan_Start_Time',)
+ 
        #Protect against empty MXD04 files
        # --------------------------------
-       if len(self.longitude) == 0:
-           self.nobs = 0
-           print("WARNING: Empty MxD04_L2 object created")
-           return           
+#       if len(self.longitude) == 0:
+#           self.nobs = 0
+#           print("WARNING: Empty MxD04_L2 object created")
+#           return           
 
        # Make each attribute a single numpy array
        # ----------------------------------------
-       for sds in self.SDS:
-           try:
-               self.__dict__[sds] = concatenate(self.__dict__[sds])
-           except:
-               print("Failed concatenating "+sds)
-           if "Quality_Assurance" in sds:
-               if Algo == 'DEEP':
-                     pass
-               else:
-                     self.__dict__['qa_flag'] = BITS(self.__dict__[sds][:,0])[1:4] # QA Flag
+#       for sds in self.SDS['GEODATA']+self.SDS['SCIDATA']:
+#           try:
+#               self.__dict__[sds] = concatenate(self.__dict__[sds])
+#           except:
+#               print("Failed concatenating "+sds)
 
        # Determine index of "good" observations
        # --------------------------------------
-       if Algo == 'LAND':
-           self.iGood = self.qa_flag==BEST
-       elif Algo == 'OCEAN':
-           self.iGood = self.qa_flag>BAD
-       elif Algo == 'DEEP':
-           self.qa_flag = self.Deep_Blue_Aerosol_Optical_Depth_550_Land_QA_Flag
-           self.iGood = self.qa_flag>BAD # for now
-       else:
-           raise ValueError('invalid algorithm (very strange)')
+#       self.iGood = self.FinalAlgorithmFlags==0
 
        # Keep only "good" observations
        # -----------------------------
-       if only_good:
-           m = self.iGood
-           for sds in self.SDS:
-               rank = len(self.__dict__[sds].shape)
-               if rank == 1:
-                   self.__dict__[sds] = self.__dict__[sds][m]
-               elif rank == 2:
-                   self.__dict__[sds] = self.__dict__[sds][m,:]
-               else:
-                   raise IndexError('invalid rank=%d'%rank)
-           self.qa_flag = self.qa_flag[m]
-           self.iGood = self.iGood[m]
+#       if only_good:
+#           m = self.iGood
+#           for sds in self.SDS['GEODATA']+self.SDS['SCIDATA']:
+#               rank = len(self.__dict__[sds].shape)
+#               if rank == 1:
+#                   self.__dict__[sds] = self.__dict__[sds][m]
+#               elif rank == 2:
+#                   self.__dict__[sds] = self.__dict__[sds][m,:]
+#               else:
+#                   raise IndexError('invalid rank=%d'%rank)
+#           self.iGood = self.iGood[m]
 
        # Make aliases for compatibility with older code 
        # ----------------------------------------------
-       Alias = list(self.ALIAS.keys())
-       for sds in self.SDS:
-           if sds in Alias:
-               self.__dict__[self.ALIAS[sds]] = self.__dict__[sds] 
+#       Alias = list(self.ALIAS.keys())
+#       for sds in self.SDS['GEODATA']+self.SDS['SCIDATA']:
+#           if sds in Alias:
+#               self.__dict__[self.ALIAS[sds]] = self.__dict__[sds] 
 
        # Create corresponding python time
        # --------------------------------
-       self.Time = array([DATE_START+timedelta(seconds=s) for s in self.Scan_Start_Time])
-
+#       self.Time = array([DATE_START+timedelta(seconds=s) for s in self.Scan_Start_Time])
+#       self.Time = self.Scan_Start_Time
        # ODS friendly attributes
        # -----------------------
-       self.nobs = self.longitude.shape[0]
-       self.kx = KX[self.sat+self.algo]
-       self.ident = IDENT[self.sat+self.algo]
-       self.Channels = CHANNELS["OCEAN"]   # all channels
-       self.sChannels = CHANNELS["SREF"]   # LAND surface reflectivity (not the same as algo)
-       self.dChannels = CHANNELS["DEEP"]   # LAND surface reflectivity (not the same as algo)
-       self.channels = CHANNELS[self.algo]
-       if syn_time == None:
-           self.syn_time = None
-           self.time = None
-           self.nymd = None
-           self.nhms = None
-           self.nsyn = None
-       else:
-           Dt = [ t-syn_time for t in self.Time ]
-           self.time = array([ (86400.*dt.days+dt.seconds)/60. for dt in Dt ])   # in minutes
-           self.syn_time = syn_time
-           self.nymd = 10000 * syn_time.year + 100*syn_time.month  + syn_time.day
-           self.nhms = 10000 * syn_time.hour + 100*syn_time.minute + syn_time.second
-           self.nsyn = nsyn # number of synoptic times per day
+#       self.nobs = self.longitude.shape[0]
+#       self.kx = KX
+#       self.sChannels = CHANNELS["SREF"]   # LAND surface reflectivity (not the same as algo)
+#       self.channels = CHANNELS["TROPO"]
+#       if syn_time == None:
+#           self.syn_time = None
+#           self.time = None
+#           self.nymd = None
+#           self.nhms = None
+#           self.nsyn = None
+#       else:
+#           Dt = [ t-syn_time for t in self.Time ]
+#           self.time = array([ (86400.*dt.days+dt.seconds)/60. for dt in Dt ])   # in minutes
+#           self.syn_time = syn_time
+#           self.nymd = 10000 * syn_time.year + 100*syn_time.month  + syn_time.day
+#           self.nhms = 10000 * syn_time.hour + 100*syn_time.minute + syn_time.second
+#           self.nsyn = nsyn # number of synoptic times per day
 
 #---
     def _readList(self,List):
@@ -272,59 +234,62 @@ class MxD04_L2(object):
 
 #---
     def _readGranule(self,filename):
-        """Reads one MOD04/MYD04 granule with Level 2 aerosol data."""
+        """Reads one TROPOMAER granule with Level 2 aerosol data."""
 
         # Don't fuss if the file cannot be opened
         # ---------------------------------------
         try:
             if self.verb:
                 print("[] Working on "+filename)
-            hfile = SD(filename)
-        except HDF4Error:
+            hfile = nc.Dataset(filename)
+        except: 
             if self.verb > 2:
                 print("- %s: not recognized as an HDF file"%filename)
             return 
 
+        # Make TROPOMI time variable
+        #---------------------------
+        bb=hfile.groups['GEODATA'].variables['delta_time'][:]
+        scanline=hfile.dimensions['scanline'].size
+        ground_pixel=hfile.dimensions['ground_pixel'].size
+        cc=reshape(bb,(scanline,1))
+        delta=repeat(cc,ground_pixel,axis=1)
+        #print(delta.shape)
+        tt=hfile.groups['GEODATA'].variables['time'][:]
+        tt.shape = (1)
+        startd=timedelta(seconds=int(tt[0]))
+        Scan_Start_Time=[startd+timedelta(seconds=dt) for dt in delta.ravel()/1000]
+        Scan_Start_Time=array(Scan_Start_Time)
+        Scan_Start_Time=reshape(Scan_Start_Time,(scanline,ground_pixel))
+        #print(Scan_Start_Time.shape)
+        self.scanline=scanline
+        self.ground_pixel=ground_pixel
+        self.Scan_Start_Time=Scan_Start_Time
+
         # Read select variables (reshape to allow concatenation later)
         # ------------------------------------------------------------
-        for sds_ in self.SDS:
-            sds = sds_
-            try:
-                v = hfile.select(sds).get()
-            except:
-                if sds in NEW_SDS: # cope with new names in Coll. 6
-                    sds = NEW_SDS[sds_]
-                    v = hfile.select(sds).get()
-            a = hfile.select(sds).attributes()
-            if a['scale_factor']!=1.0 or a['add_offset']!=0.0:
-                v = a['scale_factor'] * v + a['add_offset']
-            if len(v.shape) == 3:
-                i, j, k = v.shape
-                if "Quality_Assurance" in sds:
+        for group in self.SDS:
+            grp = hfile.groups[group]
+            for sds_ in self.SDS[group]:
+                sds = sds_
+                v = grp.variables[sds][:]
+                if len(v.shape) == 3:
+                    i, j, k = v.shape
                     v = v.reshape((i*j,k))
+                elif len(v.shape) == 2:
+                    v = v.ravel()
+                elif len(v.shape) == 1:
+                    pass
+                elif sds == 'time':
+                    pass
                 else:
-                    v = v.reshape((i,j*k)).T
-            elif len(v.shape) == 2:
-                v = v.ravel()
-            else:
-                raise IndexError("invalid shape for SDS <%s>"%sds)
-            self.__dict__[sds_].append(v) # Keep Collection 5 names!
-
-        # Core Metadata
-        # -------------
-        cm = hfile.attributes()['CoreMetadata.0']
-
-#       Satellite name
-#       --------------
-        if self.sat is None:
-            sat = cm.split('ASSOCIATEDPLATFORMSHORTNAME')[1].split('\n')[3].split('=')[1]
-            self.sat = sat.lstrip().replace('"','')
-            
+                    raise IndexError("invalid shape for SDS <{}> {}".format(sds,v.shape))
+                self.__dict__[sds_].append(v) # Keep Collection 5 names!
+              
 #       Collection
 #       ----------
         if self.col is None:
-            col = int(cm.split('COLLECTION')[1].split('VERSIONID')[1].split('\n')[2].split('=')[1])
-            self.col = "%03d"%col
+            self.col = "%03d"%int(hfile.VersionID)
 
 #---
 
@@ -377,6 +342,7 @@ class MxD04_L2(object):
                               ks = self.ks,
                         channels = self.channels,
                          qa_flag = self.qa_flag,
+                     qa_flag_aca = self.qa_flag_aca,
                      SolarZenith = self.SolarZenith,
                     SolarAzimuth = self.SolarAzimuth,
                     SensorZenith = self.SensorZenith,
@@ -384,7 +350,13 @@ class MxD04_L2(object):
                            cloud = self.cloud,
                              aod = self.aod,
                         aod_abs = self.aod_abs,
-                     reflectance = self.reflectance)
+                            alh = self.alh,
+                            ssa = self.ssa,
+                     reflectance = self.reflectance,
+                    normradiance = self.normradiance,
+                         residue = self.residue,
+                            UVAI = self.UVAI,
+                           viirs = self.virrs)
 
         if Verb >=1:
             print("[w] Wrote file "+filename)
@@ -465,7 +437,7 @@ class MxD04_L2(object):
     def writeg(self,filename=None,dir='.',expid=None,refine=8,res=None,
                channels=None,Verb=1):
        """
-        Writes gridded MODIS measurements to file.
+        Writes gridded TROPOMIC measurements to file.
 
          refine  -- refinement level for a base 4x5 GEOS-5 grid
                        refine=1  produces a   4  x  5    grid
@@ -544,7 +516,7 @@ class MxD04_L2(object):
        vunits = [ '1',    '1',     '1',      '1',            '1',       '1',  ]
        kmvar  = [ nch,    nch,     nch,      nch,            nch,        0    ]
 
-       title = 'Gridded MODIS Aerosol Retrievals'
+       title = 'Gridded TROPOMI Aerosol Retrievals'
        source = 'NASA/GSFC/GMAO GEOS-5 Aerosol Group'
        contact = 'arlindo.dasilva@nasa.gov'
 
@@ -695,7 +667,7 @@ def granules ( path, prod, syn_time, coll='051', nsyn=8 ):
     dt = timedelta(seconds = 12. * 60. * 60. / nsyn)
     t1, t2 = (syn_time-dt,syn_time+dt)
 
-    # Find MODIS granules in synoptic time range
+    # Find TROPOMI granules in synoptic time range
     # ------------------------------------------
     dt = timedelta(minutes=5)
     t = datetime(t1.year,t1.month,t1.day,t1.hour,0,0)
@@ -703,8 +675,9 @@ def granules ( path, prod, syn_time, coll='051', nsyn=8 ):
     while t < t2:
         if t >= t1:
             doy = t.timetuple()[7]
-            basen = "%s/%s/%s/%04d/%03d/%s_L2.A%04d%03d.%02d%02d.%s.*.hdf"\
-                     %(path,coll,prod,t.year,doy,prod,t.year,doy,t.hour,t.minute,coll)
+#shlee -change file name
+#            basen = "%s/%s/%s/%04d/%03d/%s_L2.A%04d%03d.%02d%02d.%s.*.nc"\   
+#                     %(path,coll,prod,t.year,doy,prod,t.year,doy,t.hour,t.minute,coll)
             try:
                 filen = glob(basen)[0]
                 Granules += [filen,]
@@ -761,12 +734,9 @@ def _gatime(nymd,nhms):
 
 if __name__ == "__main__":
 
-#    syn_time = datetime(2008,6,30,0,0,0)
     syn_time = datetime(2016,10,26,10,0,0)
-#    Files = granules('/nobackup/MODIS/Level2/','MYD04',syn_time,coll='006')
+
     Files = granules('/discover/nobackup/dao_ops/intermediate/flk/modis','MOD04',syn_time,coll='006')
 
     ocean = MxD04_L2(Files,'OCEAN',syn_time,Verb=1,only_good=True)
-#    land  = MxD04_L2(Files,'LAND',syn_time,Verb=1)
-#    deep  = MxD04_L2(Files,'DEEP',syn_time,Verb=1)
     
