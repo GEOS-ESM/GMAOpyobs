@@ -6,8 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 # [Unreleased] 2024-08-19 Modified by A.Collow
 ### Added
+- lite_install script for systems not supported by GMAO (e.g. external collaborators)
 
 ### Changed
+- Updated README to document lite_install
 
 ### Fixed
 -missing conversion from the sulfate ion to ammonium sulfate
@@ -18,6 +20,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - pm class to aop.py - with some additional comments
 - G2GAOP can now take a string as the config file variable input
 - add a function to sampler that can append a vertical coordinate to a sampled dataset
+- example Jupyter notebooks on using pyobs utilities to sample GEOS and compare to CALIPSO and DC-8 obs
+
 ### Changed 
 
 ### Fixed 
@@ -28,6 +32,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - aop.py - protect against divide by zero in getAOPrt and getAOPext when doing calculation for an individual species
 
 - aop.py - remove dependency on having 'DU' as a species in your yaml optics table definition
+- calipso_l1p5.py - took out extinction from list of variables.  L1.5 files don't have this
+- calipso_l2.py - use variable attributes to mask missing data, read the altitude coordinate from metadata
+- constants.py - fix typo in units of gravity
+and calipso_l2 scripts 
 ### Removed 
 
 # [v1.1.0] 2024-03-20
