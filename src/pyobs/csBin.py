@@ -9,6 +9,17 @@ import xarray as xr
 
 from .constants import MAPL_UNDEF
 
+class csBinError(Exception):
+    """
+    Defines general exception errors.
+    """
+    def __init__(self, value):
+        self.value = value
+    def __str__(self):
+        return repr(self.value)
+
+
+
 class CSBIN(object):
     
     def __init__(self,cs_filename):
@@ -25,11 +36,12 @@ class CSBIN(object):
         
         # Coner coordinates are available as well.
         
-    def get_FJI ( self, lons, lats):
+    def set_Indices ( self, lons, lats):
         """
-        Given a list of longitude and latitudes in (lons,lats), return
+        Given a list of longitude and latitudes in (lons,lats), store
         corresponding cube sphere face F, and indices of the grid box
-        where each observation falls into.
+        where each observation falls into. From these indices, multiple
+        variables can now be binned.
         """
         
         self.F = np.zeros(lons.shape, dtype=int)
@@ -40,7 +52,7 @@ class CSBIN(object):
         
         return 
     
-    def binObs ( self, F, J, I, obs ):
+    def binObs ( self, obs ):
         """
         Given a list of longitude and latitudes in (lons,lats),
         bin list of observations *obs* on the cubed sphere,
@@ -60,9 +72,13 @@ class CSBIN(object):
             
             # Accumulate observations lying on this face of the cube
             # ------------------------------------------------------
-            F = self.F==f  
-            I = self.I[F]
-            J = self.J[F]
+            try:
+                F = self.F==f  
+                I = self.I[F]
+                J = self.J[F]
+            except:
+                raise csBinError('Indices (F,J,I) not yet set.')
+
             aObs[J,I] += obs[F]
             nObs[J,I] += 1
             
