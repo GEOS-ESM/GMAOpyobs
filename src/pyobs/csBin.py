@@ -7,7 +7,7 @@
 import numpy as np
 import xarray as xr
 
-from constants import MAPL_UNDEF
+from .constants import MAPL_UNDEF
 
 class csBinError(Exception):
     """
