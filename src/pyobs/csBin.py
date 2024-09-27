@@ -152,7 +152,7 @@ class CSBIN(object):
                 raise csBinError('Indices (F,J,I) not yet set.')
 
             np.add.at(nObs, IJ, 1)
-            np.add.at(aObs, IJ, obs[F].values)
+            np.add.at(aObs, IJ, obs[F])
             
             # Normalize
             # ---------
@@ -172,6 +172,7 @@ if __name__ == '__main__':
    const_fn = dyv2_dn + '03KM/DYAMONDv2_c2880_L181/const_2d_asm_Mx/202002/DYAMONDv2_c2880_L181.const_2d_asm_Mx.20200201_0000z.nc4'
    csbin = CSBIN(const_fn)
    csbin.set_Indices(csbin.lon_c, csbin.lat_c)
+   obs = csbin.binObs(csbin.ds['PHIS'][0].values)
    for f in range(6):
      F = np.reshape(csbin.F, (6, csbin.Ydim, csbin.Xdim))
      assert (F[1,:,:] == 1).all(), "face is wrong"
