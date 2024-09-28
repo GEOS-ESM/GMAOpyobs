@@ -33,23 +33,6 @@ class CSBIN(object):
         self.lat_c = self.ds.coords['lats']
         self.Xdim  = self.ds.dims['Xdim']
         self.Ydim  = self.ds.dims['Ydim']
-        # Verify the grid is valid. Compare teh calculated edges with the edges in the file
-        if 'corner_lats' in self.ds and 'corner_lons' in self.ds:
-           # 1) calculate the corner_lons and corner_lats
-           shift     = 0.174532925199433
-           tolerance = 10**(-4) # on -180 -- 180 scale
-           alpha     = 0.615479708670387
-           dalpha    = 2.0*alpha/self.Xdim
-           lon_calculated = (1.750*np.pi - shift)/np.pi*180
-           lon_in_file    = self.ds['corner_lons'].values[0,0,0]
-           # 2) make sure the grid is rotated
-           assert abs(lon_calculated-lon_in_file) < tolerance, "Error: Grid should have pi/18 Japan Mount shift"
-
-           J = np.arange(self.Ydim+1)
-           lats_calculated = (-alpha+J*dalpha)/np.pi*180
-           lats_in_file    = self.ds['corner_lats'].values[0,:,0]
-           # 3) compare calculated_lats  and lats in the file, make sure theya re the same
-           assert all(abs(lats_calculated-lats_in_file) < tolerance),  "Error: cannot handle this grid"
 
     def set_Indices ( self, lons, lats):
         """
@@ -164,6 +147,33 @@ class CSBIN(object):
         # All done
         # --------
         return csObs    
+
+    def checkGrid(self):
+        """
+        Verify the grid is valid by two steps: 
+          1)Calculate the lon a corner and compare it with the value in the file
+          2)Calculate the lats on an edge and comapre them with the values in the file
+        If the values agree, the grid prpbably is fine
+        """
+        if 'corner_lats' in self.ds and 'corner_lons' in self.ds:
+           # 1) calculate the corner_lons and corner_lats
+           shift     = 0.174532925199433
+           tolerance = 10**(-4) # on -180 -- 180 scale
+           alpha     = 0.615479708670387
+           dalpha    = 2.0*alpha/self.Xdim
+           lon_calculated = (1.750*np.pi - shift)/np.pi*180
+           lon_in_file    = self.ds['corner_lons'].values[0,0,0]
+           # 2) make sure the grid is rotated
+           assert abs(lon_calculated-lon_in_file) < tolerance, "Error: Grid should have pi/18 Japan Mount shift"
+
+           J = np.arange(self.Ydim+1)
+           lats_calculated = (-alpha+J*dalpha)/np.pi*180
+           lats_in_file    = self.ds['corner_lats'].values[0,:,0]
+           # 3) compare calculated_lats  and lats in the file, make sure they are the same
+           assert all(abs(lats_calculated-lats_in_file) < tolerance),  "Error: cannot handle this grid"
+           print("The grid in the file seems fine")
+        else:
+           print('Not enough information to verify the grid')
             
 #...........................................................................
 if __name__ == '__main__':
@@ -171,14 +181,16 @@ if __name__ == '__main__':
    dyv2_dn  = '/css/g5nr/DYAMONDv2/'
    const_fn = dyv2_dn + '03KM/DYAMONDv2_c2880_L181/const_2d_asm_Mx/202002/DYAMONDv2_c2880_L181.const_2d_asm_Mx.20200201_0000z.nc4'
    csbin = CSBIN(const_fn)
+   csbin.checkGrid()
    csbin.set_Indices(csbin.lon_c, csbin.lat_c)
    obs = csbin.binObs(csbin.ds['PHIS'][0].values)
    for f in range(6):
      F = np.reshape(csbin.F, (6, csbin.Ydim, csbin.Xdim))
-     assert (F[1,:,:] == 1).all(), "face is wrong"
+     assert (F[f,:,:] == f).all(), "face is wrong"
    for j in range(csbin.Ydim):
      J = np.reshape(csbin.J, (6, csbin.Ydim, csbin.Xdim))
      assert (J[:,j,:] == j).all(), "Ydim is wrong"
    for i in range(csbin.Xdim):
      I = np.reshape(csbin.I, (6, csbin.Ydim, csbin.Xdim))
      assert (I[:,:,i] == i).all(), "Xdim is wrong"
+   print("The coordinates' indices are consistent with the indices calculated by set_Indices")
