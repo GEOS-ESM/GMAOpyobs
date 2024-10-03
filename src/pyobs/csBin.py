@@ -9,6 +9,50 @@ import xarray as xr
 
 from .constants import MAPL_UNDEF
 
+
+def reverse_rotate(lon_p, lat_p, lons_, lats_):
+  """
+   Rotate (lons_, lats_) back to its original position before Schmidt stretch
+  """
+
+  half_pi= np.pi/2
+  two_pi = 2*np.pi
+  x = np.cos(lats_)*np.cos(lons_-lon_p)
+  y = np.cos(lats_)*np.sin(lons_-lon_p)
+  z = np.sin(lats_)
+  X = np.sin(lat_p)*x - np.cos(lat_p)*z
+  Y = -y
+  Z = -np.cos(lat_p)*x - np.sin(lat_p)*z
+
+  n_s = (1. - abs(Z)) < 10**(-7)
+
+  lons  = np.where(n_s, 0, np.arctan2(Y,X))
+  lats  = np.where(n_s, half_pi*np.copysign(1,Z), np.arcsin(Z))
+
+  lons = np.where(lons < 0,       lons + two_pi, lons)
+  lons = np.where(lons >= two_pi, lons - two_pi, lons)
+
+  return lons, lats
+
+def reverse_schmidt(c, lon_p, lat_p, lons_, lats_):
+   """
+     Perform reverse Schmidt transform
+     c: stretch factor
+     lon_p, lat_p : target point
+     lons_, lats_ : coordinate after Schmidt transform
+   """
+   c2p1 = 1 + c*c
+   c2m1 = 1 - c*c
+
+   # 1) rotate back to the pole
+   lons, lats = reverse_rotate(lon_p, lat_p, lons_, lats_)
+
+   #  2) reverse stretch
+   if (abs(c2m1) > 10**(-7)): 
+     lats  = np.arcsin( (c2m1-c2p1*np.sin(lats))/(c2m1*np.sin(lats)-c2p1))
+
+   return lons, lats
+
 class csBinError(Exception):
     """
     Defines general exception errors.
@@ -26,14 +70,22 @@ class CSBIN(object):
         """
         
         self.ds = xr.open_dataset(cs_filename,chunks = {'nf': 1})
-        
+   
         # Center Cubed Sphere cordinates
         # ------------------------------
         self.lon_c = self.ds.coords['lons']
         self.lat_c = self.ds.coords['lats']
         self.Xdim  = self.ds.dims['Xdim']
         self.Ydim  = self.ds.dims['Ydim']
+        self.stretched = False
 
+        if 'STRETCH_FACTOR' in self.ds.attrs :
+           self.stretch_factor = self.ds.attrs['STRETCH_FACTOR']
+           self.target_lon     = self.ds.attrs['TARGET_LON']/180*np.pi
+           self.target_lat     = self.ds.attrs['TARGET_LAT']/180*np.pi
+           if (abs(self.stretch_factor-1) > 1.0e-4):
+             self.stretched      = True
+                
     def set_Indices ( self, lons, lats):
         """
         Given a list of longitude and latitudes in degree (lons,lats), store
@@ -49,10 +101,16 @@ class CSBIN(object):
         sqr2      = np.sqrt(2.)
 
         # Calculate (F,J,I)
+        lons  = lons/180*np.pi
+        lats  = lats/180*np.pi
+
+        if self.stretched:
+           lons, lats = reverse_schmidt(self.stretch_factor, self.target_lon, self.target_lat, lons, lats)
+           lons  -=  shift
 
         # shift the grid away from Japan Fuji Mt.
-        lons_  = lons/180*np.pi + shift
-        lats_  = lats/180*np.pi
+        lons_  = lons + shift
+        lats_  = lats
         # some functions only work for 1-d array. ravel it first
         if len(lons.shape) > 1:
           lons_  = np.ravel(lons_)
@@ -158,19 +216,24 @@ class CSBIN(object):
         if 'corner_lats' in self.ds and 'corner_lons' in self.ds:
            # 1) calculate the corner_lons and corner_lats
            shift     = 0.174532925199433
-           tolerance = 10**(-4) # on -180 -- 180 scale
+           tolerance = 10**(-5) # on 0--pi
            alpha     = 0.615479708670387
            dalpha    = 2.0*alpha/self.Xdim
-           lon_calculated = (1.750*np.pi - shift)/np.pi*180
-           lon_in_file    = self.ds['corner_lons'].values[0,0,0]
-           # 2) make sure the grid is rotated
-           assert abs(lon_calculated-lon_in_file) < tolerance, "Error: Grid should have pi/18 Japan Mount shift"
+           dimC = self.ds['corner_lons'][0,:,0].size
+           lons_calculated = np.ones(dimC, dtype=float)*(1.750*np.pi - shift)
 
-           J = np.arange(self.Ydim+1)
-           lats_calculated = (-alpha+J*dalpha)/np.pi*180
-           lats_in_file    = self.ds['corner_lats'].values[0,:,0]
-           # 3) compare calculated_lats  and lats in the file, make sure they are the same
-           assert all(abs(lats_calculated-lats_in_file) < tolerance),  "Error: cannot handle this grid"
+           lons = self.ds['corner_lons'].values[0,:,0]/180*np.pi
+           lats = self.ds['corner_lats'].values[0,:,0]/180*np.pi
+
+           if self.stretched :
+              lons_calculated += shift # no shift for stretched grid
+              lons, lats = reverse_schmidt(self.stretch_factor, self.target_lon, self.target_lat, lons , lats)
+
+           J = np.arange(dimC)
+           lats_calculated = (-alpha+J*dalpha)
+           # 2) compare calculated corners with corners in the file, make sure they are the same
+           assert all(abs(lats_calculated-lats) < tolerance),  "Error lats: cannot handle this grid"
+           assert all(abs(lons_calculated-lons) < tolerance),  "Error lons: cannot handle this grid"
            print("The grid in the file seems fine")
         else:
            print('Not enough information to verify the grid')
@@ -180,10 +243,11 @@ if __name__ == '__main__':
 
    dyv2_dn  = '/css/g5nr/DYAMONDv2/'
    const_fn = dyv2_dn + '03KM/DYAMONDv2_c2880_L181/const_2d_asm_Mx/202002/DYAMONDv2_c2880_L181.const_2d_asm_Mx.20200201_0000z.nc4'
+   #const_fn = "./v12-stock-2024Sep26-1day-c540-NoPoints-RunTimeFix.geosgcm_prog_nat.20200415_0600z.nc4"
    csbin = CSBIN(const_fn)
    csbin.checkGrid()
    csbin.set_Indices(csbin.lon_c, csbin.lat_c)
-   obs = csbin.binObs(csbin.ds['PHIS'][0].values)
+   #obs = csbin.binObs(csbin.ds['PHIS'][0].values)
    for f in range(6):
      F = np.reshape(csbin.F, (6, csbin.Ydim, csbin.Xdim))
      assert (F[f,:,:] == f).all(), "face is wrong"
