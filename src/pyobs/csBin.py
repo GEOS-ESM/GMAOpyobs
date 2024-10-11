@@ -20,10 +20,15 @@ class csBinError(Exception):
 
 class CSBIN(object):
     
+    shift = 0.174532925199433
+    alpha = 0.615479708670387
+
     def __init__(self, **kwargs):
         """
-        Supporting keywords: xdim, stretch_factor, target_lon, target_lat, and filename.
-        If Filename is given, all the other keywords are not necessary and ignored
+        Supporting keywords: xdim, stretch_factor, target_lon, target_lat and filename.
+        If Filename is given, all the other keywords are not necessary and ignored.
+        Without Filename, Xdim is a must to define a cubed sphere grid.
+        stretch_factor, target_lon and target_lat are options for stretch grid.
         """
 
         kw_ = {k.upper():v for k,v in kwargs.items()}        
@@ -94,13 +99,12 @@ class CSBIN(object):
     
        return lons, lats
 
-    @staticmethod
-    def _checkGridInFile(filename):
+    def verifyGridInFile(self, filename):
         """
         Verify the grid in a file is valid by two steps: 
-          1)Calculate the lon a corner and compare it with the value in the file
-          2)Calculate the lats on an edge and comapre them with the values in the file
-        If the values agree, the grid prpbably is fine
+          1)Calculate an edge's lats and lons
+          2)Compare them with the values in the file
+        If the values agree, the setIndices is valid for the grid
         """
         
         ds   = xr.open_dataset(filename)
@@ -108,12 +112,9 @@ class CSBIN(object):
 
         if 'corner_lats' in ds and 'corner_lons' in ds:
            # 1) calculate the corner_lons and corner_lats
-           shift     = 0.174532925199433
-           tolerance = 10**(-5) # on 0--pi
-           alpha     = 0.615479708670387
-           dalpha    = 2.0*alpha/Xdim
+           dalpha    = 2.0*self.alpha/Xdim
            dimC = ds['corner_lons'][0,:,0].size
-           lons_calculated = np.ones(dimC, dtype=float)*(1.750*np.pi - shift)
+           lons_calculated = np.ones(dimC, dtype=float)*(1.750*np.pi - self.shift)
 
            lons = ds['corner_lons'].values[0,:,0]/180*np.pi
            lats = ds['corner_lats'].values[0,:,0]/180*np.pi
@@ -127,19 +128,23 @@ class CSBIN(object):
              stretched    = True
 
            if stretched :
-              lons_calculated += shift # add shift back to make sure no shift for stretched grid
+              lons_calculated += self.shift # add shift back to make sure no shift for stretched grid
               lons, lats = CSBIN._reverse_schmidt(stretch_factor, target_lon, target_lat, lons , lats)
 
            J = np.arange(dimC)
-           lats_calculated = (-alpha+J*dalpha)
+           lats_calculated = (-self.alpha+J*dalpha)
            # 2) compare calculated corners with corners in the file, make sure they are the same
-           assert all(abs(lats_calculated-lats) < tolerance),  "Error lats: cannot handle this grid"
-           assert all(abs(lons_calculated-lons) < tolerance),  "Error lons: cannot handle this grid"
-           print("The grid in the file {} seems fine".format(filename))
-        else:
-           print('Not enough information to verify the grid')
+           tolerance = 10**(-5) # on 0--pi
+           if any(abs(lats_calculated-lats) > tolerance) or any (abs(lons_calculated-lons) > tolerance):
+             print("The indices cannot be calculated by the way in setIndices. Need more information to do the calculation")
+             return False
 
-    def set_Indices ( self, lons, lats):
+           return True
+        else:
+           print("Not enough information in the file for verification")
+           return False
+
+    def setIndices (self, lons, lats):
         """
         Given a list of longitude and latitudes in degree (lons,lats), store
         corresponding cube sphere face F, and indices of the grid box
@@ -147,22 +152,21 @@ class CSBIN(object):
         variables can now be binned.
         """
         # some constants
-        shift     = 0.174532925199433
-        tolerance = 10**(-6) # on 0-1 scale
-        alpha     = 0.615479708670387
-        dalpha    = 2.0*alpha/self.Xdim
+        tolerance = 10**(-7) # on 0-1 scale
+        dalpha    = 2.0*self.alpha/self.Xdim
         sqr2      = np.sqrt(2.)
 
         # Calculate (F,J,I)
         lons  = lons/180*np.pi
         lats  = lats/180*np.pi
 
+        shift0 = self.shift
         if self.stretched:
            lons, lats = CSBIN._reverse_schmidt(self.stretch_factor, self.target_lon, self.target_lat, lons, lats)
-           lons  -=  shift
+           shift0 = 0
 
-        # shift the grid away from Japan Fuji Mt.
-        lons_  = lons + shift
+        # shift the grid away from Japan Fuji Mt if not stretched.
+        lons_  = lons + shift0
         lats_  = lats
         # some functions only work for 1-d array. ravel it first
         if len(lons.shape) > 1:
@@ -185,33 +189,43 @@ class CSBIN(object):
 
         f1Mask = (1-x) <= tolerance
         self.F[f1Mask] = 0
-        I[f1Mask] = np.floor((np.arctan( y[f1Mask]/sqr2)+alpha)/dalpha)
-        J[f1Mask] = np.floor((np.arctan( z[f1Mask]/sqr2)+alpha)/dalpha)
+        I[f1Mask] = np.floor((np.arctan( y[f1Mask]/sqr2)+self.alpha)/dalpha)
+        J[f1Mask] = np.floor((np.arctan( z[f1Mask]/sqr2)+self.alpha)/dalpha)
 
-        f2Mask = (1-y) <= tolerance
+        fMask = f1Mask
+
+        f2Mask = ((1-y) <= tolerance) &  ~fMask
         self.F[f2Mask] = 1
-        I[f2Mask] = np.floor((np.arctan(-x[f2Mask]/sqr2)+alpha)/dalpha)
-        J[f2Mask] = np.floor((np.arctan( z[f2Mask]/sqr2)+alpha)/dalpha)
+        I[f2Mask] = np.floor((np.arctan(-x[f2Mask]/sqr2)+self.alpha)/dalpha)
+        J[f2Mask] = np.floor((np.arctan( z[f2Mask]/sqr2)+self.alpha)/dalpha)
 
-        f3Mask = (1-z) <= tolerance
+        fMask = fMask | f2Mask
+
+        f3Mask = ((1-z) <= tolerance) & ~fMask
         self.F[f3Mask] = 2
-        I[f3Mask] = np.floor((np.arctan(-x[f3Mask]/sqr2)+alpha)/dalpha)
-        J[f3Mask] = np.floor((np.arctan(-y[f3Mask]/sqr2)+alpha)/dalpha)
+        I[f3Mask] = np.floor((np.arctan(-x[f3Mask]/sqr2)+self.alpha)/dalpha)
+        J[f3Mask] = np.floor((np.arctan(-y[f3Mask]/sqr2)+self.alpha)/dalpha)
 
-        f4Mask = (x+1.0) <= tolerance
+        fMask = fMask | f3Mask
+
+        f4Mask = ((x+1.0) <= tolerance) & ~fMask
         self.F[f4Mask] = 3
-        I[f4Mask] = np.floor((np.arctan(-z[f4Mask]/sqr2)+alpha)/dalpha)
-        J[f4Mask] = np.floor((np.arctan(-y[f4Mask]/sqr2)+alpha)/dalpha)
+        I[f4Mask] = np.floor((np.arctan(-z[f4Mask]/sqr2)+self.alpha)/dalpha)
+        J[f4Mask] = np.floor((np.arctan(-y[f4Mask]/sqr2)+self.alpha)/dalpha)
 
-        f5Mask = (y+1.0) <= tolerance
+        fMask = fMask | f4Mask
+
+        f5Mask = ((y+1.0) <= tolerance) & ~fMask
         self.F[f5Mask] = 4
-        I[f5Mask] = np.floor((np.arctan(-z[f5Mask]/sqr2)+alpha)/dalpha)
-        J[f5Mask] = np.floor((np.arctan( x[f5Mask]/sqr2)+alpha)/dalpha)
+        I[f5Mask] = np.floor((np.arctan(-z[f5Mask]/sqr2)+self.alpha)/dalpha)
+        J[f5Mask] = np.floor((np.arctan( x[f5Mask]/sqr2)+self.alpha)/dalpha)
 
-        f6Mask = (z+1.0) <= tolerance
+        fMask = fMask | f5Mask
+
+        f6Mask = ((z+1.0) <= tolerance) & ~fMask
         self.F[f6Mask] = 5
-        I[f6Mask] = np.floor((np.arctan( y[f6Mask]/sqr2)+alpha)/dalpha)
-        J[f6Mask] = np.floor((np.arctan( x[f6Mask]/sqr2)+alpha)/dalpha)
+        I[f6Mask] = np.floor((np.arctan( y[f6Mask]/sqr2)+self.alpha)/dalpha)
+        J[f6Mask] = np.floor((np.arctan( x[f6Mask]/sqr2)+self.alpha)/dalpha)
 
         self.IJ = I + J*self.Xdim
 
@@ -260,33 +274,33 @@ class CSBIN(object):
         # --------
         return csObs    
 
-
-
-
 #...........................................................................
 if __name__ == '__main__':
 
    dyv2_dn  = '/css/g5nr/DYAMONDv2/'
    const_fn = dyv2_dn + '03KM/DYAMONDv2_c2880_L181/const_2d_asm_Mx/202002/DYAMONDv2_c2880_L181.const_2d_asm_Mx.20200201_0000z.nc4'
+   # a stretch grid file
    #const_fn = "./v12-stock-2024Sep26-1day-c540-NoPoints-RunTimeFix.geosgcm_prog_nat.20200415_0600z.nc4"
    csbin = CSBIN(filename = const_fn)
 
-   CSBIN._checkGridInFile(const_fn)
+   assert csbin.verifyGridInFile(const_fn), "Cannot deal with the grid in the file"
 
    ds   = xr.open_dataset( const_fn)
    lon_c = ds['lons']
    lat_c = ds['lats']
    Xdim  = ds.dims['Xdim'] 
-   csbin.set_Indices(lon_c, lat_c)
+   csbin.setIndices(lon_c, lat_c)
    #obs = csbin.binObs(csbin.ds['PHIS'][0].values)
    ij =np.array([i+j*Xdim for j in range(Xdim) for i in range(Xdim)]).reshape((Xdim,Xdim))
 
    for f in range(6):
      F = np.reshape(csbin.F, (6, csbin.Xdim, csbin.Xdim))
-     assert (F[f,:,:]  == f).all(), "face is wrong"
+     assert (F[f,:,:]  == f).all(), "face {} is wrong".format(f)
 
      face = csbin.F == f
      IJ = np.reshape(csbin.IJ[face], (csbin.Xdim, csbin.Xdim))
-     assert (IJ == ij).all(), " IJ index is wrong"
+     assert (IJ == ij).all(), " IJ indices of face {} is wrong".format(f)
 
-   print("The coordinates' indices are consistent with the indices calculated by set_Indices")
+     print("face {}'s indices are correct".format(f))
+
+   print("The coordinates' indices are consistent with the indices calculated by setIndices")
