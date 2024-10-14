@@ -192,37 +192,27 @@ class CSBIN(object):
         I[f1Mask] = np.floor((np.arctan( y[f1Mask]/sqr2)+self.alpha)/dalpha)
         J[f1Mask] = np.floor((np.arctan( z[f1Mask]/sqr2)+self.alpha)/dalpha)
 
-        fMask = f1Mask
-
-        f2Mask = ((1-y) <= tolerance) &  ~fMask
+        f2Mask = (1-y) <= tolerance
         self.F[f2Mask] = 1
         I[f2Mask] = np.floor((np.arctan(-x[f2Mask]/sqr2)+self.alpha)/dalpha)
         J[f2Mask] = np.floor((np.arctan( z[f2Mask]/sqr2)+self.alpha)/dalpha)
 
-        fMask = fMask | f2Mask
-
-        f3Mask = ((1-z) <= tolerance) & ~fMask
+        f3Mask = (1-z) <= tolerance
         self.F[f3Mask] = 2
         I[f3Mask] = np.floor((np.arctan(-x[f3Mask]/sqr2)+self.alpha)/dalpha)
         J[f3Mask] = np.floor((np.arctan(-y[f3Mask]/sqr2)+self.alpha)/dalpha)
 
-        fMask = fMask | f3Mask
-
-        f4Mask = ((x+1.0) <= tolerance) & ~fMask
+        f4Mask = (x+1.0) <= tolerance
         self.F[f4Mask] = 3
         I[f4Mask] = np.floor((np.arctan(-z[f4Mask]/sqr2)+self.alpha)/dalpha)
         J[f4Mask] = np.floor((np.arctan(-y[f4Mask]/sqr2)+self.alpha)/dalpha)
 
-        fMask = fMask | f4Mask
-
-        f5Mask = ((y+1.0) <= tolerance) & ~fMask
+        f5Mask = (y+1.0) <= tolerance
         self.F[f5Mask] = 4
         I[f5Mask] = np.floor((np.arctan(-z[f5Mask]/sqr2)+self.alpha)/dalpha)
         J[f5Mask] = np.floor((np.arctan( x[f5Mask]/sqr2)+self.alpha)/dalpha)
 
-        fMask = fMask | f5Mask
-
-        f6Mask = ((z+1.0) <= tolerance) & ~fMask
+        f6Mask = (z+1.0) <= tolerance
         self.F[f6Mask] = 5
         I[f6Mask] = np.floor((np.arctan( y[f6Mask]/sqr2)+self.alpha)/dalpha)
         J[f6Mask] = np.floor((np.arctan( x[f6Mask]/sqr2)+self.alpha)/dalpha)
