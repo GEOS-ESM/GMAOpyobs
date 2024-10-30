@@ -13,6 +13,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+# [v1.0.6.1] 2023-09-08
+
+### Changed
+
+- Allow ability to not compile f2py code for CI purposes
+
 # [v1.0.6] 2023-09-08
 
 ### Added
