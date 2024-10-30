@@ -8,6 +8,7 @@ esma_set_this ( OVERRIDE GMAOpyobs )
 
 # cmake requirements
 # ------------------
+if (USE_F2PY)
   find_package(F2PY3 REQUIRED)
 
 
@@ -58,3 +59,4 @@ esma_set_this ( OVERRIDE GMAOpyobs )
    )  
    add_dependencies(sgp4_ ${this})
 
+endif (USE_F2PY)
