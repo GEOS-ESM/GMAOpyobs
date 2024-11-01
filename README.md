@@ -76,9 +76,11 @@ Run the cmake_it script
 ```
 
 #### Multi-step build
+
 Follow these instructions for managing multi-version builds, or custom builds.
 
 ##### Create build directory
+
 We currently do not allow in-source builds of GEOSgcm. So we must make a directory:
 ```
 mkdir build
@@ -86,27 +88,35 @@ mkdir build
 The advantages of this is that you can build both a Debug and Release version with the same clone if desired.
 
 ##### Run cmake
+
 CMake generates the Makefiles needed to build the model.
 ```
-cd build
-cmake .. -DBASEDIR=$BASEDIR/Linux -DCMAKE_Fortran_COMPILER=ifort -DCMAKE_INSTALL_PREFIX=../install
+cmake -B build -DBASEDIR=$BASEDIR/Linux -DCMAKE_Fortran_COMPILER=ifort --install-prefix=$(pwd)/install
 ```
-This will install to a directory parallel to your `build` directory. If you prefer to install elsewhere change the path in:
-```
--DCMAKE_INSTALL_PREFIX=<path>
-```
-and CMake will install there.
+This will install to a directory `install` parallel to your `build` directory. If you prefer to install elsewhere change
+the `--install-prefix` option  and CMake will install there.
 
 ##### Building with debugging flags
+
 To build with debugging flags add:
 ```
 -DCMAKE_BUILD_TYPE=Debug
 ```
 to the cmake line.
 
-### Compile and install with make
+##### Disabling f2py
+
+To disable building of f2py modules add:
 ```
-make -j6 install
+-DUSE_F2PY=OFF
+```
+NOTE: This is really only used for systems that do not (yet) support f2py like those used in CI. As the f2py
+code in GMAOpyobs is essential for the code to work, this should not be used in general.
+
+### Compile and install with make
+
+```
+cmake --build build --target install -j 6
 ```
 
 ## How to build GMAOpyobs on other systems
