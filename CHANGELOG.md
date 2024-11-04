@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Mainly for newer ESMA_env that allows building on RHEL8 GMAO
     machines (e.g., calculon)
   - Use postfix-@ for subrepos to match AeroApps
+- Allow ability to not build f2py code for CI purposes
 
 ### Fixed 
 - missing conversion from the sulfate ion to ammonium sulfate
