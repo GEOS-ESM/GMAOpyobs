@@ -20,12 +20,15 @@ class MCBEF(object):
         self.ds = xr.open_mfdataset(paths,drop_variables=('crs',),combine='nested',concat_dim='fire',**kwargs)
         self.ds.coords['FP_Time'] = self.ds.FP_Time
 
-    def sample(self, dataset, Variables=None, method='linear'):
+    def sample(self, dataset, Variables=None, parallel=True, method='linear'):
         """
         Sample variables on the time and location of each file.
         """
 
-        trj = sp.TRAJECTORY(self.FP_Time, self.FP_Longitude, FP_Latitude, dataset)
+        trj = sp.TRAJECTORY(self.ds.FP_Time.values, 
+                            self.ds.FP_Longitude.values, 
+                            self.ds.FP_Latitude.values, 
+                            dataset, parallel=parallel)
 
         return trj.sample(Variables=Variables,method=method)
 
