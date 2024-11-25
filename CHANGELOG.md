@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Allow ability to not build f2py code for CI purposes
 
 ### Fixed 
+- import of IGBP_
 - missing conversion from the sulfate ion to ammonium sulfate
 - aop.py *getAOPrt* phase function now being correctly normalized 
   by total scattering
