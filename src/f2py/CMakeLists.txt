@@ -58,17 +58,6 @@ if (USE_F2PY)
   target_link_libraries(IGBP_ PRIVATE GMAOpyobs)
   install(TARGETS IGBP_ DESTINATION lib/Python/pyobs)
 
-    #esma_add_f2py3_module(IGBP_
-        #SOURCES       IGBP_py.F90
-        #DESTINATION   lib/Python/pyobs
-        #ONLY          getsimpleveg getdetailedveg
-        #LIBRARIES     GMAOpyobs
-        #INCLUDEDIRS   ${CMAKE_CURRENT_BINARY_DIR}
-                      #${CMAKE_BINARY_DIR}/lib
-                      #${include_GMAOpyobs}
-      #)
-      #add_dependencies(IGBP_ GMAOpyobs)
-
   # Module: sgp4
   # ------------
 
@@ -78,16 +67,5 @@ if (USE_F2PY)
   target_link_libraries(sgp4_ PRIVATE sgp4_object)
   target_link_libraries(sgp4_ PRIVATE GMAOpyobs)
   install(TARGETS sgp4_ DESTINATION lib/Python/pyobs)
-
-
-    #esma_add_f2py3_module(sgp4_
-      #SOURCES        sgp4_py.F90
-      #DESTINATION    lib/Python/pyobs
-      #LIBRARIES      GMAOpyobs
-      #INCLUDEDIRS    ${CMAKE_CURRENT_BINARY_DIR}
-                      #${CMAKE_BINARY_DIR}/lib
-                      #${include_GMAOpyobs}
-    #)
-    #add_dependencies(sgp4_ GMAOpyobs)
 
 endif ()
