@@ -4,10 +4,11 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
 # [Unreleased]
 
 ### Added 
-- lite_install script for systems not supported by GMAO (e.g. external collaborators)
+- Added cubed-sphere binning capability
 - pm class to aop.py - with some additional comments
 - G2GAOP can now take a string as the config file variable input
 - add a function to sampler that can append a vertical coordinate to a sampled dataset
