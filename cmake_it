@@ -3,7 +3,7 @@
 # Run cmake with reasonable defaults. Why make the user do all these steps?
 #
 
-source @env/g5_modules # to be sure
+source env@/g5_modules # to be sure
 mkdir -p build
 cd build
 ##cmake .. -DBASEDIR=$BASEDIR/`uname -s` \
