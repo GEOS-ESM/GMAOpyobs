@@ -1,16 +1,42 @@
 #!/bin/env python
 """
    Implements Python interface to CALIPSO Level-2 data.
+   By SG, Started Sep/2024
+   Files to be read are of the format as  
+          CAL_LID_L2_05kmALay-Standard-V4-51.YYYY-MM-DDTHH-MM-SSZD.hdf
+          
+   Main differences are related to the call "self._readList(Path)" (in def __init__ section) and 
+   related subcalls within it. 
+   
+   Notable differences with previous calipso_l2.py
+         1) it assumes the user provides a full path to a directory with many files or a single filename.  
+         2) Only ingests Day time orbit by checking the Day/Night flag for a pixel somwhere in the middles of array)
+            (this is can be removed since I usually provide a list of daytime files already prepared by the 
+            wrapper calling calipso_l2.py)
+         3) When reading  severeal orbits in a folder , the time ouput array is
+            separated by date datetime(2001,1,1,1,1,1) to make it easy to separate each orbit   
+         4) Minor additions but of relevance:
+           4.1 Created a new output array self.NOBS : number of orbits read    
+           4.2 Different number of variables to read , see ALIAS below
+         
 """
 
+<<<<<<< HEAD
 import os
 from pyhdf import SD
 from glob     import glob
 from   numpy    import ones, concatenate, array,linspace,arange
+=======
+import os,sys
+from pyhdf import SD,HDF,VS
+from glob     import glob
+from   numpy    import ones, concatenate, array,linspace,arange,array,flip
+>>>>>>> 9478293 (Version of calipso_l2.py used to work w/U of Iowa files)
 from   datetime import date, datetime, timedelta
 MISSING = -9999.0
 
 
+<<<<<<< HEAD
 ALIAS = dict (
         
                                                            Latitude = 'lat' ,
@@ -22,10 +48,25 @@ ALIAS = dict (
                      Total_Backscatter_Coefficient_Uncertainty_532  = 'tback_err',
                                          Extinction_Coefficient_532 = 'ext',
                              Extinction_Coefficient_Uncertainty_532 = 'ext_err' )
+=======
+>>>>>>> 9478293 (Version of calipso_l2.py used to work w/U of Iowa files)
 
+ALIAS = dict (
+                                                           Latitude  = 'lat' ,
+                                                          Longitude  = 'lon' ,
+                                                   Profile_UTC_Time  = 'Time',
+                                               Lidar_Data_Altitudes  = 'zlidar',
+                                  Total_Backscatter_Coefficient_532  = 'tback',
+                                         Extinction_Coefficient_532  = 'ext',
+                                         Extinction_Coefficient_1064 = 'ext2')
 
 SDS = list(ALIAS.keys())
-
+# Note: about CALIPSO latitude/long: 
+# Geodetic latitude, in degrees, of the laser footprint. For the 5 km profile products, three 
+# values are reported: the footprint latitude for the first pulse included in the 15 
+# shot average; the footprint latitude at the temporal midpoint 
+# (i.e., at the 8th of 15 consecutive laser shots); and the footprint latitude for 
+# the final pulse.
 #.........................................................................................
 
 class CALIPSO_L2(object):
@@ -45,16 +86,22 @@ class CALIPSO_L2(object):
 
      #  Initially are lists of numpy arrays for each granule
      # ----------------------------------------------------
+<<<<<<< HEAD
      self.verb = Verbose
      self.keep = keep
+=======
+     self.verb = 'no'  #yes
+     # #self.keep = keep
+>>>>>>> 9478293 (Version of calipso_l2.py used to work w/U of Iowa files)
      self.SDS = SDS
+     self.NOBS = [] # save number of observations in each orbit
+     # print("hello in calipso_lev2.py")
 
      # Variable names
      # --------------
      self.Names = []
 
      for name in SDS:
-             
              self.Names.append(name)
      self.Names += ['nymd','nhms']
 
@@ -65,6 +112,7 @@ class CALIPSO_L2(object):
      for name in self.Names:
          self.__dict__[name] = []
      self.time = [] # to hold datetime objects
+     self.filelist=[] # initialize structure that will hold filenames read
      
 
      # Read each orbit, appending them to the list
@@ -100,8 +148,13 @@ class CALIPSO_L2(object):
      # Make aliases for compatibility with older code
      # ----------------------------------------------
 #    Alias = ALIAS.keys()
+#      print("\n Done reading all files \n")
      for name in self.Names:
+<<<<<<< HEAD
          print('shape', name,array(self.__dict__[name]).shape)
+=======
+         if self.verb=='yes': print('   shape', name,array(self.__dict__[name]).shape)
+>>>>>>> 9478293 (Version of calipso_l2.py used to work w/U of Iowa files)
          if name in SDS:
              self.__dict__[ALIAS[name]] = self.__dict__[name]
      
@@ -126,17 +179,35 @@ class CALIPSO_L2(object):
 #---
    def _readDir(self,dir):
         """Recursively, look for files in directory."""
-        for item in os.listdir(dir):
+        #### Read file list from directory, then select only those in Daytime (*D.hdf)
+        #### and then sort the list in descending order from oldest to newest orbit. 
+        items=os.listdir(dir)
+        # Filter filenames to include only those ending in 'D.hdf' and sort them by date
+#         breakpoint()
+        new_list = sorted(
+            [item for item in items if item.endswith('D.hdf')],
+            key=lambda filename: datetime.strptime(
+                filename.split('.')[1].split('Z')[0], '%Y-%m-%dT%H-%M-%S'
+            )
+        )
+        for item in new_list:
             path = dir + os.sep + item
-            if os.path.isdir(path):      self._readDir(path)
-            elif os.path.isfile(path):   self._readOrbit(path)
+            # breakpoint()  # Add a breakpoint here
+            if os.path.isdir(path):      
+               # breakpoint()  # Add a breakpoint here
+               self._readDir(path)
+            elif os.path.isfile(path):   
+               # breakpoint()  # Add a breakpoint here
+               self._readOrbit(path)
             else:
                 print("%s is not a valid file or directory, ignoring it"%item)
+                sys.exit()
 
 #---
    def _readOrbit(self,filename):
-        """Reads one CALIPSO orbit with Level 1.5 data."""
+        """Reads one CALIPSO orbit with Level 2.0 data."""
 
+        self.filelist.append(filename.split('/')[-1])
         # Reference time
         # --------------
         REF_DATE = datetime(1993,1,1,0,0,0)
@@ -145,11 +216,29 @@ class CALIPSO_L2(object):
         # extracting GEOLOCATION and Data fields
         # ----------------------------------------------
 
-        if self.verb:
-            print("[] working on <%s>"%filename)
+        if self.verb=='yes': print(" File <%s>"%filename)
 
         f = SD.SD(filename)
+        #### Get Day_night SDS and Check if it is nightime in the central profile.
+        #### if it is nightime, then assume that the full profile is nightime and skip
+        sd = f.select('Day_Night_Flag') # Range Values: 0 = day; 1 = night
+        dn_flag=sd.get()
+        # breakpoint()  # Add a breakpoint here
+        i0= int(len(dn_flag[:,0])/2)
+        # print(' int(len(dn_flag[:,0])/2) =', i0)
+        if dn_flag[i0,0] == 1 :
+                print('         Select orbit is in Nighttime. Skip!')
+        else:
+           for name in self.SDS:
+             v = name
+             if self.verb=='yes': print('   v dataset', v)
+   #      ------------------------------------------------------------------
+             if v == 'Profile_UTC_Time':
+               sd = f.select(v)
+               Time  = sd.get()
+               nobs  = len(Time)
 
+<<<<<<< HEAD
 #       for group in self.SDS.keys():
         for name in self.SDS:
           v = name
@@ -200,6 +289,65 @@ class CALIPSO_L2(object):
                     self.__dict__[v].append(data[0:self.keep,:])
               else:
                     self.__dict__[v].append(data[:,:])
+=======
+               nymd  = ones(nobs).astype('int')
+               nhms  = ones(nobs).astype('int')
+               ###NOTE  append adds its argument as a single item, while extend 
+               ###     adds the elements of its argument one by one. 
+               ## one adds [4,5] append results as Output: [1, 2, 3, [4, 5]] and 
+               ##                        extend as Output: [1, 2, 3, 4, 5]
+               # self.__dict__[v].append(Time)       # time as on file
+               self.__dict__[v].extend(Time)       # time as on file
+               for i in range(nobs):
+                   yymmdd = Time[i,1]   # 3 times are reported, choose the middle
+                   nymd0 = int(Time[i,1])               
+                   nd    = Time[i,1] - nymd0
+                   nd0   = nd * 24.0
+                   hh    = int(nd0)
+                   nd1   = nd0 - hh
+                   nd2   = nd1 * 60
+                   mm    = int(nd2)
+                   nd3   = nd2 - mm
+                   nd4   = nd3 * 60
+                   ss    = int(nd4)
+                                   
+                   nymd[i]  = 20000000 + nymd0
+                   nhms[i]  = ((hh * 100) + mm) * 100 + ss
+                   
+                   self.nymd.append(nymd)
+                   self.nhms.append(nhms)
+                   
+                   year = int(nymd[i]/10000)
+                   month = int((nymd[i] - 10000*year)/100)
+                   day = nymd[i] - (year*10000 + month * 100) 
+                   self.time.append(datetime(year,month,day,hh,mm,ss))
+               self.NOBS.append(nobs)
+               # self.time.append(datetime(2001,1,1,1,1,1)) # add seprating date that will be used to separate each orbit
+             elif v == 'Lidar_Data_Altitudes':
+                  # alitude is not a dataset, it is stored in a VD structured
+                  # the following lines  are from https://forum.earthdata.nasa.gov/viewtopic.php?t=4222
+                  #it works. but it seems that it can be improved.
+                  #get altitude
+                  hdf = HDF.HDF(filename)
+                  vs = hdf.vstart() ; xid = vs.find('metadata'); altid = vs.attach(xid)
+                  altid.setfields('Lidar_Data_Altitudes')
+                  nrecs, _, _, _, _ = altid.inquire()
+                  altitude = altid.read(nRec=nrecs)
+                  altid.detach()
+#                   alti = np.array(altitude[0][0])
+#                   data = np.flip(alti)
+                  alti = array(altitude[0][0])
+                  data = flip(alti)
+                  self.__dict__[v].append(data)               
+             else:
+                 
+                 sd    =  f.select(v)
+                 data  = sd.get()  # most of parameters : data = (nobs) or (nobs,km) except L2 feature type(nobs,km,4)
+                 if v == 'Temperature': data = data + 273.15
+                 # for aerosol arrays: 1st dim: same as time, 2nd dim: Nlayer=399
+                 # for lat/lon arrays: 1st dim: same as time, 2nd dim: 3
+                 self.__dict__[v].append(data[:,:]) 
+>>>>>>> 9478293 (Version of calipso_l2.py used to work w/U of Iowa files)
           
 #---
    def writeg(self,aer,syn_time,nsyn=8,filename=None,dir='.',expid='calipso_lev2',Verb=1):
@@ -230,7 +378,7 @@ class CALIPSO_L2(object):
        nymd = 10000 * syn_time.year + 100 * syn_time.month  + syn_time.day
        nhms = 10000 * syn_time.hour + 100 * syn_time.minute + syn_time.second
 
-       print('nymd=',nymd, 'nhms=',nhms) 
+       if self.verb=='yes': print('in writeg nymd=',nymd, 'nhms=',nhms) 
        km = aer.km             # vertical levels
        ptop = 1.               # ~ 1 Pa at the top
 
