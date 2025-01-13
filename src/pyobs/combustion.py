@@ -113,6 +113,9 @@ class COMBUSTION(object):
 
         """
         
+        if fuel_temp is None:
+            fuel_temp = air_temp
+        
         # Save inputs
         self.fuel_comp = ( fuel_C, fuel_H, fuel_O)
         self.fuel_lhc = fuel_lhc
