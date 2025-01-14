@@ -13,7 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - pm class to aop.py - with some additional comments
 - G2GAOP can now take a string as the config file variable input
 - add a function to sampler that can append a vertical coordinate to a sampled dataset
-- example Jupyter notebooks on using pyobs utilities to sample GEOS and compare to CALIPSO and DC-8 obs
+- example Jupyter notebooks on using pyobs utilities to sample GEOS
+   and compare to CALIPSO and DC-8 obs
+- Added combustion module.
 
 ### Changed 
 - Updated README to document lite_install
