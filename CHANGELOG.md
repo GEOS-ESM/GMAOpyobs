@@ -5,25 +5,41 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-# [Unreleased]
+# [Unreleased] - yyyy-mm-dd 
+
+### Fixed 
 
 ### Added 
+	
+### Changed 
+
+### Removed 
+
+### Deprecated 
+
+
+# [v1.2.0] - 2025-01-16
+
+### Added 
+- Added module mcbef for handling plume rise/fire related functionality.	
 - Added cubed-sphere binning capability
 - pm class to aop.py - with some additional comments
 - G2GAOP can now take a string as the config file variable input
 - add a function to sampler that can append a vertical coordinate to a sampled dataset
-- example Jupyter notebooks on using pyobs utilities to sample GEOS and compare to CALIPSO and DC-8 obs
+- example Jupyter notebooks on using pyobs utilities to sample GEOS
+   and compare to CALIPSO and DC-8 obs
+- Added combustion module.
 
 ### Changed 
-
 - Updated README to document lite_install
 - Update `components.yaml` to match that of AeroApps
   - Mainly for newer ESMA_env that allows building on RHEL8 GMAO
     machines (e.g., calculon)
   - Use postfix-@ for subrepos to match AeroApps
 - Allow ability to not build f2py code for CI purposes
-
+	
 ### Fixed 
+- import of IGBP_ in igbp.py
 - missing conversion from the sulfate ion to ammonium sulfate
 - aop.py *getAOPrt* phase function now being correctly normalized 
   by total scattering

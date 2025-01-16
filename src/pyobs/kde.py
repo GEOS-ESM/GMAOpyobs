@@ -12,7 +12,7 @@ from matplotlib        import cm, ticker
 from matplotlib.pyplot import plot, title, xlabel, ylabel, figure, imshow, \
                               grid, colorbar, draw, axes, legend
 
-from scipy             import stats, mgrid, c_, reshape, random, rot90
+from scipy             import stats, reshape
 
 MISSING = 1.e15
 
@@ -57,7 +57,7 @@ def calc_kde1d(Xin,N=256,range=None,Verbose=False,name=None):
         X = Xin
     if range==None:
         q = (0.0, 25.0, 50.0, 75.0, 100.0)
-        prc = prctile(X,q)
+        prc = percentile(X,q)
         range = [prc[0],prc[4]]
     bins = linspace(range[0],range[1],N)
     if Verbose:
