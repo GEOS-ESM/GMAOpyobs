@@ -22,8 +22,6 @@ ALIAS = dict (
                       Total_Attenuated_Backscatter_Uncertainty_532  = 'taback_err',
                       Perpendicular_Attenuated_Backscatter_532_Mean = 'paback',
                Perpendicular_Attenuated_Backscatter_Uncertainty_532 = 'paback_err',
-                                    Extinction_Coefficient_532_Mean = 'ext',
-                             Extinction_Coefficient_Uncertainty_532 = 'ext_err',
                          Molecular_Model_Attenuated_Backscatter_532 = 'mol_aback',
                                                     L2_Feature_Type = 'feature' )
 
@@ -88,11 +86,13 @@ class CALIPSO_L1p5(object):
      # ----------------------------------------
      for name in self.Names:
             try:
-                self.__dict__[name] = concatenate(self.__dict__[name])
+                self.__dict__[name] = concatenate(self.__dict__[name]).squeeze()
                 
             except:
                 print("Failed concatenating "+name)
-     
+    
+     self.time = array(self.time)
+
      # Determine index of "good" observations
      # --------------------------------------
      pass # to do

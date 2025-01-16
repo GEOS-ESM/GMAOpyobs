@@ -8,6 +8,10 @@ esma_set_this ( OVERRIDE GMAOpyobs )
 
 # cmake requirements
 # ------------------
+# NOTE: For CI purposes, f2py is hard to support. Until
+#       a solution can be found, we add a flag to allow
+#       the user to disable f2py in these circumstances
+if (USE_F2PY)
   find_package(F2PY3 REQUIRED)
 
 
@@ -58,3 +62,4 @@ esma_set_this ( OVERRIDE GMAOpyobs )
    )  
    add_dependencies(sgp4_ ${this})
 
+endif (USE_F2PY)
