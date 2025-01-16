@@ -7,15 +7,3 @@ env:
   remote: ../ESMA_env.git
   tag: v4.8.2
   develop: main
-
-cmake:
-  local: ./cmake@
-  remote: ../ESMA_cmake.git
-  tag: v3.28.0
-  develop: develop
-
-ecbuild:
-  local: ./cmake@/ecbuild@
-  remote: ../ecbuild.git
-  tag: geos/v1.3.0
-

@@ -4,9 +4,6 @@
 *.nc
 *.nc4
 *.npz
-/cmake/
-/@cmake/
-/cmake@/
 /env/
 /@env/
 /env@/
