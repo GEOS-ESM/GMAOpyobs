@@ -1,6 +1,6 @@
 """
 
-   Bin observations on LatLon grid. Based on externally generated 
+   Bin observations on LatLon grid. 
 
 """
 
@@ -24,15 +24,17 @@ class LLBIN(object):
     def __init__(self, **kwargs):
         """
         Supporting keywords: GridName,lon_bnds, lat_bnds.
-        GridName: It should have the standard format : POLEnnnXnnn-DATELINE
+        GridName: It should have the standard format : POLEiiiXjjj-DATELINE
            POLE      : PE or PC
-           first nnn : number of lon
-           x         : the seperator
-           second nnn: number of lat
+           iii       : number of lon
+           x         : the separator
+           jjj       : number of lat
            DATELINE  : DE or DC
-           for example, PE360x180-DE is a lat-lon grid with 360 lons, 180 lats, pole on edge and Dateline on edge
-        lon_bnds: -180. -- 180.
-        lat_bnds: -90.  -- 90.
+
+           For example, PE360x180-DE represents a lat-lon grid with 360 lons, 180 lats, pole on edge and Dateline on edge
+
+        lon_bnds: longitude bounds, an ordered array from -180. to 180. 
+        lat_bnds: latitude bounds, an ordered array from -90.  to 90.
         """
 
         kw_ = {k.upper():v for k,v in kwargs.items()}        
@@ -84,7 +86,7 @@ class LLBIN(object):
            dlat = 180./(self.Ydim-1)  
            J    = np.floor((lats + 90.+ dlat/2.)/dlat).astype(int)
         elif (self.pole == 'unknown'):
-           J   = np.array([ bisect.bisect(self.lat_bnds, lat)  for lat in lats]) - 1
+           J    = np.array([ bisect.bisect(self.lat_bnds, lat)  for lat in lats]) - 1
         # m
         I = np.where( I == self.Xdim, 0,   I)
         J = np.where( J == self.Ydim, J-1, J)
@@ -96,14 +98,14 @@ class LLBIN(object):
     def binObs ( self, obs, average = True ):
         """
         Given a list of longitude and latitudes in (lons,lats),
-        bin list of observations *obs* on the cubed sphere,
-        returning gridded observations *csObs*.
+        bin list of observations *obs* on the lat-lon grid,
+        returning gridded observations *llObs*.
         """
         
-        llObs = np.zeros((self.Xdim, self.Ydim), dtype=float)
+        llObs     = np.zeros((self.Xdim, self.Ydim), dtype=float)
         grid_size = self.Xdim * self.Ydim
-        aObs  = np.zeros(grid_size, dtype=float)
-        nObs  = np.zeros(grid_size, dtype=int)
+        aObs      = np.zeros(grid_size, dtype=float)
+        nObs      = np.zeros(grid_size, dtype=int)
        
         if (len(obs.shape) > 1):
            obs = np.ravel(obs) 
@@ -111,7 +113,7 @@ class LLBIN(object):
            # Accumulator, counter
            # --------------------
            
-           # Accumulate observations lying on this face of the cube
+           # Accumulate observations lying on this grid
            # ------------------------------------------------------
            try:
                IJ = self.IJ
