@@ -8,7 +8,7 @@ import numpy as np
 import bisect
 import xarray as xr
 
-from constants import MAPL_UNDEF
+from .constants import MAPL_UNDEF
 
 class llBinError(Exception):
     """
