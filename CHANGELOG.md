@@ -8,6 +8,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 # [Unreleased] - yyyy-mm-dd 
 
 ### Fixed 
+
+### Added 
+	
+### Changed 
+
+### Removed 
+
+### Deprecated 
+
+
+# [v1.2.1] - 2025-02-04 
+
+### Fixed 
 - Bug fix in aop.py for returning PMOM
 
 ### Added 
