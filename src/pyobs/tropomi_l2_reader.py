@@ -109,36 +109,19 @@ class TROPOAER_L2(object):
                 return
         else:
             Path = [Path, ]
-        # print('List of Files to read:')
-        # print(Path)
         self._readList(Path) ##### note this read the actual file, see example in mxd04.py
 
 
-
-    	# Make each attribute a single numpy array
+    # Make each attribute a single numpy array
     # ----------------------------------------
-        # for name in self.SDS:
-        #      try:
-        #          self.__dict__[name] = concatenate(self.__dict__[name])
-        #      except:
-        #          print("Failed concatenating "+name)
-
-        # for group in list(self.SDS.keys()):
-        #     for name in self.SDS[group]:
-        #         try :
-        #              self.__dict__[name] = concatenate(self.__dict__[name])
-        #         except:
-        #             print("Failed concatenating,name=  "+name)
-        #             print("Failed concatenating,group=  "+group)
-
         for igroup in self.SELGROUP:
             key_content_names=tuple(self.SDS.get(igroup))
             for sds_name in key_content_names:
                 try :
                      self.__dict__[sds_name] = np.concatenate(self.__dict__[sds_name])
                 except:
-                    print("Failed concatenating,name=  "+sds_name)
-                    print("Failed concatenating,group=  "+igroup)
+                    print("tropomi_le_reader: Failed concatenating,name=  "+sds_name)
+                    print("tropomi_le_reader: Failed concatenating,group=  "+igroup)
 
        # USE ALIAS dic to shorten the variable names
         Alias = list(self.ALIAS.keys())
@@ -183,7 +166,6 @@ class TROPOAER_L2(object):
     # ----------------------------------------------
         if self.verb: print("\n ... working with file <%s>"%filename)
         f = h5py.File(filename,mode='r')
-        print(' ')
         for igroup in self.SELGROUP:
             key_content_names=self.SDS[igroup]
             if self.verb: 
@@ -194,7 +176,6 @@ class TROPOAER_L2(object):
         # Read select variables (reshape to allow concatenation later)
         # ------------------------------------------------------------
             for ig in key_content_names:
-                #print('hello2 :',ig,igroup)
                 if ig == 'delta_time': #  "MILLIseconds  since beginning of day for orbit"
                    delta_time=g.get(ig)
                    delta_time=delta_time.astype('float')
@@ -236,9 +217,6 @@ class TROPOAER_L2(object):
                      self.__dict__[ig].append(data)
                 # if self.verb: print('Read .... ',self.__dict__[ig])
             # print('End of _readOrbit \n')
-        print('   ')
-
-
 
 #............................................................................
 ###### -------- test area
