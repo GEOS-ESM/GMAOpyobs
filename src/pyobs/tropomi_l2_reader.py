@@ -176,6 +176,10 @@ class TROPOAER_L2(object):
         # Read select variables (reshape to allow concatenation later)
         # ------------------------------------------------------------
             for ig in key_content_names:
+<<<<<<< HEAD
+=======
+                #print('hello2 :',ig,igroup)
+>>>>>>> feature/sgassoumd/mpl_reader
                 if ig == 'delta_time': #  "MILLIseconds  since beginning of day for orbit"
                    delta_time=g.get(ig)
                    delta_time=delta_time.astype('float')
@@ -183,9 +187,14 @@ class TROPOAER_L2(object):
                    Time      = g.get('time')
                    time_value = Time[()]  # or Time.value , = int32
                    self.time.append(time_value)
+<<<<<<< HEAD
 #                   # formatted_date = (datetime(2010, 1, 1) + timedelta(seconds=int(time_value))).strftime('%Y-%m-%dT%H:%M:%S')
                    # breakpoint()
 
+=======
+
+                   # breakpoint()
+>>>>>>> feature/sgassoumd/mpl_reader
 #                   nobs = len(delta_time)
 #                   nymd  = np.ones(nobs).astype('int')
 #                   nhms  = np.ones(nobs).astype('int')
@@ -208,6 +217,10 @@ class TROPOAER_L2(object):
 #                elif ig == 'time':
                    #breakpoint()
 
+<<<<<<< HEAD
+=======
+#                   # formatted_date = (datetime(2010, 1, 1) + timedelta(seconds=int(time_value))).strftime('%Y-%m-%dT%H:%M:%S')
+>>>>>>> feature/sgassoumd/mpl_reader
 #                   # if self.verb: print('Time = ', time_value)
 #                   if self.verb: print('Reference Day : ', (DATE_START + timedelta(seconds=int(time_value))).strftime('%Y-%m-%dT%H:%M:%S'))
 #                   self.__dict__[ig].append(time_value)
@@ -218,6 +231,11 @@ class TROPOAER_L2(object):
                 # if self.verb: print('Read .... ',self.__dict__[ig])
             # print('End of _readOrbit \n')
 
+<<<<<<< HEAD
+=======
+
+
+>>>>>>> feature/sgassoumd/mpl_reader
 #............................................................................
 ###### -------- test area
 if __name__ == "__main__":
