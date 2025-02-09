@@ -10,9 +10,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed 
 
 ### Added 
+- Module *mcd_sinu* derived from *mcd43* as this is now a generalized class for dealing with 
+	those annoying modis sinosoidal tiles.
+- Module *mcd12* based on  *mcd_simu*
 	
 ### Changed 
-
+- Module *mcd43*, most of the code moved to the generic *mcd_sinu*.
+	
 ### Removed 
 
 ### Deprecated 

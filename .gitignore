@@ -4,6 +4,8 @@
 *.nc
 *.nc4
 *.npz
+*.pyc
+core.*
 /cmake/
 /@cmake/
 /cmake@/
