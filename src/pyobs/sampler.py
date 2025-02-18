@@ -98,7 +98,10 @@ class STATION(object):
 
         for vn in Variables:
             if self.verb: print('[ ] sampling ',vn)
-            sampled[vn] = self.ds[vn].interp(lon=self.lons,lat=self.lats,method=method)
+            if method == 'nearest':
+                sampled[vn] = self.ds[vn].sel(lon=self.lons,lat=self.lats,method=method)
+            else:
+                sampled[vn] = self.ds[vn].interp(lon=self.lons,lat=self.lats,method=method)
 
         return xr.Dataset(sampled).assign_coords({'station': self.stations})
 

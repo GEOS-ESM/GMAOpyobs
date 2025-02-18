@@ -13,9 +13,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Module *mcd_sinu* derived from *mcd43* as this is now a generalized class for dealing with 
 	those annoying modis sinosoidal tiles.
 - Module *mcd12* based on  *mcd_simu*
+- Module *ioda*, only function open_ioda for now
 	
 ### Changed 
 - Module *mcd43*, most of the code moved to the generic *mcd_sinu*.
+- Module *sampler*, special handled method *nearest* in STATION.
 	
 ### Removed 
 

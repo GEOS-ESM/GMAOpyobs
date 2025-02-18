@@ -17,6 +17,7 @@ import pandas      as pd
     
 from glob     import glob
 
+Alias = None # by default, keep variables as they are on file.
 
 #...........................................................................
 
@@ -111,7 +112,7 @@ class MCD_SINU(object):
     This class implements the MODIS LAND Level 3 products on the tiled sinosoidal grid. 
     """
 
-    def __init__ (self,Path,lon,lat,addLatLon=False, Alias=None):
+    def __init__ (self,Path,lon,lat,addLatLon=False, Alias=Alias):
        """
        Reads individual tile files for full day of Level 3 
        tiled files on a simosoidal grid. Files assumed to be 
@@ -204,7 +205,7 @@ class MCD_SINU(object):
             
         # Add coordinate variables
         # ------------------------
-        self.nx, self.ny = ds.dims['x'], ds.dims['y']
+        self.nx, self.ny = ds.sizes['x'], ds.sizes['y']
         for tn in self.Tiles:
             xs, ys = _tn2bbox(tn)
             x = np.linspace(xs[0],xs[1],self.nx,endpoint=True)
@@ -291,7 +292,7 @@ class MCD_SINU(object):
            return var
 
 #---
-    def interp_many(self,Variables=None,Index=None):
+    def interp_many(self,Variables=None,Index=None,method='nearest'):
         """
         Sample all variables on file, returning an xarray Data DataFrame with all
         interpolated variables. On input,
@@ -306,7 +307,7 @@ class MCD_SINU(object):
         if Index is not None:       
             variables['lon'], variables['lat'] = self.lon, self.lat
         for vname in Variables:
-            variables[vname] = self.interp(vname)
+            variables[vname] = self.interp(vname,method=method)
      
         if Index is None:       
             return xr.Dataset(variables)

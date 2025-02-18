@@ -13,6 +13,7 @@ from glob     import glob
 
 from .mcd_sinu import MCD_SINU
 
+# Override default variable names
 Alias = dict ( LC_Type1 = 'LC_IGBP',
                LC_Type2 = 'LC_UMD',
                LC_Type3 = 'LC_LAI',
