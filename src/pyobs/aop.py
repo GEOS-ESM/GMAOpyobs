@@ -277,7 +277,7 @@ class G2GAOP(object):
             coords = dict(rh.coords).copy()
             coords['p'] = mie.ds.coords['p']
             dims = space + ('p', 'm')
-            DA['PMOM'] = DataArray(pmom, dims=rh.dims+('p','m'),coords=coords)
+            DA['PMOM'] = xr.DataArray(pmom, dims=rh.dims+('p','m'),coords=coords)
         else:
             DA['G'] = xr.DataArray(g,dims=rh.dims,coords=rh.coords)
             
