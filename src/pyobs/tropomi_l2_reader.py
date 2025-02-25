@@ -1,14 +1,19 @@
 # -*- coding: utf-8 -*-
-"""
-
-Generic script to load and plot aerosol data from TROPOAER_L2 product. 
-
-Sept/2024 - by Santiago Gassó , sgasso@umd.edu
-
-Internal notes: 
-
-@author: sgassoumd
-"""
+#"""
+#
+#Generic script to load and plot aerosol data from TROPOAER_L2 product. 
+# See example at the end of code. 
+#Uploaded Feb/2025 - sgassoumd@github.com
+#Sept/2024          - by Santiago Gassó , sgasso@umd.edu
+#
+#Input and Output notes: 
+#      User can input a list of variables to read (GEO structure), otherwise it uses a default listdir
+#      User can input either a single file or a folder . 
+#      Output self.time is the current date since reference date 2010/Jan/01 
+#             orbit_date= (datetime(2010, 1, 1) + timedelta(seconds=int(self.time[0])))
+#
+#@author: sgassoumd
+#"""
 
 
 import os, sys, time
@@ -24,10 +29,10 @@ from matplotlib.colors import ListedColormap, BoundaryNorm  # For custom colorma
 import cartopy.crs as ccrs  # For cartographic projections
 import cartopy.feature as cfeature  # For adding features to the map
 # from glob     import glob
-# import pdb
+# import pdb # use this for debugging
 
 
-#default SDSs if not specifically input by user
+#default SDSs if not specifically input by the user
 SDS = dict (
       GEODATA = ('latitude','longitude','latitude_bounds','longitude_bounds','delta_time'),
       SCIDATA = ('UVAerosolIndex','FinalAlgorithmFlags','FinalAerosolLayerHeight',\
@@ -39,7 +44,6 @@ ALIAS = dict ( latitude            ='lat',
                latitude_bounds     ='lat4',
                longitude_bounds    ='lon4',
                delta_time          ='dtime', # seconds since start day of this orbit 
-#               time                ='daystart', # seconds since 2010-01-01
                UVAerosolIndex      ='uvai',
                FinalAerosolLayerHeight='ztro',
                FinalAlgorithmFlags ='algQA',
@@ -51,20 +55,20 @@ ALIAS = dict ( latitude            ='lat',
 # SELGROUP=['GEODATA'] # SDS to be selected
 
 CHANNELS=(354.0 ,388.0 ,500.0)
-DATE_START = datetime(2010,1,1,0,0,0)
+DATE_START = datetime(2010,1,1,0,0,0) # reference date used by TROPOMI L2 time array 
 #...........................................................................
 
 class TROPOAER_L2(object):
-    """
-    This class loads TROPOMI data, for variable input types: single files, several directories.
-    Based on existing codes in GEOSPYobs aura.py and mxd04.py
-    """
+#    """
+#    This class loads TROPOMI data, for variable input types: single files, several directories.
+#    Based on existing codes in GEOSPYobs aura.py and mxd04.py
+#    """
 
     def __init__ (self,Path,SDS=SDS,Verbose=0,GEO=False,alias=None):
-        """
-        Put General Ancilliary info here
-
-        """
+#        """
+#        Set here global operation available for the class
+#       
+#        """
 
         # Initially are lists of numpy arrays for each granule
         # ----------------------------------------------------
@@ -84,14 +88,12 @@ class TROPOAER_L2(object):
         for group in list(self.SDS.keys()):
             for name in self.SDS[group]:
                 self.Names.append(name)
-        self.Names += ['nymd','nhms'] # inherited from old code. Might be useful. 
         
-       # Add/Substitute some aliases if given
+       # Add/Substitute some aliases if given (because some SDS have long names)
        # ------------------------------------
         self.ALIAS = ALIAS.copy()
         if alias is not None:
            for a in alias: self.ALIAS[a] = alias[a]
-        # print('self.ALIAS 2 ', self.ALIAS)
         
         # Create empty lists for SDS to be read from orbit file;
         #  each element of the list contains data for one orbit
@@ -109,8 +111,11 @@ class TROPOAER_L2(object):
                 return
         else:
             Path = [Path, ]
-        self._readList(Path) ##### note this read the actual file, see example in mxd04.py
-
+        
+        #### Now initiate the data extraction throug ._readList
+        self._readList(Path) ##### note this read(s) the actual file(s)
+    
+    #### By now file has been read and data is stored in self
 
     # Make each attribute a single numpy array
     # ----------------------------------------
@@ -120,8 +125,8 @@ class TROPOAER_L2(object):
                 try :
                      self.__dict__[sds_name] = np.concatenate(self.__dict__[sds_name])
                 except:
-                    print("tropomi_le_reader: Failed concatenating,name=  "+sds_name)
-                    print("tropomi_le_reader: Failed concatenating,group=  "+igroup)
+                    print("tropomi_l2_reader: Failed concatenating,name=  "+sds_name)
+                    print("tropomi_l2_reader: Failed concatenating,group=  "+igroup)
 
        # USE ALIAS dic to shorten the variable names
         Alias = list(self.ALIAS.keys())
@@ -179,37 +184,10 @@ class TROPOAER_L2(object):
                 if ig == 'delta_time': #  "MILLIseconds  since beginning of day for orbit"
                    delta_time=g.get(ig)
                    delta_time=delta_time.astype('float')
-                   self.__dict__[ig].append(delta_time[:]) # add reference time
+                   self.__dict__[ig].append(delta_time[:]) 
                    Time      = g.get('time')
                    time_value = Time[()]  # or Time.value , = int32
-                   self.time.append(time_value)
-#                   # formatted_date = (datetime(2010, 1, 1) + timedelta(seconds=int(time_value))).strftime('%Y-%m-%dT%H:%M:%S')
-                   # breakpoint()
-#                   nobs = len(delta_time)
-#                   nymd  = np.ones(nobs).astype('int')
-#                   nhms  = np.ones(nobs).astype('int')
-                   # print('')
-#                   for i in range(nobs):
-#                     t_secs = delta_time[i]
-#                     n_secs = timedelta(seconds=t_secs)
-#                     t = DATE_START + n_secs
-#                     yy, mm, dd = (t.year,t.month,t.day)
-#                     h, m, s = (t.hour,t.minute,t.second)
-#                     nymd[i] = 10000 * yy + 100 * mm + dd
-#                     nhms[i] = 10000 * h  + 100 * m  + s
-#                     self.time.append(t)
-
-#                   self.delta_time.append(delta_time[:]+Time) # time as on file
-                   # self.__dict__[ig].append(delta_time[:]+time_value) # add reference time
-#                   self.nymd.append(nymd)
-#                   self.nhms.append(nhms)
-                   # breakpoint()
-#                elif ig == 'time':
-                   #breakpoint()
-#                   # if self.verb: print('Time = ', time_value)
-#                   if self.verb: print('Reference Day : ', (DATE_START + timedelta(seconds=int(time_value))).strftime('%Y-%m-%dT%H:%M:%S'))
-#                   self.__dict__[ig].append(time_value)
-
+                   self.time.append(time_value) # add reference time
                 else:
                      data = g.get(ig)
                      self.__dict__[ig].append(data)
