@@ -1,16 +1,15 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Feb/3/2025 - Based on test_read_level2_geo_2.py, it is reorganized so it can load TROPOMI file and 
-carry out the collocation.  
-
-Jan/28/2025 - it works it outputs a structure with following format
-[tropo_orbit_filename, MPL_site_name, site_lat,site_lon,site_alt,start_time,end_time]
-that can be used late for finding the matches.  
-
 This code test reading lat,lon and time tags from a L2 Tropo file and compares
 with time of tytpical from the site of interest.
 
+-----------------------
+
+Feb/8/2025 Based on test_read_level2_geo_2.py, it takes a date (yyyy-mm-dd or julian-day),
+It outputs a list of orbits that do contain the sites of interest. 
+
+-----------------------
 
 Created on Fri Jan 24 11:56:58 2025
 
@@ -178,136 +177,85 @@ def find_matching_orbits(orbits_list, sites_list):
 
 
 if __name__ == "__main__":
+    
+    # Set correct paths
     current_working_directory = os.getcwd()
-    print('\nThis code is running from directory :', current_working_directory)
-    # Get user inputs
     current_os    = platform.system()
     computer_name = platform.node()
-    print(f'This code is executed in computer {computer_name} \n')
     current_pth,pth_fig = get_path(current_os.lower(),computer_name)
-    # filename='TROPOMI-Sentinel-5P_L2-TROPOMAER_2023m1224t234903-o32115_v01-2023m1231t055100.nc'
-    #filename='TROPOMI-Sentinel-5P_L2-TROPOMAER_2023m1225t013033-o32116_v01-2023m1231t050855.nc'
-    #folder_path = '/Volumes/ExtData1/SatData/Tropomi/Level2/2023/359/'
-
-    file_list = glob.glob(current_pth+'/2023/359/*.nc')
-
+    
+    #### User Input
+    yyyy =2023 ; verb = True
+    mm=12; dd=24
+    #julian=359
+    #### Some checks 
+    if not yyyy : sys.exit('Input year most be provided')
+    if not mm and not julian : sys.exit('Either Month and day or Julian day must be provided')
+    if verb :
+        print('\nThis code is running from directory :', current_working_directory)
+        print(f'This code is executed in computer {computer_name} \n')
+    
+    ################## Main code
+        
+    ### if input month and day , then convert to julian
+    if mm :
+        # Convert to datetime object
+        date_obj = datetime(yyyy, mm, dd)
+        julian = (datetime(yyyy, mm, dd) - datetime(yyyy, 1, 1)).days + 1
+    julian_str = str(julian)
+    if verb: print(f'Date is {yyyy} , julian {julian_str}')
+    ## Load list of site to get their typical overpass time
+    pth_site_list=current_working_directory + '/' + 'list_mpl_sites.txt'
+    # now get a list of files for selected date
+    file_list = glob.glob(current_pth+'/'+str(yyyy)+'/'+'359/*.nc')
     orbits_list=[]
     for full_pathname in file_list:
-       
       ### Get some global info from file
       Nlines, Ncols,t_start,t_end = get_array_dimensions(full_pathname)
-      # print(t_start.strftime("%Y-%m-%d %H:%M:%S"))
-      # print(t_end.strftime("%Y-%m-%d %H:%M:%S"))
       # Store in array if needed
       orbit_time = [t_start, t_end]
-#      # print('Orbit: ',full_pathname[-80:])
-#      # print('     Start,End time',t_start.strftime("%H:%M:%S"),t_end.strftime("%H:%M:%S"))
       orbits_list.append((full_pathname[-80:],orbit_time[0],orbit_time[1]))
-
-    ### Save date for converting time in MPL sites
+    ### Store date for converting time in MPL sites
     sel_date=orbits_list[1][1].date() # it returns only the day
-
     ### now load list of MPL sites
-    pth_site_list=current_working_directory + '/' + 'list_mpl_sites.txt'
     mpl_sites_list = read_mpl_site_list(pth_site_list,sel_date)
-    # print("\nPython List of Dictionaries:")
-    #for site in mpl_sites_list:
-    #    print(site)
     
-    #### Print Sites header
-    print("\n------------------------------")
-    print(f"{'Location':<20} {'Latitude':>8} {'Longitude':>9} {'Altitude':>7} {'Start Time':>15}   {'End Time':>15}")
-    # print("-" * 85)  # Separator line
-    for entry in mpl_sites_list:
-       print(f"{entry[0]:<20} {entry[1]:>8.3f} {entry[2]:>9.3f} {entry[3]:>7.3f} {entry[4].strftime('%Y-%m-%d %H:%M'):>20} {entry[5].strftime('%Y-%m-%d %H:%M'):>20}")
+    if verb :
+        #### Print Sites header
+        print("\n------------------------------")
+        print(f"{'Location':<20} {'Latitude':>8} {'Longitude':>9} {'Altitude':>7} {'Start Time':>15}   {'End Time':>15}")
+        # print("-" * 85)  # Separator line
+        for entry in mpl_sites_list:
+           print(f"{entry[0]:<20} {entry[1]:>8.3f} {entry[2]:>9.3f} {entry[3]:>7.3f} {entry[4].strftime('%Y-%m-%d %H:%M'):>20} {entry[5].strftime('%Y-%m-%d %H:%M'):>20}")
        
     ### Compare the orbit time frame with site time frame
     matching_orbits = find_matching_orbits(orbits_list, mpl_sites_list)
 
     # Print results
-    print("------------------------------\n")
-    print("\nMatching sites for each orbit:")
-    for orbit, sites in matching_orbits.items():
-        print(f"Orbit: {orbit}")
-        print("  Matching sites:")
-        for site in sites:
-            print(f"  - {site}")
-        print("")
-        
-    # # Create structured list
-    # structured_data = []
-    # for orbit, sites in matching_orbits.items():
-        # for site in sites:
-            # structured_data.append([orbit, site])
-    # # Print the structured data
-    # print("\nStructured Data:")
-    # print("-" * 85)
-    # print(f"{'Orbit':<70} {'Site':<20}")
-    # print("-" * 85)
-    # for entry in structured_data:
-        # print(f"{entry[0]:<70} {entry[1]:<20}")
+    if verb :
+        print("------------------------------\n")
+        print("\nMatching sites for each orbit:")
+        for orbit, sites in matching_orbits.items():
+            print(f"Orbit: {orbit}")
+            print("  Matching sites:")
+            for site in sites:
+                print(f"  - {site}")
+            print("")
     
-    # #### Create structured list
-    # structured_data = []
-    # for orbit, site_names in matching_orbits.items():
-        # for site_name in site_names:
-            # # Find the complete site information from mpl_sites_list
-            # site_info = next(site for site in mpl_sites_list if site[0] == site_name)
-            # structured_data.append([
-                # orbit,             # orbit filename
-                # site_info[0],      # site name
-                # site_info[1],      # latitude
-                # site_info[2],      # longitude
-                # site_info[3],      # altitude
-                # site_info[4],      # start time
-                # site_info[5]       # end time
-            # ])
-    # ##### Print the structured data
-    # print("\nStructured Data:")
-    # print("-" * 140)
-    # print(f"{'Orbit':<70} {'Site':<20} {'Lat':>8} {'Lon':>9} {'Alt':>7} {'Start Time':>15} {'End Time':>15}")
-    # print("-" * 140)
-    # for entry in structured_data:
-        # print(f"{entry[0]:<70} {entry[1]:<20} {entry[2]:>8.3f} {entry[3]:>9.3f} {entry[4]:>7.3f} {entry[5].strftime('%H:%M'):>15} {entry[6].strftime('%H:%M'):>15}")
-        
-    # Create dictionary of orbits and their matching sites
+    # Create dictionary of orbits and their matching sites for later use
     orbit_sites = []
     for orbit, site_names in matching_orbits.items():
         orbit_num=int(orbit[51:56])
         for site_name in site_names:
             # Find the complete site information from mpl_sites_list
-            site_info = next(site for site in mpl_sites_list if site[0] == site_name)
+            site_info    = next(site for site in mpl_sites_list if site[0] == site_name)
             location_info=[orbit_num,orbit]+site_info
             orbit_sites.append(location_info)
-
-            # If orbit already exists as key, append the site info
-            # If not, create new list with site info
-#             if orbit_num in orbit_sites:
-#                 orbit_sites[orbit_num].append(location_info)
-#             else:
-#                 orbit_sites[orbit_num] = [location_info]
-
-#             if orbit_num in orbit_sites:
-#            orbit_sites.append(location_info)
-#             else:
-#                 orbit_sites = [location_info]
-#     sys.exit()
-#     # Print the dictionary contents
-#     print("\nOrbit-Sites Dictionary:")
-#     print("-" * 80)
-#     for orbit, sites in orbit_sites.items():
-#         print(f"\nOrbit: {orbit}")
-#         print(f"{'Site':<20} {'Lat':>8} {'Lon':>9} {'Alt':>7} {'Start Time':>15} {'End Time':>15}")
-#         print("-" * 80)
-#         for site in sites:
-#             print(f"{site[0]:<20} {site[1]:>8.3f} {site[2]:>9.3f} {site[3]:>7.3f} {site[4].strftime('%H:%M'):>15} {site[5].strftime('%H:%M'):>15}")
-
-    print("\nFormatted Orbit-Site Information:")
-    print("-" * 100)  # Print a separator line
-    print(f"{'Orbit':^8} {'Site':^20} {'Latitude':^10} {'Longitude':^10} {'Altitude':^10} {'Start Time':^20} {'End Time':^20}")
-    print("-" * 100)  # Print a separator line
-    
-    for entry in orbit_sites:
-        print(f"{entry[0]:^8} {entry[2]:^20} {entry[3]:^10.3f} {entry[4]:^10.3f} {entry[5]:^10.3f} {entry[6].strftime('%Y-%m-%d %H:%M'):^20} {entry[7].strftime('%Y-%m-%d %H:%M'):^20}")
-    
-    print("-" * 100)  # Print a separator line
+#     if verb :
+#         print("\nFormatted Orbit-Site Information:")
+#         print("-" * 100)  # Print a separator line
+#         print(f"{'Orbit':^8} {'Site':^20} {'Latitude':^10} {'Longitude':^10} {'Altitude':^10} {'Start Time':^20} {'End Time':^20}")
+#         print("-" * 100)  # Print a separator line
+#         for entry in orbit_sites:
+#             print(f"{entry[0]:^8} {entry[2]:^20} {entry[3]:^10.3f} {entry[4]:^10.3f} {entry[5]:^10.3f} {entry[6].strftime('%Y-%m-%d %H:%M'):^20} {entry[7].strftime('%Y-%m-%d %H:%M'):^20}")
+#         print("-" * 100)  # Print a separator line

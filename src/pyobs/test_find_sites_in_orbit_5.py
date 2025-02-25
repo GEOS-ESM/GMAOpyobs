@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
+
+Feb12 - This is working
+
 Feb/6/2025 - based on version _3, this code incorporates some improvements towards final code
 such as scanning for whether the site contains target site, operationalize more respect to previous version.
 
@@ -23,14 +26,14 @@ from datetime import datetime, timedelta
 from tropomi_l2_reader import TROPOAER_L2
 
 def find_hdf5_files(folder_path):
-    """Find all HDF5 files in the specified folder"""
+   #### Find all HDF5 files in the specified folder
     hdf5_files = []
     for file in Path(folder_path).glob('*.hdf5'):  # Also add '*.h5' if needed
         hdf5_files.append(str(file))
     return hdf5_files
 
 def process_hdf5_file(filename, use_indices=False, i_range=None, j_range=None, use_spacing=False, spacing=(1,1)):
-    """Process individual HDF5 file with index-based subsetting"""
+    #### Process individual HDF5 file with index-based subsetting"""
     try:
         with h5.File(filename, "r") as idf:
             print(filename)
@@ -93,7 +96,7 @@ def get_array_dimensions(filename):
 
 
 def get_path(now_os, now_computer):
-    # Your existing get_path function remains the same
+    #####  Your existing get_path function remains the same
     if now_os=='win32':
         base_path    = 'C:/Users/sgasso/Downloads/'
         pth_fig_out='C:/Users/sgasso/OneDrive - NASA/ToShare/2025/GEOS/Pyfigures/'
@@ -128,7 +131,7 @@ def get_path(now_os, now_computer):
     # return row, col
 
 #### Read list of MPL sites
-def read_mpl_site_list(filename,day0):
+def read_mpl_site_list(filename):
 #Expected format: comma separated
 #line 1 :Name_MPL_sites , name,lat, lon, altiude(km),time_start, time_end
 #line 2 : GSFC           ,38.9930,-76.8400,0.050,    hh:mm , hh:mm
@@ -143,15 +146,15 @@ def read_mpl_site_list(filename,day0):
             time1 = datetime.strptime(data[4], "%H:%M").time()
             time2 = datetime.strptime(data[5], "%H:%M").time()
            # Combine date with times
-            datetime1 = datetime.combine(day0, time1)
-            datetime2 = datetime.combine(day0, time2)
+#             datetime1 = datetime.combine(day0, time1)
+#             datetime2 = datetime.combine(day0, time2)
             site = [
                 data[0],
                 float(data[1]),
                 float(data[2]),
                 float(data[3]),
-                datetime1,
-                datetime2
+                time1,
+                time2
             ]
             sites.append(site)
     return sites
@@ -202,56 +205,28 @@ def create_output_files(output_array, year, userstring):
                 line = ','.join(str(item) for item in row)
                 # Write line to file with newline
                 f.write(line + '\n')
-
-# Example usage:
-# create_output_files(output_array, "2023", "test")
-if __name__ == "__main__":
-    REF_DATE=datetime(2010, 1, 1)
-    current_working_directory = os.getcwd()
-    print('\nThis code is running from directory :', current_working_directory)
-    # Get user inputs
-    current_os    = platform.system()
-    computer_name = platform.node()
-    print(f'This code is executed in computer {computer_name} \n')
-    current_pth,pth_fig = get_path(current_os.lower(),computer_name)
-    
-    
-    
-    #### The next list was created by running test_read_level2_geo_2.py
-    #### Using a local dictionary now but eventually this will be the output of test_read_level2_geo_2.py
-    SEL_DATE = datetime(2023,12,25) # 
-    matching_orbits_list=[\
-    [32123,'TROPOMI-Sentinel-5P_L2-TROPOMAER_2023m1225t132102-o32123_v01-2023m1231t105113.nc',
-  'Santa_Cruz_Tenerife',28.472,-16.247,0.052,datetime(2023, 12, 25, 13, 15),datetime(2023, 12, 25, 15, 15)],
-    [32125,'TROPOMI-Sentinel-5P_L2-TROPOMAER_2023m1225t164402-o32125_v01-2023m1230t212055.nc',
-  'GSFC',38.993,-76.84,0.05,datetime(2023, 12, 25, 17, 5),datetime(2023, 12, 25, 19, 5)],
-    [32126,'TROPOMI-Sentinel-5P_L2-TROPOMAER_2023m1225t182532-o32126_v01-2023m1230t205012.nc',
-  'GSFC',38.993,-76.84,0.05,datetime(2023, 12, 25, 17, 5),datetime(2023, 12, 25, 19, 5)]\
-                         ]
+def process_matching_orbits(matching_orbits_list, current_working_directory, current_pth, SEL_DATE, REF_DATE,mpl_sites_list):
     ### now load list of MPL sites
-    pth_site_list=current_working_directory + '/' + 'list_mpl_sites.txt'
-    mpl_sites_list = read_mpl_site_list(pth_site_list,SEL_DATE)
-    # Use a traditional for loop to initialize a dictionary for output file
-    # one liner : output_array = {site[0]:[] for site in mpl_sites_list}
+#     pth_site_list = current_working_directory + '/' + 'list_mpl_sites.txt'
+#     mpl_sites_list = read_mpl_site_list(pth_site_list, SEL_DATE)
+    
+    # Initialize output dictionary
     output_array = {}
     for site in mpl_sites_list:
         output_array[site[0]] = []
-    
         
     #### now loop over each element in matching_orbits_list and check if the orbit needs to be 
     #### loaded or is already in memory.
     current_orbit = None
     current_file = None
     start_time = datetime.now()
-    #output_array=[]
+    
     for entry in matching_orbits_list:
         orbit_num    = entry[0]
         filename_tro = entry[1]
         # Check if we need to load a new file or use existing orbit
         if orbit_num != current_orbit:
             print(f"\nLoading new file for orbit {orbit_num}: {filename_tro}")
-            # Here you would put your file loading code, for example:
-            # current_file = load_tropomi_file(filename)
             file_pth = current_pth+filename_tro
             # Extract only GEO data
             TROP = TROPOAER_L2(file_pth,GEO=True,Verbose=0)
@@ -268,7 +243,6 @@ if __name__ == "__main__":
         obs_time2  = entry[7]
 
         print(f"   Processing site: {site_name}")
-        # Now get closest point
         print(f"   Operating on data for {site_name} at ({lat0:.4f}, {lon0:.4f}), OverpassTimeFrame {obs_time1.strftime('%H:%M')}  ,  {obs_time2.strftime('%H:%M')}")
         line, col,distance = find_nearest_point_haversine(TROP.lat, TROP.lon, lat0, lon0)
         
@@ -289,15 +263,59 @@ if __name__ == "__main__":
             print(f"         Time scanline at site: {date2_str}")
             print(f"         For   lat,lon  {found_lat:.4f},{found_lon:.4f} ")
             print(f"    MPL site located at {lat0:.4f},{lon0:.4f}")
-            ####
+            
             if not output_array[site_name]:  # checks if the list is empty
-                output_array[site_name] = [(date2_str, orbit_num, filename_tro, line, col)]  # creates a list with first tuple
+                output_array[site_name] = [(date2_str, orbit_num, filename_tro, line, col)]
             else:
                 output_array[site_name].append((date2_str, orbit_num, filename_tro, line, col))
-            #output_array.append((date2,site_name,orbit_num,filename_tro,line,col))
+                
     end_time = datetime.now()
     time_diff = (end_time - start_time).total_seconds()
     print(f"\nExecution time: {time_diff:.2f} seconds")
+    
+    return output_array
 
-##### NExt save outfile one per site
+
+if __name__ == "__main__":
+    REF_DATE=datetime(2010, 1, 1) # Reference date for Time Array in Tropomi SDS variable
+    current_working_directory = os.getcwd()
+    print('\nThis code is running from directory :', current_working_directory)
+    # Get user inputs
+    current_os    = platform.system()
+    computer_name = platform.node()
+    print(f'This code is executed in computer {computer_name} \n')
+    current_pth,pth_fig = get_path(current_os.lower(),computer_name)
+    
+    #### Get user defined text file with MPL sites to process
+    pth_site_list  = current_working_directory + '/' + 'list_mpl_sites.txt'
+    mpl_sites_list = read_mpl_site_list(pth_site_list)
+    #### The next list was created by running test_read_level2_geo_2.py
+    #### Using a local dictionary now but eventually this will be the output of test_read_level2_geo_2.py
+    SEL_DATE = datetime(2023,12,25) # 
+    ### Now add SEL_DATE to mpl time stamps, this is needed to get the matching orbits 
+    for i in mpl_sites_list:
+         i[-1]= datetime.combine(SEL_DATE, i[-1])
+         i[-2]= datetime.combine(SEL_DATE, i[-2])
+     
+    #sys.exit()
+    #### now need to get a list of matching orbits, that is a list of orbits that contain a 
+    ####  MPL site.
+    matching_orbits_list=[\
+    [32123,'TROPOMI-Sentinel-5P_L2-TROPOMAER_2023m1225t132102-o32123_v01-2023m1231t105113.nc',
+  'Santa_Cruz_Tenerife',28.472,-16.247,0.052,datetime(2023, 12, 25, 13, 15),datetime(2023, 12, 25, 15, 15)],
+    [32125,'TROPOMI-Sentinel-5P_L2-TROPOMAER_2023m1225t164402-o32125_v01-2023m1230t212055.nc',
+  'GSFC',38.993,-76.84,0.05,datetime(2023, 12, 25, 17, 5),datetime(2023, 12, 25, 19, 5)],
+    [32126,'TROPOMI-Sentinel-5P_L2-TROPOMAER_2023m1225t182532-o32126_v01-2023m1230t205012.nc',
+  'GSFC',38.993,-76.84,0.05,datetime(2023, 12, 25, 17, 5),datetime(2023, 12, 25, 19, 5)]\
+                         ]
+                         
+    ##### Now find the locations of the MPL sites inside the selected TROPomi orbits
+    output_array = process_matching_orbits(matching_orbits_list, current_working_directory, 
+                                         current_pth, SEL_DATE, REF_DATE,mpl_sites_list)
+    
+    ##### Next save outfile one per site
+    ### Inputs: array_to_save, year_string,user_string
     create_output_files(output_array, "2023", "test")
+
+# To do, finish editing read_mpl_site_list module, remove input SEL_DATE ,read data as time only and add 
+# SEL_DATE later. 
