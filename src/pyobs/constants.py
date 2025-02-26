@@ -15,7 +15,7 @@ except:  # hardwire otherwise for portability
 
     MAPL_PSDRY   = 98305.0                # dry surface pressure [Pa]
     MAPL_SECONDS_PER_SIDEREAL_DAY = 86164.0 #s
-    MAPL_GRAV    = 9.80665                # m s-2
+    MAPL_GRAV    = 9.80665                # m^2/s
     MAPL_RADIUS  = 6371.0E3               # m
     MAPL_OMEGA   = 2.0*MAPL_PI/MAPL_SECONDS_PER_SIDEREAL_DAY    # 1/s
     MAPL_RUNIV   = 8314.47                # J/(Kmole K)

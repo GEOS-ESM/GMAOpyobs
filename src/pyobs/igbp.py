@@ -17,7 +17,7 @@ GRASSLAND      = 4
 import sys
 from numpy    import any
 
-from . import IGBP_  # load f2py extension
+import IGBP_  # load f2py extension
 
 #                      tf    xf   sv    gl
 FLAMING_FRACTION = [ 0.45, 0.45, 0.75, 0.97 ]
