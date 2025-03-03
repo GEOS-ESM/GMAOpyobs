@@ -6,13 +6,13 @@ import os
 
 from numpy             import sum, zeros, ones, sqrt, std, mean, unique, \
                               concatenate, where, linspace, meshgrid, exp, savez, \
-                              percentile
+                              percentile, reshape
 from matplotlib        import cm, ticker
 
 from matplotlib.pyplot import plot, title, xlabel, ylabel, figure, imshow, \
                               grid, colorbar, draw, axes, legend
 
-from scipy             import stats, reshape
+from scipy             import stats
 
 MISSING = 1.e15
 
