@@ -327,9 +327,9 @@ class G2GAOP(object):
         ssa[I] = sca[I] / aot[I]
 
         if vector:
-             I = np.where(sca.reshape((ns) != 0.0))[0]
+             I = np.where(sca.reshape(ns) != 0.0)[0]
              pmom[I,:,:] = pmom[I,:,:] / sca.reshape((ns,1,1))[I,:,:]
-             I = np.where(sca.reshape((ns) == 0.0))[0]
+             I = np.where(sca.reshape(ns) == 0.0)[0]
              pmom[I,:,:] = np.nan
              pmom = pmom.reshape(space+(p,m))
         else:
