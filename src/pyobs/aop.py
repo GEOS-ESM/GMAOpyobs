@@ -214,7 +214,7 @@ class G2GAOP(object):
            self.p = max(self.p,dims_['p']) # max number of entries in phase matrix
            self.m = max(self.m,dims_['m']) # max number of moments in phase matrix
         
-    def getAOPrt(self,Species=None,wavelength=None,vector=False,fixrh=None):
+    def getAOPrt(self,Species=None,wavelength=None,vector=False,fixrh=None,m=None):
 
         """
         Returns an xarray Dataset with (aot,ssa,g) if vector is
@@ -228,6 +228,7 @@ class G2GAOP(object):
         vector:     bool, whether to return full phase matrix or
                     asymmetry parameter.
 
+        m: number of pmom moments to read in. If None, reads all on file.
         """
 
         # Tables must have be consistent across species
@@ -275,7 +276,10 @@ class G2GAOP(object):
         aot, sca, g = np.zeros(space), np.zeros(space), np.zeros(space)
         if vector:
             ns = np.prod(space)
-            p, m = self.p, self.m
+            p = self.p
+            if m is None:
+                m = self.m
+
             pmom = np.zeros((ns,p,m)) # flatten space dimensions for convenience
 
         for s in Species:   # loop over species
@@ -304,7 +308,7 @@ class G2GAOP(object):
                 if vector:
 
                     pmom_ = mie.getAOP('pmom', bin, rh, q_mass=q_mass,
-                                        wavelength=wavelength)
+                                        wavelength=wavelength,m=m)
                     p_, m_ = pmom_.shape[-2:]
                     pmom_ = pmom_.values.reshape((ns,p_,m_)) * sca_.reshape((ns,1,1))
 
