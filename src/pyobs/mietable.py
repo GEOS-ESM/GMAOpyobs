@@ -136,7 +136,7 @@ class MIETABLE(object):
        return dims
    
    #--
-   def _getAOP(self, name, bin, wavelength=None):
+   def _getAOP(self, name, bin, wavelength=None,m=None):
       """
       Return DataArray with optical property *name* for bin and, if needed,
       wavelength. No RH interpolation performed. This is internal,
@@ -163,10 +163,15 @@ class MIETABLE(object):
       else:
          da = self.ds[name].isel({'bin':[bin_]})
 
+      # limit number of moments
+      if m is not None:
+         if da.sizes['m'] > m:
+             da = da.isel(m=slice(0,m))
+
       return da.squeeze()
          
 #--
-   def getAOP(self, name, bin, rh, q_mass=None, wavelength=None):
+   def getAOP(self, name, bin, rh, q_mass=None, wavelength=None, m=None):
       """
       Returns DataArray with Aerosol Optical Property *name*.
       
@@ -177,6 +182,7 @@ class MIETABLE(object):
       q_mass:     DataArray, aerosol column mass (Kg/m2), only needed for
                   extensive properties
       wavelength: float, wavelength in nm
+      m:          integer, max number of pmom moments
       
       """
       
@@ -186,7 +192,7 @@ class MIETABLE(object):
       rh = rh.clip(min=0,max=_rh_max)           # clip RH as in GOCART-2G
 
       if name in self.AOPs:
-         aop = self._getAOP(name, bin, wavelength=wavelength)
+         aop = self._getAOP(name, bin, wavelength=wavelength,m=m)
          if len(aop.dims) > 1:
              aop = aop.interp(rh=_rh)[_iRH(rh)] # Faster RH interpolation
          else:
@@ -234,7 +240,7 @@ class MIETABLE(object):
          ssa  = (bsca/bext).interp(rh=rh).rename('ssa')
          aot  = (bext.interp(rh=rh) * q_mass).rename('aot')
          if 'pmom' in name:
-            pmom = self.getAOP('pmom', bin, rh, wavelength=wavelength)
+            pmom = self.getAOP('pmom', bin, rh, wavelength=wavelength,m=m)
             aop  = (aot, ssa, pmom)
          elif 'gasym' in name:
             gasym = self.getAOP('g', bin, rh, wavelength=wavelength).rename('gasym')

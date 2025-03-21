@@ -15,6 +15,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Deprecated
 
+# [v1.2.3] - 2025-03-20
+
+### Fixed
+- bug/typo in aop.py for vector AOP calculation
+
+### Added
+- ability to limit number of moments requested from getAOPrt
+
+### Changed
+
+### Removed
+
+### Deprecated
+
 # [v1.2.2] - 2025-03-03 
 
 ### Fixed 
