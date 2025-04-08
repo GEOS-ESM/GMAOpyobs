@@ -1,0 +1,18 @@
+Name_MPL_sites               , lat, lon, altitude(km)
+Appalachian_State            , 36.2150, -81.6940,1.080
+Barcelona                    , 41.3860,   2.1170,0.125
+CARTEL                       , 45.3790, -71.9310,0.251
+El_Arenosillo                , 37.1050,  -6.7340,0.059
+EPA-NCU                      , 24.9670, 121.1810,0.135
+GSFC                         , 38.9930, -76.8400,0.050 
+Izana                        , 28.3090, -16.4990,2.401
+KAUST_Campus                 , 22.3050,  39.1030,0.011 
+London-CDN                   , 43.0080, -81.2700,0.258 
+Santa_Cruz_Tenerife          , 28.4720, -16.2470,0.052 
+Sao_Paolo                    ,-23.5620, -46.7350,0.865
+SEDE_BOKER                   , 30.8550,  34.7820,0.480
+Silpakorn_Univ               , 13.8190, 100.0410,0.072 
+Singapore                    ,  1.2980, 103.7800,0.030
+Songkhla_Regional_Observatory,  7.1580, 100.6100,0.105
+UH_Liberty                   , 30.0970, -94.7630,0.020
+Univ_of_Nevada-Reno          , 39.5410,-119.8140,1.410

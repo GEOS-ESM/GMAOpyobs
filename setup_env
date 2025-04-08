@@ -1,0 +1,47 @@
+#!/usr/bin/csh
+#=======================================================================
+# name - setup_env.bash
+# purpose -
+#   This script can be "sourced" from the bash shell to set environment
+#   variables and modules needed for building and running the GEOS system.
+#
+
+# Add GMAOpyobs to the path
+#----------------
+# setenv AERODIR  /home/sgasso/Python/CALTRO/GMAOpyobs
+#setenv AERODIR  /home/sgasso/Python/MPL/GMAOpyobs
+setenv AERODIR $HOME/REPOS/AOCH/GMAOpyobs
+#setenv PATH ${AERODIR}/install/bin/:${PATH}
+#setenv PATH ${AERODIR}/build/install/bin/:${PATH}
+
+# Set Python PATH
+#-----------------
+setenv PYTHONPATH ${AERODIR}/install/lib/Python
+#setenv PYTHONPATH $HOME/REPOS/AOCH/AeroApps/install/lib/Python
+#setenv PYTHONPATH ${AERODIR}/install/lib
+#setenv PYTHONPATH ${AERODIR}/install/lib/Python:$PYTHONPATH
+
+#### source g5_modules
+source ${AERODIR}/env@/g5_modules
+#source /home/sgasso/REPOS/AOCH/AeroApps/env@/g5_modules
+
+# Path for shared object libraries
+#------------------
+#setenv LD_LIBRARY_PATH ${AERODIR}/install/lib:$LD_LIBRARY_PATH
+#setenv LD_LIBRARY_PATH ${LD_LIBRARY_PATH}:${BASEDIR}/`uname -s`/lib
+
+# link over scripts and datasets needed
+# -------------------
+
+#------ Load Python modules
+#module load /ford1/share/gmao_SIteam/modulefiles/other/python/GEOSpyD/Ana2019.10_py3.7
+
+# # climatology datasets
+# setenv climatology /discover/nobackup/pcastell/workspace/aero_work/asia-aq/climatology
+# foreach fname (${climatology}/*20*nc)
+# set basename=`basename $fname`
+# if ( ! -l $basename )  then
+# ln -s $fname .
+# endif
+# end
+
