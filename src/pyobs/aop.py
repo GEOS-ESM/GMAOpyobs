@@ -369,7 +369,7 @@ class G2GAOP(object):
         return xr.Dataset(DA)
 
      
-    def getAOPext(self,Species=None,wavelength=None,fixrh=None):
+    def getAOPext(self,Species=None,wavelength=None,fixrh=None,includemolec=True):
 
         """
         Returns an xarray Dataset with the following variables:
@@ -494,7 +494,28 @@ class G2GAOP(object):
         DA['AIRDENS'] = a['AIRDENS']
 
         return xr.Dataset(DA)
-
+        
+        
+    def molecularScattering(self,wavelength,pressure,T,delp,airdens):
+        """
+        Returns an xarray Dataset with the molecular component of the backscatter coefficient following methodology beginning on page 147 of https://ntrs.nasa.gov/api/citations/19960051003/downloads/19960051003.pdf.
+    
+        Wavelength: float, wavelength in nm.
+        pressure: float, pressure in ?
+        T: temperature in K
+        """
+        #Define contstants
+        #-----------------------------------------
+        avogadrosnumber=6.022e23 #units are mol^-1
+        gasconstant= 8.3145 #units are J mol^-1 K^-1
+        gravity=9.81 
+        
+        #Calculate wavelength dependent backscatter as a function of temperature and pressure
+        #-----------------------------------------
+        backscat_mol = (5.45e-32/(gasconstant/avogadrosnumber)) * np.power((wavelength/550),-4.0)  * P / T
+        delz  = delp / (gravity * airdens)
+        tau_mol_layer = backscat_mol * 8* np.pi /3 * delz
+        return tau_mol_layer
 
     def getAOPintensive(self,Species=None,wavelength=None):
         """
