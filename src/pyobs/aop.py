@@ -506,7 +506,7 @@ class G2GAOP(object):
 
         if ndims==2:
             ###TOA
-            abackTOA[:,0]=(bsc[:,0]+ backscat_mol[:,0]) * np.exp(-2*tau_aer_layer[:,0]) * np.exp(-2*tau_mol_layer[:,0])
+            abackTOA[:,0]=(bsc[:,0]+ backscat_mol[:,0]) * np.exp(-tau_aer_layer[:,0]) * np.exp(-tau_mol_layer[:,0])
             for k in range(1,km):
                 tau_aer=0
                 tau_mol=0
@@ -518,7 +518,7 @@ class G2GAOP(object):
                 abackTOA[:,k] = (bsc[:,k] + backscat_mol[:,k]) * np.exp(-2*tau_aer) * np.exp(-2*tau_mol)
 
             ###Surface    
-            abackSFC[:,0]=(bsc[:,km-1]+ backscat_mol[:,km-1]) * np.exp(-2*tau_aer_layer[:,km-1]) * np.exp(-2*tau_mol_layer[:,km-1])
+            abackSFC[:,0]=(bsc[:,km-1]+ backscat_mol[:,km-1]) * np.exp(-tau_aer_layer[:,km-1]) * np.exp(-tau_mol_layer[:,km-1])
             for k in range(km-2,-1,-1):
                 tau_aer=0
                 tau_mol=0
@@ -531,7 +531,7 @@ class G2GAOP(object):
 
         if ndims==3:
             ###TOA
-            abackTOA[:,:,0]=(bsc[:,:,0]+ backscat_mol[:,:,0]) * np.exp(-2*tau_aer_layer[:,:,0]) * np.exp(-2*tau_mol_layer[:,:,0])
+            abackTOA[:,:,0]=(bsc[:,:,0]+ backscat_mol[:,:,0]) * np.exp(-tau_aer_layer[:,:,0]) * np.exp(-tau_mol_layer[:,:,0])
             for k in range(1,km):
                 tau_aer=0
                 tau_mol=0
@@ -543,7 +543,7 @@ class G2GAOP(object):
                 abackTOA[:,:,k] = (bsc[:,:,k] + backscat_mol[:,:,k]) * np.exp(-2*tau_aer) * np.exp(-2*tau_mol)
                 
             ###Surface    
-            abackSFC[:,0]=(bsc[:,:,km-1]+ backscat_mol[:,:,km-1]) * np.exp(-2*tau_aer_layer[:,:,km-1]) * np.exp(-2*tau_mol_layer[:,:,km-1])
+            abackSFC[:,0]=(bsc[:,:,km-1]+ backscat_mol[:,:,km-1]) * np.exp(-tau_aer_layer[:,:,km-1]) * np.exp(-tau_mol_layer[:,:,km-1])
             for k in range(km-2,-1,-1):
                 tau_aer=0
                 tau_mol=0
