@@ -129,7 +129,7 @@ class MIETABLE(object):
        """
        Return dimensions of tables as a dictionary
        """
-       dims = dict(self.ds.dims)
+       dims = dict(self.ds.sizes)
        if 'p' not in dims:
            dims['p'] = None
            dims['m'] = None

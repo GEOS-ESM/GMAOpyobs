@@ -9,7 +9,7 @@ __version__ = '1.1.0'
 import numpy  as np
 import xarray as xr
 import yaml
-
+#import xarray.ufuncs as xu
 
 from . import mietable  as mt
 from . import xrctl     as xc
@@ -503,7 +503,7 @@ class G2GAOP(object):
                 abackTOA[:,k] = (bsc[:,k] + backscat_mol[:,k]) * np.exp(-2*tau_aer) * np.exp(-2*tau_mol)
 
             ###Surface    
-            abackSFC[:,0]=(bsc[:,km-1]+ backscat_mol[:,km-1]) * np.exp(-tau_aer_layer[:,km-1]) * np.exp(-tau_mol_layer[:,km-1])
+            abackSFC[:,0]=(bsc[:,km-1]+ backscat_mol[:,km-1]) * np.exp(-2*tau_aer_layer[:,km-1]) * np.exp(-2*tau_mol_layer[:,km-1])
             for k in range(km-2,-1,-1):
                 tau_aer=0
                 tau_mol=0
@@ -512,7 +512,7 @@ class G2GAOP(object):
                     tau_mol += tau_mol_layer[:,kk]
                 tau_aer += 0.5 *  tau_aer_layer[:,k]
                 tau_mol += 0.5 *  tau_mol_layer[:,k]
-                abackSFC[:,k] = (bsc[:,k] + backscat_mol[:,k]) * np.exp(-tau_aer) * np.exp(-tau_mol)
+                abackSFC[:,k] = (bsc[:,k] + backscat_mol[:,k]) * np.exp(-2*tau_aer) * np.exp(-2*tau_mol)
 
         if ndims==3:
             ###TOA
@@ -865,6 +865,13 @@ def CLI_aop():
     # ------------
     aer = xc.open_mfdataset(aerDataset,parallel=True,chunks='auto')
     g = G2GAOP(aer,config=config,mieRootDir=options.rootDir,verbose=options.verbose)
+    g.aer['RH'].load()
+    g.aer['AIRDENS'].load()
+    try:
+        g.aer['delp'].load()
+    except:
+        g.aer['DELP'].load()
+    g.aer['T'].load()
     for w_ in options.wavelengths.split(','):
         w = float(w_)
         if options.aop == 'ext':
