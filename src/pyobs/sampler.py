@@ -32,7 +32,8 @@ class SamplerError(Exception):
 class STATION(object):
 
     def __init__(self, stations, lons, lats,
-                 dataset, time_range=None, verbose=False):
+                 dataset, time_range=None, verbose=False,
+                 parallel=True,chunks='auto'):
         """
         Specifies dataset to be sampled at obs location.
         On input,
@@ -60,14 +61,14 @@ class STATION(object):
         # If dataset is a list of files...
         # --------------------------------
         elif isinstance(dataset,(list,tuple)):
-            self.ds = xr.open_mfdataset(dataset,parallel=True)
+            self.ds = xr.open_mfdataset(dataset,parallel=parallel,chunks=chunks)
 
         # If datatset is a string it is either a GrADS-style ctl or
         # a glob type of template
         # ---------------------------------------------------------
         elif isinstance(dataset,str):
             # Special handles GrADS-style ctl if found
-            self.ds = xc.open_mfdataset(dataset,time_range=time_range,parallel=True)
+            self.ds = xc.open_mfdataset(dataset,time_range=time_range,parallel=paralle,chunks=chunks)
 
         else:
             raise SamplerError("Invalid dataset specification.")
