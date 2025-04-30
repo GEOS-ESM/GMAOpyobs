@@ -9,9 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 ### Added
-MPL reader and plot curtain 
+- MPL reader and plot curtain 
 ### Changed
-
+- add auto chunking to TRAJECTORY and STATION. This enables dask
+- preload some key variables in aop.py so you don't hit dask repeatedly in for loop
 ### Removed
 
 ### Deprecated
