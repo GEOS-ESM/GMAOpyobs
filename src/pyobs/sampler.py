@@ -68,7 +68,7 @@ class STATION(object):
         # ---------------------------------------------------------
         elif isinstance(dataset,str):
             # Special handles GrADS-style ctl if found
-            self.ds = xc.open_mfdataset(dataset,time_range=time_range,parallel=paralle,chunks=chunks)
+            self.ds = xc.open_mfdataset(dataset,time_range=time_range,parallel=parallel,chunks=chunks)
 
         else:
             raise SamplerError("Invalid dataset specification.")
