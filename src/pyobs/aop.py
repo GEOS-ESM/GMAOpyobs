@@ -249,6 +249,13 @@ class G2GAOP(object):
 
         a = self.aer    # aerosol mixing ratio tracers
 
+        # pre-load RH, AIRDENS, and DELP so you don't hit dask
+        # repeatedly looping through  AOP calculations
+        # -------------------------------------------------------
+        a['DELP'].load()
+        a['AIRDENS'].load()
+        a['RH'].load()
+
         # GEOS files can be inconsistent when it comes to case
         # ----------------------------------------------------
         try:
@@ -400,6 +407,14 @@ class G2GAOP(object):
             Species = [Species,]
 
         a = self.aer    # aerosol mixing ratio tracers
+
+        # pre-load RH, AIRDENS, T and DELP so you don't hit dask
+        # repeatedly looping through  AOP calculations
+        # -------------------------------------------------------
+        a['DELP'].load()
+        a['AIRDENS'].load()
+        a['T'].load()
+        a['RH'].load()
 
         # GEOS files can be inconsistent when it comes to case
         # ----------------------------------------------------
@@ -631,6 +646,13 @@ class G2GAOP(object):
             Species = [Species,]
 
         a = self.aer    # aerosol mixing ratio tracers
+
+        # pre-load RH, AIRDENS, and DELP so you don't hit dask
+        # repeatedly looping through  AOP calculations
+        # -------------------------------------------------------
+        a['DELP'].load()
+        a['AIRDENS'].load()
+        a['RH'].load()
 
         # Determine PM Threshold
         # -------------------------------
