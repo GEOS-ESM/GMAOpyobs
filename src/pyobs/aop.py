@@ -10,11 +10,13 @@ import numpy  as np
 import xarray as xr
 import yaml
 
+
 from . import mietable  as mt
 from . import xrctl     as xc
 
 from .constants import MAPL_GRAV as GRAV
-
+from .constants import MAPL_AVOGAD
+from .constants import MAPL_RUNIV
 # Default YAML file mapping GOCART tracers in aer_Nv and the optics files
 # -----------------------------------------------------------------------
 G2G_MieMap = """
@@ -386,7 +388,7 @@ class G2GAOP(object):
 
         Wavelength: float, wavelength in nm.
 
-        TO DO: total attenuated backscatter, including molecular component
+        fixrh: value between 0 and 1 representing realtive humidity
 
         """
 
@@ -468,37 +470,39 @@ class G2GAOP(object):
         #following the methodology begining on page 147 of 
         #http://ntrs.nasa.gov/archive/nasa/casi.ntrs.nasa.gov/19960051003.pdf
         # -----------------------------------------        
-        avogadrosnumber=6.022e23 #units are mol^-1
-        gasconstant= 8.3145 #units are J mol^-1 K^-1
         if ndims==2:
             pe=np.zeros((space[0],km+1))
-            pe[:,0]=1
-            for k in range(1,km):
-                pe[:,k]=pe[:,k-1]+dp[:,k]
+            pe[:,0]=1 #assume TOA has a pressure of 1 Pa
+            for k in range(0,km):
+                pe[:,k+1]=pe[:,k]+dp[:,k]
             for k in range(km):
                 pressure[:,k]=(pe[:,k]+pe[:,k+1])/2
         elif ndims==3:
             pe=np.zeros((space[0],space[1],km+1))
-            pe[:,:,0]=1
-            for k in range(1,km):
-                pe[:,:,k]=pe[:,:,k-1]+dp[:,:,k]
+            pe[:,:,0]=1 #assume TOA has a pressure of 1 Pa
+            for k in range(0,km):
+                pe[:,:,k+1]=pe[:,:,k]+dp[:,:,k]
             for k in range(km):
                 pressure[:,:,k]=(pe[:,:,k]+pe[:,:,k+1])/2
-        backscat_mol = (5.45e-32/(gasconstant/avogadrosnumber)) * np.power((wavelength/550),-4.0)  * pressure / T
+        backscat_mol = (5.45e-32/(MAPL_RUNIV/MAPL_AVOGAD)) * (wavelength/550)**-4  * pressure / T #molecular backscatter coefficient in m-1
 
-        tau_mol_layer = backscat_mol * 8* np.pi /3 * delz
+        tau_mol_layer = backscat_mol * 8 * np.pi /3 * delz
         tau_aer_layer = ext * delz
+
         if ndims==2:
-            abackTOA[:,0]=(bsc[:,0]+ backscat_mol[:,0]) * np.exp(-tau_aer_layer[:,0]) * np.exp(-tau_mol_layer[:,0])
+            ###TOA
+            abackTOA[:,0]=(bsc[:,0]+ backscat_mol[:,0]) * np.exp(-2*tau_aer_layer[:,0]) * np.exp(-2*tau_mol_layer[:,0])
             for k in range(1,km):
                 tau_aer=0
                 tau_mol=0
-                for kk in range(k+1):
+                for kk in range(0,k):
                     tau_aer += tau_aer_layer[:,kk]
                     tau_mol += tau_mol_layer[:,kk]
-                tau_aer += 0.5 *  tau_aer_layer[:,k]
-                tau_mol += 0.5 *  tau_mol_layer[:,k]
-                abackTOA[:,k] = (bsc[:,k] + backscat_mol[:,k]) * np.exp(-tau_aer) * np.exp(-tau_mol)
+                tau_aer += 0.5 * tau_aer_layer[:,k]
+                tau_mol += 0.5 * tau_mol_layer[:,k]
+                abackTOA[:,k] = (bsc[:,k] + backscat_mol[:,k]) * np.exp(-2*tau_aer) * np.exp(-2*tau_mol)
+
+            ###Surface    
             abackSFC[:,0]=(bsc[:,km-1]+ backscat_mol[:,km-1]) * np.exp(-tau_aer_layer[:,km-1]) * np.exp(-tau_mol_layer[:,km-1])
             for k in range(km-2,-1,-1):
                 tau_aer=0
@@ -509,18 +513,22 @@ class G2GAOP(object):
                 tau_aer += 0.5 *  tau_aer_layer[:,k]
                 tau_mol += 0.5 *  tau_mol_layer[:,k]
                 abackSFC[:,k] = (bsc[:,k] + backscat_mol[:,k]) * np.exp(-tau_aer) * np.exp(-tau_mol)
+
         if ndims==3:
-            abackTOA[:,:,0]=(bsc[:,:,0]+ backscat_mol[:,:,0]) * np.exp(-tau_aer_layer[:,:,0]) * np.exp(-tau_mol_layer[:,:,0])
+            ###TOA
+            abackTOA[:,:,0]=(bsc[:,:,0]+ backscat_mol[:,:,0]) * np.exp(-2*tau_aer_layer[:,:,0]) * np.exp(-2*tau_mol_layer[:,:,0])
             for k in range(1,km):
                 tau_aer=0
                 tau_mol=0
-                for kk in range(k+1):
+                for kk in range(0,k):
                     tau_aer += tau_aer_layer[:,:,kk]
                     tau_mol += tau_mol_layer[:,:,kk]
                 tau_aer += 0.5 *  tau_aer_layer[:,:,k]
                 tau_mol += 0.5 *  tau_mol_layer[:,:,k]
-                abackTOA[:,:,k] = (bsc[:,:,k] + backscat_mol[:,:,k]) * np.exp(-tau_aer) * np.exp(-tau_mol)
-            abackSFC[:,0]=(bsc[:,:,km-1]+ backscat_mol[:,:,km-1]) * np.exp(-tau_aer_layer[:,:,km-1]) * np.exp(-tau_mol_layer[:,:,km-1])
+                abackTOA[:,:,k] = (bsc[:,:,k] + backscat_mol[:,:,k]) * np.exp(-2*tau_aer) * np.exp(-2*tau_mol)
+                
+            ###Surface    
+            abackSFC[:,0]=(bsc[:,:,km-1]+ backscat_mol[:,:,km-1]) * np.exp(-2*tau_aer_layer[:,:,km-1]) * np.exp(-2*tau_mol_layer[:,:,km-1])
             for k in range(km-2,-1,-1):
                 tau_aer=0
                 tau_mol=0
@@ -529,7 +537,7 @@ class G2GAOP(object):
                     tau_mol += tau_mol_layer[:,:,kk]
                 tau_aer += 0.5 *  tau_aer_layer[:,:,k]
                 tau_mol += 0.5 *  tau_mol_layer[:,:,k]
-                abackSFC[:,k] = (bsc[:,:,k] + backscat_mol[:,:,k]) * np.exp(-tau_aer) * np.exp(-tau_mol)
+                abackSFC[:,k] = (bsc[:,:,k] + backscat_mol[:,:,k]) * np.exp(-2*tau_aer) * np.exp(-2*tau_mol)
                    
 
         # Final normalization
@@ -565,8 +573,8 @@ class G2GAOP(object):
                     SCA = xr.DataArray(sca.astype('float32'),dims=rh.dims,coords=rh.coords,attrs=A['SCA']),
                     BSC = xr.DataArray(bsc.astype('float32'),dims=rh.dims,coords=rh.coords,attrs=A['BSC']),
                     DEPOL = xr.DataArray(depol.astype('float32'),dims=rh.dims,coords=rh.coords,attrs=A['DEPOL']),
-                    TOTABCKTOA = xr.DataArray(abacktoa.astype('float32'),dims=rh.dims,coords=rh.coords,attrs=A['TOTABCKTOA']),
-                    TOTABCKSFC = xr.DataArray(abacksfc.astype('float32'),dims=rh.dims,coords=rh.coords,attrs=A['TOTABCKSFC'])
+                    TOTABCKTOA = xr.DataArray(abackTOA.astype('float32'),dims=rh.dims,coords=rh.coords,attrs=A['TOTABCKTOA']),
+                    TOTABCKSFC = xr.DataArray(abackSFC.astype('float32'),dims=rh.dims,coords=rh.coords,attrs=A['TOTABCKSFC'])
                  )
 
         DA['DELP'] = dp
@@ -855,7 +863,7 @@ def CLI_aop():
 
     # Compute AOPs
     # ------------
-    aer = xc.open_mfdataset(aerDataset,parallel=True)
+    aer = xc.open_mfdataset(aerDataset,parallel=True,chunks='auto')
     g = G2GAOP(aer,config=config,mieRootDir=options.rootDir,verbose=options.verbose)
     for w_ in options.wavelengths.split(','):
         w = float(w_)
@@ -867,7 +875,7 @@ def CLI_aop():
             ds = g.getPM(pmsize=options.d_pm,fixrh=options.fixrh,aerodynamic=options.aerodynamic)
         else:
             print(options.aop)
-            raise AOPError('Unknow AOP option '+options.aop)
+            raise AOPError('Unknown AOP option '+options.aop)
 
         filename = options.outFile.replace('%{w}',w_)
         if options.verbose:
