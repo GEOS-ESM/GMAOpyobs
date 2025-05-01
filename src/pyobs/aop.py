@@ -409,25 +409,21 @@ class G2GAOP(object):
         a = self.aer    # aerosol mixing ratio tracers
 
         # pre-load RH, AIRDENS, T and DELP so you don't hit dask
-        # repeatedly looping through  AOP calculations
+        # repeatedly looping through AOP calculations
         # -------------------------------------------------------
-        a['DELP'].load()
-        a['AIRDENS'].load()
-        a['T'].load()
-        a['RH'].load()
-
-        # GEOS files can be inconsistent when it comes to case
-        # ----------------------------------------------------
         try:
+            a['DELP'].load()
             dp = a['DELP']
         except:
+            a['delp'].load()
             dp = a['delp']
-
-        rh = a['RH']
-        T = a['T']
+        a['AIRDENS'].load()
         airdens = a['AIRDENS']
+        a['T'].load()
+        T = a['T']
+        a['RH'].load()
+        rh = a['RH']
         delz  = dp / (GRAV * airdens)
-
         
         # Check FIXRH option
         # --------------------------
@@ -503,7 +499,6 @@ class G2GAOP(object):
 
         tau_mol_layer = backscat_mol * 8 * np.pi /3 * delz
         tau_aer_layer = ext * delz
-
         if ndims==2:
             ###TOA
             abackTOA[:,0]=(bsc[:,0]+ backscat_mol[:,0]) * np.exp(-tau_aer_layer[:,0]) * np.exp(-tau_mol_layer[:,0])
@@ -579,7 +574,8 @@ class G2GAOP(object):
                   BSC = {'long_name':'Aerosol Backscatter Coefficient', 'units':'km-1'},
                   DEPOL = {'long_name':'Depolarization Ratio', 'units':'1'},
                   TOTABCKTOA = {'long_name':'Total Attenuated Backscatter Coefficient from TOA','units':'km-1 sr-1'},
-                  TOTABCKSFC = {'long_name':'Total Attenuated Backscatter Coefficient from Surface','units':'km-1 sr-1'}
+                  TOTABCKSFC = {'long_name':'Total Attenuated Backscatter Coefficient from Surface','units':'km-1 sr-1'},
+                  TAUMOLEC = {'long_name':'tau_mol_layer','units':''}
                   )
 
         # Pack results into a Dataset
@@ -589,7 +585,8 @@ class G2GAOP(object):
                     BSC = xr.DataArray(bsc.astype('float32'),dims=rh.dims,coords=rh.coords,attrs=A['BSC']),
                     DEPOL = xr.DataArray(depol.astype('float32'),dims=rh.dims,coords=rh.coords,attrs=A['DEPOL']),
                     TOTABCKTOA = xr.DataArray(abackTOA.astype('float32'),dims=rh.dims,coords=rh.coords,attrs=A['TOTABCKTOA']),
-                    TOTABCKSFC = xr.DataArray(abackSFC.astype('float32'),dims=rh.dims,coords=rh.coords,attrs=A['TOTABCKSFC'])
+                    TOTABCKSFC = xr.DataArray(abackSFC.astype('float32'),dims=rh.dims,coords=rh.coords,attrs=A['TOTABCKSFC']),
+                    TAUMOLEC = xr.DataArray(tau_mol_layer.astype('float32'),dims=rh.dims,coords=rh.coords,attrs=A['TAUMOLEC'])
                  )
 
         DA['DELP'] = dp
