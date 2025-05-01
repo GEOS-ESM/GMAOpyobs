@@ -9,7 +9,7 @@ __version__ = '1.1.0'
 import numpy  as np
 import xarray as xr
 import yaml
-#import xarray.ufuncs as xu
+import xarray.ufuncs as xu
 
 from . import mietable  as mt
 from . import xrctl     as xc
@@ -100,8 +100,8 @@ BR:
   monoFile: ExtData/chemistry/AerosolOptics/v1.0.0/x/optics_BRC.v1_5.nc4
   bandFile: ExtData/chemistry/AerosolOptics/v1.0.0/x/opticsBands_BRC.v1_5.RRTMG.nc4
   tracers:
-    - BRPHOBIC
-    - BRPHILIC
+    - BRCPHOBIC
+    - BRCPHILIC
   shapefactor: 1
   rhod:
     - 1800
@@ -122,9 +122,9 @@ NI:
   monoFile: ExtData/chemistry/AerosolOptics/v1.0.0/x/optics_NI.v2_5.nc4
   bandFile: ExtData/chemistry/AerosolOptics/v1.0.0/x/opticsBands_NI.v2_5.RRTMG.nc4
   tracers:
-    - NO3an1
-    - NO3an2
-    - NO3an3
+    - NO3AN1
+    - NO3AN2
+    - NO3AN3
   shapefactor: 1
   rhod:
     - 1725
@@ -387,7 +387,8 @@ class G2GAOP(object):
         SCA:     aerosol scattering profile
         BSC:     aerosol backscatter profile
         DEPOL:   aerosol depolarization ratio
-
+        ABACKTOA: total attenuated backscatter from the TOA
+        ABACKSFC: total attenuated backscatter from the surface
         On inout,
 
         Species:    None, str, or list. If None, all species on file,
@@ -411,18 +412,15 @@ class G2GAOP(object):
         # pre-load RH, AIRDENS, T and DELP so you don't hit dask
         # repeatedly looping through AOP calculations
         # -------------------------------------------------------
+        #go back and see if this can be loaded in one line
+
         try:
-            a['DELP'].load()
-            dp = a['DELP']
+            dp = a['DELP'].load()
         except:
-            a['delp'].load()
-            dp = a['delp']
-        a['AIRDENS'].load()
-        airdens = a['AIRDENS']
-        a['T'].load()
-        T = a['T']
-        a['RH'].load()
-        rh = a['RH']
+            dp = a['delp'].load()
+        airdens = a['AIRDENS'].load()
+        T = a['T'].load()
+        rh = a['RH'].load()
         delz  = dp / (GRAV * airdens)
         
         # Check FIXRH option
@@ -573,9 +571,8 @@ class G2GAOP(object):
                   SCA = {'long_name':'Aerosol Scattering Coefficient', 'units':'km-1'},
                   BSC = {'long_name':'Aerosol Backscatter Coefficient', 'units':'km-1'},
                   DEPOL = {'long_name':'Depolarization Ratio', 'units':'1'},
-                  TOTABCKTOA = {'long_name':'Total Attenuated Backscatter Coefficient from TOA','units':'km-1 sr-1'},
-                  TOTABCKSFC = {'long_name':'Total Attenuated Backscatter Coefficient from Surface','units':'km-1 sr-1'},
-                  TAUMOLEC = {'long_name':'tau_mol_layer','units':''}
+                  ABACKTOA = {'long_name':'Total Attenuated Backscatter Coefficient from TOA','units':'km-1 sr-1'},
+                  ABACKSFC = {'long_name':'Total Attenuated Backscatter Coefficient from Surface','units':'km-1 sr-1'}
                   )
 
         # Pack results into a Dataset
@@ -584,9 +581,8 @@ class G2GAOP(object):
                     SCA = xr.DataArray(sca.astype('float32'),dims=rh.dims,coords=rh.coords,attrs=A['SCA']),
                     BSC = xr.DataArray(bsc.astype('float32'),dims=rh.dims,coords=rh.coords,attrs=A['BSC']),
                     DEPOL = xr.DataArray(depol.astype('float32'),dims=rh.dims,coords=rh.coords,attrs=A['DEPOL']),
-                    TOTABCKTOA = xr.DataArray(abackTOA.astype('float32'),dims=rh.dims,coords=rh.coords,attrs=A['TOTABCKTOA']),
-                    TOTABCKSFC = xr.DataArray(abackSFC.astype('float32'),dims=rh.dims,coords=rh.coords,attrs=A['TOTABCKSFC']),
-                    TAUMOLEC = xr.DataArray(tau_mol_layer.astype('float32'),dims=rh.dims,coords=rh.coords,attrs=A['TAUMOLEC'])
+                    ABACKTOA = xr.DataArray(abackTOA.astype('float32'),dims=rh.dims,coords=rh.coords,attrs=A['ABACKTOA']),
+                    ABACKSFC = xr.DataArray(abackSFC.astype('float32'),dims=rh.dims,coords=rh.coords,attrs=A['ABACKSFC'])
                  )
 
         DA['DELP'] = dp
@@ -882,15 +878,8 @@ def CLI_aop():
 
     # Compute AOPs
     # ------------
-    aer = xc.open_mfdataset(aerDataset,parallel=True,chunks='auto')
+    aer = xc.open_mfdataset(aerDataset,parallel=True,chunks='auto',engine='netcdf4')
     g = G2GAOP(aer,config=config,mieRootDir=options.rootDir,verbose=options.verbose)
-    g.aer['RH'].load()
-    g.aer['AIRDENS'].load()
-    try:
-        g.aer['delp'].load()
-    except:
-        g.aer['DELP'].load()
-    g.aer['T'].load()
     for w_ in options.wavelengths.split(','):
         w = float(w_)
         if options.aop == 'ext':
