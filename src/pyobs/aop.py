@@ -100,8 +100,8 @@ BR:
   monoFile: ExtData/chemistry/AerosolOptics/v1.0.0/x/optics_BRC.v1_5.nc4
   bandFile: ExtData/chemistry/AerosolOptics/v1.0.0/x/opticsBands_BRC.v1_5.RRTMG.nc4
   tracers:
-    - BRCPHOBIC
-    - BRCPHILIC
+    - BRPHOBIC
+    - BRPHILIC
   shapefactor: 1
   rhod:
     - 1800
@@ -122,9 +122,9 @@ NI:
   monoFile: ExtData/chemistry/AerosolOptics/v1.0.0/x/optics_NI.v2_5.nc4
   bandFile: ExtData/chemistry/AerosolOptics/v1.0.0/x/opticsBands_NI.v2_5.RRTMG.nc4
   tracers:
-    - NO3AN1
-    - NO3AN2
-    - NO3AN3
+    - NO3an1
+    - NO3an2
+    - NO3an3
   shapefactor: 1
   rhod:
     - 1725
@@ -438,7 +438,7 @@ class G2GAOP(object):
         # -------------------
         space = rh.shape
         ndims = len(space)
-        km = space[-1]
+        km = space[1]
         ext, sca, bsc, depol1, depol2, pressure, abackTOA, abackSFC = (np.zeros(space), np.zeros(space),
                                          np.zeros(space), np.zeros(space), np.zeros(space),
                                          np.zeros(space), np.zeros(space), np.zeros(space))
@@ -488,13 +488,13 @@ class G2GAOP(object):
                 pe[:,k+1]=pe[:,k]+dp[:,k]
             for k in range(km):
                 pressure[:,k]=(pe[:,k]+pe[:,k+1])/2
-        elif ndims==3:
-            pe=np.zeros((space[0],space[1],km+1))
-            pe[:,:,0]=1 #assume TOA has a pressure of 1 Pa
+        elif ndims==4:
+            pe=np.zeros((space[0],km+1,space[2],space[3]))
+            pe[:,0,:,:]=1 #assume TOA has a pressure of 1 Pa
             for k in range(0,km):
-                pe[:,:,k+1]=pe[:,:,k]+dp[:,:,k]
+                pe[:,k+1,:,:]=pe[:,k,:,:]+dp[:,k,:,:]
             for k in range(km):
-                pressure[:,:,k]=(pe[:,:,k]+pe[:,:,k+1])/2
+                pressure[:,k,:,:]=(pe[:,k,:,:]+pe[:,k+1,:,:])/2
         backscat_mol = (5.45e-32/(MAPL_RUNIV/MAPL_AVOGAD)) * (wavelength/550)**-4  * pressure / T #molecular backscatter coefficient in m-1
 
         tau_mol_layer = backscat_mol * 8 * np.pi /3 * delz
@@ -524,30 +524,30 @@ class G2GAOP(object):
                 tau_mol += 0.5 *  tau_mol_layer[:,k]
                 abackSFC[:,k] = (bsc[:,k] + backscat_mol[:,k]) * np.exp(-2*tau_aer) * np.exp(-2*tau_mol)
 
-        if ndims==3:
+        if ndims==4:
             ###TOA
-            abackTOA[:,:,0]=(bsc[:,:,0]+ backscat_mol[:,:,0]) * np.exp(-tau_aer_layer[:,:,0]) * np.exp(-tau_mol_layer[:,:,0])
+            abackTOA[:,0,:,:]=(bsc[:,0,:,:]+ backscat_mol[:,0,:,:]) * np.exp(-tau_aer_layer[:,0,:,:]) * np.exp(-tau_mol_layer[:,0,:,:])
             for k in range(1,km):
                 tau_aer=0
                 tau_mol=0
                 for kk in range(0,k):
-                    tau_aer += tau_aer_layer[:,:,kk]
-                    tau_mol += tau_mol_layer[:,:,kk]
-                tau_aer += 0.5 *  tau_aer_layer[:,:,k]
-                tau_mol += 0.5 *  tau_mol_layer[:,:,k]
-                abackTOA[:,:,k] = (bsc[:,:,k] + backscat_mol[:,:,k]) * np.exp(-2*tau_aer) * np.exp(-2*tau_mol)
+                    tau_aer += tau_aer_layer[:,kk,:,:]
+                    tau_mol += tau_mol_layer[:,kk,:,:]
+                tau_aer += 0.5 *  tau_aer_layer[:,k,:,:]
+                tau_mol += 0.5 *  tau_mol_layer[:,k,:,:]
+                abackTOA[:,k,:,:] = (bsc[:,k,:,:] + backscat_mol[:,k,:,:]) * np.exp(-2*tau_aer) * np.exp(-2*tau_mol)
                 
             ###Surface    
-            abackSFC[:,0]=(bsc[:,:,km-1]+ backscat_mol[:,:,km-1]) * np.exp(-tau_aer_layer[:,:,km-1]) * np.exp(-tau_mol_layer[:,:,km-1])
+            abackSFC[:,0,:,:]=(bsc[:,km-1,:,:]+ backscat_mol[:,km-1,:,:]) * np.exp(-tau_aer_layer[:,km-1,:,:]) * np.exp(-tau_mol_layer[:,km-1,:,:])
             for k in range(km-2,-1,-1):
                 tau_aer=0
                 tau_mol=0
                 for kk in range(km-1,k-1,-1):
-                    tau_aer += tau_aer_layer[:,:,kk]
-                    tau_mol += tau_mol_layer[:,:,kk]
-                tau_aer += 0.5 *  tau_aer_layer[:,:,k]
-                tau_mol += 0.5 *  tau_mol_layer[:,:,k]
-                abackSFC[:,k] = (bsc[:,:,k] + backscat_mol[:,:,k]) * np.exp(-2*tau_aer) * np.exp(-2*tau_mol)
+                    tau_aer += tau_aer_layer[:,kk,:,:]
+                    tau_mol += tau_mol_layer[:,kk,:,:]
+                tau_aer += 0.5 *  tau_aer_layer[:,k,:,:]
+                tau_mol += 0.5 *  tau_mol_layer[:,k,:,:]
+                abackSFC[:,k,:,:] = (bsc[:,k,:,:] + backscat_mol[:,k,:,:]) * np.exp(-2*tau_aer) * np.exp(-2*tau_mol)
                    
 
         # Final normalization
