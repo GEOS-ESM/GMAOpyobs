@@ -9,12 +9,14 @@ __version__ = '1.1.0'
 import numpy  as np
 import xarray as xr
 import yaml
+import xarray.ufuncs as xu
 
 from . import mietable  as mt
 from . import xrctl     as xc
 
 from .constants import MAPL_GRAV as GRAV
-
+from .constants import MAPL_AVOGAD
+from .constants import MAPL_RUNIV
 # Default YAML file mapping GOCART tracers in aer_Nv and the optics files
 # -----------------------------------------------------------------------
 G2G_MieMap = """
@@ -385,7 +387,8 @@ class G2GAOP(object):
         SCA:     aerosol scattering profile
         BSC:     aerosol backscatter profile
         DEPOL:   aerosol depolarization ratio
-
+        ABACKTOA: total attenuated backscatter from the TOA
+        ABACKSFC: total attenuated backscatter from the surface
         On inout,
 
         Species:    None, str, or list. If None, all species on file,
@@ -393,7 +396,7 @@ class G2GAOP(object):
 
         Wavelength: float, wavelength in nm.
 
-        TO DO: total attenuated backscatter, including molecular component
+        fixrh: value between 0 and 1 representing realtive humidity
 
         """
 
@@ -407,22 +410,19 @@ class G2GAOP(object):
         a = self.aer    # aerosol mixing ratio tracers
 
         # pre-load RH, AIRDENS, T and DELP so you don't hit dask
-        # repeatedly looping through  AOP calculations
+        # repeatedly looping through AOP calculations
         # -------------------------------------------------------
-        a['DELP'].load()
-        a['AIRDENS'].load()
-        a['T'].load()
-        a['RH'].load()
+        #go back and see if this can be loaded in one line
 
-        # GEOS files can be inconsistent when it comes to case
-        # ----------------------------------------------------
         try:
-            dp = a['DELP']
+            dp = a['DELP'].load()
         except:
-            dp = a['delp']
-
-        rh = a['RH']
-
+            dp = a['delp'].load()
+        airdens = a['AIRDENS'].load()
+        T = a['T'].load()
+        rh = a['RH'].load()
+        delz  = dp / (GRAV * airdens)
+        
         # Check FIXRH option
         # --------------------------
         if fixrh is not None:
@@ -435,10 +435,12 @@ class G2GAOP(object):
         # Relevant dimensions
         # -------------------
         space = rh.shape
-
-        ext, sca, bsc, depol1, depol2 = (np.zeros(space), np.zeros(space),
-                                         np.zeros(space), np.zeros(space),
-                                         np.zeros(space))
+        ndims = len(space)
+        km = space[1]
+        ext, sca, bsc, depol1, depol2, pressure, abackTOA, abackSFC = (np.zeros(space), np.zeros(space),
+                                         np.zeros(space), np.zeros(space), np.zeros(space),
+                                         np.zeros(space), np.zeros(space), np.zeros(space))
+                               
 
         for s in Species:   # species
 
@@ -473,12 +475,86 @@ class G2GAOP(object):
                 depol2 += (p11_+p22_) * sca_
 
                 bin += 1
+        #Compute Molecular Scattering and Total Attenuated Backscatter Coefficient
+        #following the methodology begining on page 147 of 
+        #http://ntrs.nasa.gov/archive/nasa/casi.ntrs.nasa.gov/19960051003.pdf
+        # -----------------------------------------        
+        if ndims==2:
+            pe=np.zeros((space[0],km+1))
+            pe[:,0]=1 #assume TOA has a pressure of 1 Pa
+            for k in range(0,km):
+                pe[:,k+1]=pe[:,k]+dp[:,k]
+            for k in range(km):
+                pressure[:,k]=(pe[:,k]+pe[:,k+1])/2
+        elif ndims==4:
+            pe=np.zeros((space[0],km+1,space[2],space[3]))
+            pe[:,0,:,:]=1 #assume TOA has a pressure of 1 Pa
+            for k in range(0,km):
+                pe[:,k+1,:,:]=pe[:,k,:,:]+dp[:,k,:,:]
+            for k in range(km):
+                pressure[:,k,:,:]=(pe[:,k,:,:]+pe[:,k+1,:,:])/2
+        backscat_mol = (5.45e-32/(MAPL_RUNIV/MAPL_AVOGAD)) * (wavelength/550)**-4  * pressure / T #molecular backscatter coefficient in m-1
+
+        tau_mol_layer = backscat_mol * 8 * np.pi /3 * delz
+        tau_aer_layer = ext * delz
+        if ndims==2:
+            ###TOA
+            abackTOA[:,0]=(bsc[:,0]+ backscat_mol[:,0]) * np.exp(-tau_aer_layer[:,0]) * np.exp(-tau_mol_layer[:,0])
+            for k in range(1,km):
+                tau_aer=0
+                tau_mol=0
+                for kk in range(0,k):
+                    tau_aer += tau_aer_layer[:,kk]
+                    tau_mol += tau_mol_layer[:,kk]
+                tau_aer += 0.5 * tau_aer_layer[:,k]
+                tau_mol += 0.5 * tau_mol_layer[:,k]
+                abackTOA[:,k] = (bsc[:,k] + backscat_mol[:,k]) * np.exp(-2*tau_aer) * np.exp(-2*tau_mol)
+
+            ###Surface    
+            abackSFC[:,0]=(bsc[:,km-1]+ backscat_mol[:,km-1]) * np.exp(-tau_aer_layer[:,km-1]) * np.exp(-tau_mol_layer[:,km-1])
+            for k in range(km-2,-1,-1):
+                tau_aer=0
+                tau_mol=0
+                for kk in range(km-1,k-1,-1):
+                    tau_aer += tau_aer_layer[:,kk]
+                    tau_mol += tau_mol_layer[:,kk]
+                tau_aer += 0.5 *  tau_aer_layer[:,k]
+                tau_mol += 0.5 *  tau_mol_layer[:,k]
+                abackSFC[:,k] = (bsc[:,k] + backscat_mol[:,k]) * np.exp(-2*tau_aer) * np.exp(-2*tau_mol)
+
+        if ndims==4:
+            ###TOA
+            abackTOA[:,0,:,:]=(bsc[:,0,:,:]+ backscat_mol[:,0,:,:]) * np.exp(-tau_aer_layer[:,0,:,:]) * np.exp(-tau_mol_layer[:,0,:,:])
+            for k in range(1,km):
+                tau_aer=0
+                tau_mol=0
+                for kk in range(0,k):
+                    tau_aer += tau_aer_layer[:,kk,:,:]
+                    tau_mol += tau_mol_layer[:,kk,:,:]
+                tau_aer += 0.5 *  tau_aer_layer[:,k,:,:]
+                tau_mol += 0.5 *  tau_mol_layer[:,k,:,:]
+                abackTOA[:,k,:,:] = (bsc[:,k,:,:] + backscat_mol[:,k,:,:]) * np.exp(-2*tau_aer) * np.exp(-2*tau_mol)
+                
+            ###Surface    
+            abackSFC[:,0,:,:]=(bsc[:,km-1,:,:]+ backscat_mol[:,km-1,:,:]) * np.exp(-tau_aer_layer[:,km-1,:,:]) * np.exp(-tau_mol_layer[:,km-1,:,:])
+            for k in range(km-2,-1,-1):
+                tau_aer=0
+                tau_mol=0
+                for kk in range(km-1,k-1,-1):
+                    tau_aer += tau_aer_layer[:,kk,:,:]
+                    tau_mol += tau_mol_layer[:,kk,:,:]
+                tau_aer += 0.5 *  tau_aer_layer[:,k,:,:]
+                tau_mol += 0.5 *  tau_mol_layer[:,k,:,:]
+                abackSFC[:,k,:,:] = (bsc[:,k,:,:] + backscat_mol[:,k,:,:]) * np.exp(-2*tau_aer) * np.exp(-2*tau_mol)
+                   
 
         # Final normalization
         # -------------------
         ext *= 1000. # m-1 to km-1
         sca *= 1000. # m-1 to km-1
         bsc *= 1000. # m-1 to km-1
+        abackTOA *= 1000. # m-1 sr-1 to km-1 sr-1
+        abackSFC *= 1000. # m-1 sr-1 to km-1 sr-1
 
         # protect against divide by zero
         # this can happen if you ask for the AOP of an individual species
@@ -494,7 +570,9 @@ class G2GAOP(object):
         A = dict (EXT = {'long_name':'Aerosol Extinction Coefficient', 'units':'km-1'},
                   SCA = {'long_name':'Aerosol Scattering Coefficient', 'units':'km-1'},
                   BSC = {'long_name':'Aerosol Backscatter Coefficient', 'units':'km-1'},
-                  DEPOL = {'long_name':'Depolarization Ratio', 'units':'1'}
+                  DEPOL = {'long_name':'Depolarization Ratio', 'units':'1'},
+                  ABACKTOA = {'long_name':'Total Attenuated Backscatter Coefficient from TOA','units':'km-1 sr-1'},
+                  ABACKSFC = {'long_name':'Total Attenuated Backscatter Coefficient from Surface','units':'km-1 sr-1'}
                   )
 
         # Pack results into a Dataset
@@ -502,15 +580,17 @@ class G2GAOP(object):
         DA = dict(  EXT = xr.DataArray(ext.astype('float32'),dims=rh.dims,coords=rh.coords,attrs=A['EXT']),
                     SCA = xr.DataArray(sca.astype('float32'),dims=rh.dims,coords=rh.coords,attrs=A['SCA']),
                     BSC = xr.DataArray(bsc.astype('float32'),dims=rh.dims,coords=rh.coords,attrs=A['BSC']),
-                    DEPOL = xr.DataArray(depol.astype('float32'),dims=rh.dims,coords=rh.coords,attrs=A['DEPOL'])
+                    DEPOL = xr.DataArray(depol.astype('float32'),dims=rh.dims,coords=rh.coords,attrs=A['DEPOL']),
+                    ABACKTOA = xr.DataArray(abackTOA.astype('float32'),dims=rh.dims,coords=rh.coords,attrs=A['ABACKTOA']),
+                    ABACKSFC = xr.DataArray(abackSFC.astype('float32'),dims=rh.dims,coords=rh.coords,attrs=A['ABACKSFC'])
                  )
 
         DA['DELP'] = dp
         DA['AIRDENS'] = a['AIRDENS']
 
         return xr.Dataset(DA)
-
-
+        
+ 
     def getAOPintensive(self,Species=None,wavelength=None):
         """
         Returns an xarray Dataset with intensive properties.
@@ -798,7 +878,7 @@ def CLI_aop():
 
     # Compute AOPs
     # ------------
-    aer = xc.open_mfdataset(aerDataset,parallel=True)
+    aer = xc.open_mfdataset(aerDataset,parallel=True,chunks='auto',engine='netcdf4')
     g = G2GAOP(aer,config=config,mieRootDir=options.rootDir,verbose=options.verbose)
     for w_ in options.wavelengths.split(','):
         w = float(w_)
@@ -810,7 +890,7 @@ def CLI_aop():
             ds = g.getPM(pmsize=options.d_pm,fixrh=options.fixrh,aerodynamic=options.aerodynamic)
         else:
             print(options.aop)
-            raise AOPError('Unknow AOP option '+options.aop)
+            raise AOPError('Unknown AOP option '+options.aop)
 
         filename = options.outFile.replace('%{w}',w_)
         if options.verbose:
