@@ -461,8 +461,8 @@ class G2GAOP(object):
                 ext_ = mie.getAOP('bext', bin, rh, wavelength=wavelength).values
                 sca_ = mie.getAOP('bsca', bin, rh, wavelength=wavelength).values
                 bsc_ = mie.getAOP('bbck', bin, rh, wavelength=wavelength).values
-                p11_ = mie.getAOP('p11',  bin, rh, wavelength=wavelength).values
-                p22_ = mie.getAOP('p22',  bin, rh, wavelength=wavelength).values
+                pback11_ = mie.getAOP('pback11',  bin, rh, wavelength=wavelength).values
+                pback22_ = mie.getAOP('pback22',  bin, rh, wavelength=wavelength).values
 
                 ext_ = ext_ * q_conc
                 sca_ = sca_ * q_conc
@@ -471,8 +471,8 @@ class G2GAOP(object):
                 ext += ext_
                 sca += sca_
                 bsc += bsc_
-                depol1 += (p11_-p22_) * sca_
-                depol2 += (p11_+p22_) * sca_
+                depol1 += (pback11_-pback22_) * sca_
+                depol2 += (pback11_+pback22_) * sca_
 
                 bin += 1
         #Compute Molecular Scattering and Total Attenuated Backscatter Coefficient

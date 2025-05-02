@@ -24,8 +24,8 @@
       bsca             (b,w,r) bsca values [m2 kg-1]
       bbck             (b,w,r) bbck values [m2 kg-1]
       g                (b,w,r) asymmetry parameter
-      p11              (b,w,r) Backscatter phase function, index 0 
-      p22              (b,w,r) Backscatter phase function, index 4
+      pback11          (b,w,r) Backscatter phase function, index 0 
+      pback22          (b,w,r) Backscatter phase function, index 4
       pmom             (b,w,r,p,m) moments of phase function
       pback            (b,w,r,p)   moments of backscatter phase function
       gf               (b,r) hygroscopic growth factor
@@ -58,7 +58,7 @@ import numpy  as np
 __VERSION__ = '0.9.0'
 
 supportedAOPs = ['aot',          'ssa',     'gf',      'gasym',   'g',   'growth_factor',
-                 'RefIndex',     'pmom',    'area',    'volume',  'p11', 'p22', 'pback',
+                 'RefIndex',     'pmom',    'area',    'volume',  'pback11', 'pback22', 'pback',
                  'rhod',         'rhop',    'rEff',    'bbck',    'tau', 'sca',
                  'bsca',         'bext',    'refreal', 'refimag',
                  'aot_ssa_pmom',
@@ -246,13 +246,13 @@ class MIETABLE(object):
             gasym = self.getAOP('g', bin, rh, wavelength=wavelength).rename('gasym')
             aop   = (aot, ssa, gasym)
 
-      elif name == 'p11':
-         p11 = self.getAOP('pback', bin, rh, wavelength=wavelength)
-         aop = p11.isel({"p": [0]}).squeeze().rename('p11')
+      elif name == 'pback11':
+         pback11 = self.getAOP('pback', bin, rh, wavelength=wavelength)
+         aop = pback11.isel({"p": [0]}).squeeze().rename('pback11')
 
-      elif name == 'p22':
-         p22 = self.getAOP('pback', bin, rh, wavelength=wavelength)
-         aop = p22.isel({"p": [4]}).squeeze().rename('p22')
+      elif name == 'p22back':
+         pback22 = self.getAOP('pback', bin, rh, wavelength=wavelength)
+         aop = pback22.isel({"p": [4]}).squeeze().rename('pback22')
 
       else:
           raise MieTableError('Unknown AOP '+name)
@@ -288,7 +288,7 @@ if __name__ == "__main__":
    # Sample variable names
    # ---------------------
    Vars = ['tau', 'aot', 'gasym', 'bext', 'bsca', 'ssa', 'bbck', 'rEff',
-           'RefIndex', 'pmom', 'pback', 'p11', 'p22',
+           'RefIndex', 'pmom', 'pback', 'pback11', 'pback22',
            'aot_ssa_gasym', 'aot_ssa_pmom']
 
    # Loop over Tables

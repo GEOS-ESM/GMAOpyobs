@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - add auto chunking to TRAJECTORY and STATION. This enables dask
 - preload some key variables in aop.py so you don't hit dask repeatedly in for loop
+- rename p11 and p22 to pback11 & 22
 ### Removed
 
 ### Deprecated
