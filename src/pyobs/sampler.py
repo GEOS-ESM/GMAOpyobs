@@ -59,15 +59,10 @@ class STATION(object):
             self.ds = dataset # we are good to go...
 
         # If dataset is a list of files...
+        # OR GrADS-style ctl
+        # OR a glob type of template
         # --------------------------------
-        elif isinstance(dataset,(list,tuple)):
-            self.ds = xr.open_mfdataset(dataset,parallel=parallel,chunks=chunks)
-
-        # If datatset is a string it is either a GrADS-style ctl or
-        # a glob type of template
-        # ---------------------------------------------------------
-        elif isinstance(dataset,str):
-            # Special handles GrADS-style ctl if found
+        elif isinstance(dataset,(list,tuple,str)):
             self.ds = xc.open_mfdataset(dataset,time_range=time_range,parallel=parallel,chunks=chunks)
 
         else:
@@ -136,17 +131,10 @@ class TRAJECTORY(object):
             self.ds = dataset # we are good to go...
 
         # If dataset is a list of files...
+        # OR GrADS-style ctl 
+        # OR a glob type of template
         # --------------------------------
-        elif isinstance(dataset,(list,tuple)):
-            self.ds = xr.open_mfdataset(dataset,parallel=parallel,chunks=chunks)
-
-        # If datatset is a string it is either a GrADS-style ctl or
-        # a glob type of template
-        # ---------------------------------------------------------
-        elif isinstance(dataset,str):
-
-            # Special handles GrADS-style ctl if found
-            # ----------------------------------------
+        elif isinstance(dataset,(list,tuple,str)):
             self.ds = xc.open_mfdataset(dataset,time_range=time_range,parallel=parallel,chunks=chunks) # special handles GrADS-style ctl if found
 
         else:
