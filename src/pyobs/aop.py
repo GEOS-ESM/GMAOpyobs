@@ -9,7 +9,6 @@ __version__ = '1.1.0'
 import numpy  as np
 import xarray as xr
 import yaml
-import xarray.ufuncs as xu
 
 from . import mietable  as mt
 from . import xrctl     as xc
@@ -378,7 +377,7 @@ class G2GAOP(object):
         return xr.Dataset(DA)
 
      
-    def getAOPext(self,Species=None,wavelength=None,fixrh=None):
+    def getAOPext(self,Species=None,wavelength=None,fixrh=None,doaback=True):
 
         """
         Returns an xarray Dataset with the following variables:
@@ -397,6 +396,8 @@ class G2GAOP(object):
         Wavelength: float, wavelength in nm.
 
         fixrh: value between 0 and 1 representing realtive humidity
+
+ 	doaback: flag to turn on/off attenuated backscatter calculation
 
         """
 
@@ -419,7 +420,8 @@ class G2GAOP(object):
         except:
             dp = a['delp'].load()
         airdens = a['AIRDENS'].load()
-        T = a['T'].load()
+	if doaback:
+            T = a['T'].load()
         rh = a['RH'].load()
         delz  = dp / (GRAV * airdens)
         
@@ -437,9 +439,11 @@ class G2GAOP(object):
         space = rh.shape
         ndims = len(space)
         km = space[1]
-        ext, sca, bsc, depol1, depol2, pressure, abackTOA, abackSFC = (np.zeros(space), np.zeros(space),
+        ext, sca, bsc, depol1, depol2, pressure = (np.zeros(space), np.zeros(space),
                                          np.zeros(space), np.zeros(space), np.zeros(space),
-                                         np.zeros(space), np.zeros(space), np.zeros(space))
+                                         np.zeros(space))
+		if doaback:
+			abackTOA, abackSFC = (np.zeros(space), np.zeros(space))
                                
 
         for s in Species:   # species
@@ -475,77 +479,79 @@ class G2GAOP(object):
                 depol2 += (pback11_+pback22_) * sca_
 
                 bin += 1
-        #Compute Molecular Scattering and Total Attenuated Backscatter Coefficient
-        #following the methodology begining on page 147 of 
-        #http://ntrs.nasa.gov/archive/nasa/casi.ntrs.nasa.gov/19960051003.pdf
-        # -----------------------------------------        
-        if ndims==2:
-            pe=np.zeros((space[0],km+1))
-            pe[:,0]=1 #assume TOA has a pressure of 1 Pa
-            for k in range(0,km):
-                pe[:,k+1]=pe[:,k]+dp[:,k]
-            for k in range(km):
-                pressure[:,k]=(pe[:,k]+pe[:,k+1])/2
-        elif ndims==4:
-            pe=np.zeros((space[0],km+1,space[2],space[3]))
-            pe[:,0,:,:]=1 #assume TOA has a pressure of 1 Pa
-            for k in range(0,km):
-                pe[:,k+1,:,:]=pe[:,k,:,:]+dp[:,k,:,:]
-            for k in range(km):
-                pressure[:,k,:,:]=(pe[:,k,:,:]+pe[:,k+1,:,:])/2
-        backscat_mol = (5.45e-32/(MAPL_RUNIV/MAPL_AVOGAD)) * (wavelength/550)**-4  * pressure / T #molecular backscatter coefficient in m-1
 
-        tau_mol_layer = backscat_mol * 8 * np.pi /3 * delz
-        tau_aer_layer = ext * delz
-        if ndims==2:
-            ###TOA
-            abackTOA[:,0]=(bsc[:,0]+ backscat_mol[:,0]) * np.exp(-tau_aer_layer[:,0]) * np.exp(-tau_mol_layer[:,0])
-            for k in range(1,km):
-                tau_aer=0
-                tau_mol=0
-                for kk in range(0,k):
-                    tau_aer += tau_aer_layer[:,kk]
-                    tau_mol += tau_mol_layer[:,kk]
-                tau_aer += 0.5 * tau_aer_layer[:,k]
-                tau_mol += 0.5 * tau_mol_layer[:,k]
-                abackTOA[:,k] = (bsc[:,k] + backscat_mol[:,k]) * np.exp(-2*tau_aer) * np.exp(-2*tau_mol)
-
-            ###Surface    
-            abackSFC[:,0]=(bsc[:,km-1]+ backscat_mol[:,km-1]) * np.exp(-tau_aer_layer[:,km-1]) * np.exp(-tau_mol_layer[:,km-1])
-            for k in range(km-2,-1,-1):
-                tau_aer=0
-                tau_mol=0
-                for kk in range(km-1,k-1,-1):
-                    tau_aer += tau_aer_layer[:,kk]
-                    tau_mol += tau_mol_layer[:,kk]
-                tau_aer += 0.5 *  tau_aer_layer[:,k]
-                tau_mol += 0.5 *  tau_mol_layer[:,k]
-                abackSFC[:,k] = (bsc[:,k] + backscat_mol[:,k]) * np.exp(-2*tau_aer) * np.exp(-2*tau_mol)
-
-        if ndims==4:
-            ###TOA
-            abackTOA[:,0,:,:]=(bsc[:,0,:,:]+ backscat_mol[:,0,:,:]) * np.exp(-tau_aer_layer[:,0,:,:]) * np.exp(-tau_mol_layer[:,0,:,:])
-            for k in range(1,km):
-                tau_aer=0
-                tau_mol=0
-                for kk in range(0,k):
-                    tau_aer += tau_aer_layer[:,kk,:,:]
-                    tau_mol += tau_mol_layer[:,kk,:,:]
-                tau_aer += 0.5 *  tau_aer_layer[:,k,:,:]
-                tau_mol += 0.5 *  tau_mol_layer[:,k,:,:]
-                abackTOA[:,k,:,:] = (bsc[:,k,:,:] + backscat_mol[:,k,:,:]) * np.exp(-2*tau_aer) * np.exp(-2*tau_mol)
-                
-            ###Surface    
-            abackSFC[:,0,:,:]=(bsc[:,km-1,:,:]+ backscat_mol[:,km-1,:,:]) * np.exp(-tau_aer_layer[:,km-1,:,:]) * np.exp(-tau_mol_layer[:,km-1,:,:])
-            for k in range(km-2,-1,-1):
-                tau_aer=0
-                tau_mol=0
-                for kk in range(km-1,k-1,-1):
-                    tau_aer += tau_aer_layer[:,kk,:,:]
-                    tau_mol += tau_mol_layer[:,kk,:,:]
-                tau_aer += 0.5 *  tau_aer_layer[:,k,:,:]
-                tau_mol += 0.5 *  tau_mol_layer[:,k,:,:]
-                abackSFC[:,k,:,:] = (bsc[:,k,:,:] + backscat_mol[:,k,:,:]) * np.exp(-2*tau_aer) * np.exp(-2*tau_mol)
+	if doaback:
+            #Compute Molecular Scattering and Total Attenuated Backscatter Coefficient
+            #following the methodology begining on page 147 of 
+            #http://ntrs.nasa.gov/archive/nasa/casi.ntrs.nasa.gov/19960051003.pdf
+            # -----------------------------------------        
+	        if ndims==2:
+	            pe=np.zeros((space[0],km+1))
+	            pe[:,0]=1 #assume TOA has a pressure of 1 Pa
+	            for k in range(0,km):
+	                pe[:,k+1]=pe[:,k]+dp[:,k]
+	            for k in range(km):
+	                pressure[:,k]=(pe[:,k]+pe[:,k+1])/2
+	        elif ndims==4:
+	            pe=np.zeros((space[0],km+1,space[2],space[3]))
+	            pe[:,0,:,:]=1 #assume TOA has a pressure of 1 Pa
+	            for k in range(0,km):
+	                pe[:,k+1,:,:]=pe[:,k,:,:]+dp[:,k,:,:]
+	            for k in range(km):
+	                pressure[:,k,:,:]=(pe[:,k,:,:]+pe[:,k+1,:,:])/2
+	        backscat_mol = (5.45e-32/(MAPL_RUNIV/MAPL_AVOGAD)) * (wavelength/550)**-4  * pressure / T #molecular backscatter coefficient in m-1
+	
+	        tau_mol_layer = backscat_mol * 8 * np.pi /3 * delz
+	        tau_aer_layer = ext * delz
+	        if ndims==2:
+	            ###TOA
+	            abackTOA[:,0]=(bsc[:,0]+ backscat_mol[:,0]) * np.exp(-tau_aer_layer[:,0]) * np.exp(-tau_mol_layer[:,0])
+	            for k in range(1,km):
+	                tau_aer=0
+	                tau_mol=0
+	                for kk in range(0,k):
+	                    tau_aer += tau_aer_layer[:,kk]
+	                    tau_mol += tau_mol_layer[:,kk]
+	                tau_aer += 0.5 * tau_aer_layer[:,k]
+	                tau_mol += 0.5 * tau_mol_layer[:,k]
+	                abackTOA[:,k] = (bsc[:,k] + backscat_mol[:,k]) * np.exp(-2*tau_aer) * np.exp(-2*tau_mol)
+	
+	            ###Surface    
+	            abackSFC[:,0]=(bsc[:,km-1]+ backscat_mol[:,km-1]) * np.exp(-tau_aer_layer[:,km-1]) * np.exp(-tau_mol_layer[:,km-1])
+	            for k in range(km-2,-1,-1):
+	                tau_aer=0
+	                tau_mol=0
+	                for kk in range(km-1,k-1,-1):
+	                    tau_aer += tau_aer_layer[:,kk]
+	                    tau_mol += tau_mol_layer[:,kk]
+	                tau_aer += 0.5 *  tau_aer_layer[:,k]
+	                tau_mol += 0.5 *  tau_mol_layer[:,k]
+	                abackSFC[:,k] = (bsc[:,k] + backscat_mol[:,k]) * np.exp(-2*tau_aer) * np.exp(-2*tau_mol)
+	
+	        if ndims==4:
+	            ###TOA
+	            abackTOA[:,0,:,:]=(bsc[:,0,:,:]+ backscat_mol[:,0,:,:]) * np.exp(-tau_aer_layer[:,0,:,:]) * np.exp(-tau_mol_layer[:,0,:,:])
+	            for k in range(1,km):
+	                tau_aer=0
+	                tau_mol=0
+	                for kk in range(0,k):
+	                    tau_aer += tau_aer_layer[:,kk,:,:]
+	                    tau_mol += tau_mol_layer[:,kk,:,:]
+	                tau_aer += 0.5 *  tau_aer_layer[:,k,:,:]
+	                tau_mol += 0.5 *  tau_mol_layer[:,k,:,:]
+	                abackTOA[:,k,:,:] = (bsc[:,k,:,:] + backscat_mol[:,k,:,:]) * np.exp(-2*tau_aer) * np.exp(-2*tau_mol)
+	                
+	            ###Surface    
+	            abackSFC[:,0,:,:]=(bsc[:,km-1,:,:]+ backscat_mol[:,km-1,:,:]) * np.exp(-tau_aer_layer[:,km-1,:,:]) * np.exp(-tau_mol_layer[:,km-1,:,:])
+	            for k in range(km-2,-1,-1):
+	                tau_aer=0
+	                tau_mol=0
+	                for kk in range(km-1,k-1,-1):
+	                    tau_aer += tau_aer_layer[:,kk,:,:]
+	                    tau_mol += tau_mol_layer[:,kk,:,:]
+	                tau_aer += 0.5 *  tau_aer_layer[:,k,:,:]
+	                tau_mol += 0.5 *  tau_mol_layer[:,k,:,:]
+	                abackSFC[:,k,:,:] = (bsc[:,k,:,:] + backscat_mol[:,k,:,:]) * np.exp(-2*tau_aer) * np.exp(-2*tau_mol)
                    
 
         # Final normalization
@@ -553,8 +559,9 @@ class G2GAOP(object):
         ext *= 1000. # m-1 to km-1
         sca *= 1000. # m-1 to km-1
         bsc *= 1000. # m-1 to km-1
-        abackTOA *= 1000. # m-1 sr-1 to km-1 sr-1
-        abackSFC *= 1000. # m-1 sr-1 to km-1 sr-1
+		if doaback:
+        	abackTOA *= 1000. # m-1 sr-1 to km-1 sr-1
+        	abackSFC *= 1000. # m-1 sr-1 to km-1 sr-1
 
         # protect against divide by zero
         # this can happen if you ask for the AOP of an individual species
@@ -570,20 +577,23 @@ class G2GAOP(object):
         A = dict (EXT = {'long_name':'Aerosol Extinction Coefficient', 'units':'km-1'},
                   SCA = {'long_name':'Aerosol Scattering Coefficient', 'units':'km-1'},
                   BSC = {'long_name':'Aerosol Backscatter Coefficient', 'units':'km-1'},
-                  DEPOL = {'long_name':'Depolarization Ratio', 'units':'1'},
-                  ABACKTOA = {'long_name':'Total Attenuated Backscatter Coefficient from TOA','units':'km-1 sr-1'},
-                  ABACKSFC = {'long_name':'Total Attenuated Backscatter Coefficient from Surface','units':'km-1 sr-1'}
+                  DEPOL = {'long_name':'Depolarization Ratio', 'units':'1'}
                   )
+		if doaback:
+			A['ABACKTOA'] = {'long_name':'Total Attenuated Backscatter Coefficient from TOA','units':'km-1 sr-1'}
+            A['ABACKSFC'] = {'long_name':'Total Attenuated Backscatter Coefficient from Surface','units':'km-1 sr-1'}
 
         # Pack results into a Dataset
         # ---------------------------
         DA = dict(  EXT = xr.DataArray(ext.astype('float32'),dims=rh.dims,coords=rh.coords,attrs=A['EXT']),
                     SCA = xr.DataArray(sca.astype('float32'),dims=rh.dims,coords=rh.coords,attrs=A['SCA']),
                     BSC = xr.DataArray(bsc.astype('float32'),dims=rh.dims,coords=rh.coords,attrs=A['BSC']),
-                    DEPOL = xr.DataArray(depol.astype('float32'),dims=rh.dims,coords=rh.coords,attrs=A['DEPOL']),
-                    ABACKTOA = xr.DataArray(abackTOA.astype('float32'),dims=rh.dims,coords=rh.coords,attrs=A['ABACKTOA']),
-                    ABACKSFC = xr.DataArray(abackSFC.astype('float32'),dims=rh.dims,coords=rh.coords,attrs=A['ABACKSFC'])
+                    DEPOL = xr.DataArray(depol.astype('float32'),dims=rh.dims,coords=rh.coords,attrs=A['DEPOL'])
                  )
+
+		if doaback:
+			D['ABACKTOA'] = xr.DataArray(abackTOA.astype('float32'),dims=rh.dims,coords=rh.coords,attrs=A['ABACKTOA'])
+            D['ABACKSFC'] = xr.DataArray(abackSFC.astype('float32'),dims=rh.dims,coords=rh.coords,attrs=A['ABACKSFC'])
 
         DA['DELP'] = dp
         DA['AIRDENS'] = a['AIRDENS']
