@@ -864,8 +864,17 @@ def CLI_aop():
     parser.add_option("-s","--size", dest="d_pm", default=None,
               help="The threshold diameter size used to compute PM in units of microns (example 2.5 for PM2.5). This option is only valid for --aop=pm.")
 
+    parser.add_option("--noaback", dest="noaback", action="store_true",
+              help="Do not calculate aerosol backscatter when --aop=ext. Note, aerosol backscatter requires a temperature vertical profile.")
+
+
 
     (options, args) = parser.parse_args()
+
+    # store doaback flag
+    doaback = True
+    if args.noaback:
+        doaback = False
 
     if options.dump:
         print(G2G_MieMap)
@@ -905,7 +914,7 @@ def CLI_aop():
     for w_ in options.wavelengths.split(','):
         w = float(w_)
         if options.aop == 'ext':
-            ds = g.getAOPext(wavelength=w,fixrh=options.fixrh)
+            ds = g.getAOPext(wavelength=w,fixrh=options.fixrh,doaback=doaback)
         elif options.aop == 'rt':
             ds = g.getAOPrt(wavelength=w,vector=options.vector,fixrh=options.fixrh)
         elif options.aop == 'pm':
