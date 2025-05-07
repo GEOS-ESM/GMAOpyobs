@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 # [Unreleased] - yyyy-mm-dd
 
 ### Fixed
+- Added list parsing for variables in trajectory sampler
 ### Added
 - MPL reader and plot curtain 
 - calculation of total backscatter coefficient in aop.py
