@@ -491,17 +491,6 @@ class G2GAOP(object):
         sca *= 1000. # m-1 to km-1
         bsc *= 1000. # m-1 to km-1
 
-        if doaback:
-            # Compute Molecular Scattering and Total Attenuated Backscatter Coefficient
-            # following the methodology begining on page 147 of
-            # http://ntrs.nasa.gov/archive/nasa/casi.ntrs.nasa.gov/19960051003.pdf
-            # [km-1 sr-1]
-            # -----------------------------------------
-            T = a['T'].load()
-            delz  = dp / (GRAV * airdens * 1000.)  # km
-            abackTOA, abackSFC = self.calcABACK(wavelength,T,rh,dp,airdens,delz,ext,bsc)
-
-
         # protect against divide by zero
         # this can happen if you ask for the AOP of an individual species
         # and its' concentration in a layer is zero
