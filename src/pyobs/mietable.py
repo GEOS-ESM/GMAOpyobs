@@ -250,7 +250,7 @@ class MIETABLE(object):
          pback11 = self.getAOP('pback', bin, rh, wavelength=wavelength)
          aop = pback11.isel({"p": [0]}).squeeze().rename('pback11')
 
-      elif name == 'p22back':
+      elif name == 'pback22':
          pback22 = self.getAOP('pback', bin, rh, wavelength=wavelength)
          aop = pback22.isel({"p": [4]}).squeeze().rename('pback22')
 
