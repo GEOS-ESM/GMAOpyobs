@@ -36,6 +36,7 @@ def open_mfdataset(paths,*args, time_range=None, lock=False, **kwargs):
     from netCDF4 import Dataset # only needed for hack below
     opendap = False
     compat = "no_conflicts" # variables of the same name should have no conflicts
+    coords = "different"
     paths_ = paths
     if isinstance(paths,str):
         if 'http' in paths_[:4]:
@@ -60,9 +61,9 @@ def open_mfdataset(paths,*args, time_range=None, lock=False, **kwargs):
                 if b'DSET' == head.upper():
                     plist.append(parse_ctl(p,time_range))
         if len(plist) > 0:
-            paths_ = np.concatenate(plist)
+            paths_ = np.array(plist).transpose().flatten()
             compat = "override"  # if there are multiples of the same variable name, just use the one from the first dataset
-
+            coords = "minimal"
        
     if isinstance(paths_,(list,tuple)):          
         _ = Dataset(paths_[0])    # hack to circumvent some bug in open_mfdataset, it seems to initialize netcdf.
@@ -70,7 +71,7 @@ def open_mfdataset(paths,*args, time_range=None, lock=False, **kwargs):
     if opendap:
         return xr.open_dataset(paths_)
     else:
-        return xr.open_mfdataset(paths_,*args,lock=lock,**kwargs,compat=compat)
+        return xr.open_mfdataset(paths_,*args,lock=lock,**kwargs,compat=compat,coords=coords)
 
 #...........................................................................
 
