@@ -69,10 +69,11 @@ def open_mfdataset(paths,*args, time_range=None, lock=False, **kwargs):
         _ = Dataset(paths_[0])    # hack to circumvent some bug in open_mfdataset, it seems to initialize netcdf.
 
     if opendap:
-        return xr.open_dataset(paths_)
+        ds = xr.open_dataset(paths_)
     else:
-        return xr.open_mfdataset(paths_,*args,lock=lock,**kwargs,compat=compat,coords=coords)
+        ds = xr.open_mfdataset(paths_,*args,lock=lock,**kwargs,compat=compat,coords=coords)
 
+    return ds.assign_attrs(source_file_path=paths_)
 #...........................................................................
 
 
