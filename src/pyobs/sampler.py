@@ -32,7 +32,8 @@ class SamplerError(Exception):
 class STATION(object):
 
     def __init__(self, stations, lons, lats,
-                 dataset, time_range=None, verbose=False,
+                 dataset, time_range=None, times=None, 
+                 verbose=False,
                  parallel=True,chunks='auto'):
         """
         Specifies dataset to be sampled at obs location.
@@ -48,7 +49,8 @@ class STATION(object):
                  list,tuple: a list of file names
         time_range: when using a GrADS templates, the time interval
               to generate a list of files.
-
+        times: optional specific times to sample at, 
+              otherwise output at model time resolution
         """
 
         self.verb = verbose
@@ -74,6 +76,11 @@ class STATION(object):
         self.lons = xr.DataArray(lons, dims='station',attrs=self.ds.coords['lon'].attrs)
         self.lats = xr.DataArray(lats, dims='station',attrs=self.ds.coords['lat'].attrs)
 
+        if times is not None:
+            self.times = xr.DataArray(times,dims='time')
+        else:
+            self.times = self.ds.time
+
         # TO DO: when using xESMF for regridding, pre-compute transforms here
         # -------------------------------------------------------------------
 
@@ -94,7 +101,7 @@ class STATION(object):
 
         for vn in Variables:
             if self.verb: print('[ ] sampling ',vn)
-            sampled[vn] = self.ds[vn].interp(lon=self.lons,lat=self.lats,method=method)
+            sampled[vn] = self.ds[vn].interp(time=self.times,lon=self.lons,lat=self.lats,method=method)
 
         return xr.Dataset(sampled).assign_coords({'station': self.stations})
 
@@ -393,17 +400,19 @@ def addVertCoord(aer):
         dz = rhodz / aer['AIRDENS']       # column thickness in m
 
         # add up the thicknesses to get edge level altitudes
-        npts, nlev = dz.shape
-        ze = np.array([dz[:,i:].sum(axis=1) for i in range(nlev)])
+        nlev = dz.sizes['lev']
+        ze = xr.concat([dz.isel(lev=slice(i,None)).sum(dim='lev',keep_attrs=True) for i in range(nlev)],dim='lev')
         # append surface level, altitude = 0
-        ze = np.append(ze,np.zeros([1,npts]),axis=0)
-        # transpose to get npts, nlev again
-        ze = ze.T
+        surface = xr.DataArray(np.zeros((1,) +ze.shape[1:]),dims=ze.dims)
+        ze = xr.concat([ze,surface],dim='lev')
+        # transpose back to npts,nlev again
+        dims = list(dz.dims)
+        ze = ze.transpose(*dims)
         # convert from m to km
         ze = ze*1e-3
 
         # get mid-level altitudes
-        z = (ze[:,:-1] + ze[:,1:])*0.5
+        z = (ze.isel(lev=slice(None,-1)) + ze.isel(lev=slice(1,None)))*0.5
 
         # Attributes
         # ----------
@@ -413,8 +422,8 @@ def addVertCoord(aer):
 
         # Pack results into a DataArray
         # ---------------------------
-        DA = dict(  Z = xr.DataArray(z.astype('float32'),dims=dp.dims,coords=dp.coords,attrs=A['Z']),
-                    DZ = xr.DataArray(dz.astype('float32'),dims=dp.dims,coords=dp.coords,attrs=A['DZ'])
+        DA = dict(  Z = z.assign_attrs(A['Z']),
+                    DZ = dz.assign_attrs(A['DZ'])
                  )
 
         # Add to Dataset
