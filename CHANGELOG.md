@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - updates aop aback calculation to use name indexing. generalizes to any dimensionality
 - updates station sampler to sample at an input time frequency. defaults to model time frequency
 - updates xrctl to read multiple GEOS collections at once
+- updates the compile and build instructions in the readme
 ### Removed
 
 ### Deprecated
