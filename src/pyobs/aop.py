@@ -534,26 +534,26 @@ class G2GAOP(object):
         # http://ntrs.nasa.gov/archive/nasa/casi.ntrs.nasa.gov/19960051003.pdf
         # -----------------------------------------
         space = rh.shape
-        ndims = len(space)
-        km = space[1]
+        zdim = rh.dims[1]
+        nlev = space[1]
+        dims = list(rh.dims)
 
-        abackTOA, abackSFC, pressure = (np.zeros(space), np.zeros(space), np.zeros(space))
+        abackSFC = xr.DataArray(np.zeros(space),dims=dims)
+        bsc = xr.DataArray(bsc,dims=dims)
+        ext = xr.DataArray(ext,dims=dims)
   
         # get the pressure vertical profile
-        if ndims==2:
-            pe=np.zeros((space[0],km+1))
-            pe[:,0]=1 #assume TOA has a pressure of 1 Pa
-            for k in range(0,km):
-                pe[:,k+1]=pe[:,k]+dp[:,k]
-            for k in range(km):
-                pressure[:,k]=(pe[:,k]+pe[:,k+1])/2
-        elif ndims==4:
-            pe=np.zeros((space[0],km+1,space[2],space[3]))
-            pe[:,0,:,:]=1 #assume TOA has a pressure of 1 Pa
-            for k in range(0,km):
-                pe[:,k+1,:,:]=pe[:,k,:,:]+dp[:,k,:,:]
-            for k in range(km):
-                pressure[:,k,:,:]=(pe[:,k,:,:]+pe[:,k+1,:,:])/2
+        edge = list(space)
+        edge[1] += 1
+        pe = xr.DataArray(np.zeros(edge),dims=dims)
+
+        #assume TOA has a pressure of 1 Pa
+        pe[{zdim:0}] = 1.
+
+        for k in range(nlev):
+            pe[{zdim:k+1}] = pe[{zdim:k}] + dp[{zdim:k}]
+
+        pressure = (pe[{zdim:slice(None,-1)}] + pe[{zdim:slice(1,None)}])*0.5
 
         # calcualte molecular backscatter
         backscat_mol = (5.45e-32/(MAPL_RUNIV/MAPL_AVOGAD)) * (wavelength/550)**-4  * pressure / T #molecular backscatter coefficient in m-1
@@ -561,55 +561,31 @@ class G2GAOP(object):
         # calculate backscatter
         tau_mol_layer = backscat_mol * 8 * np.pi /3 * delz
         tau_aer_layer = ext * delz
-        if ndims==2:
-            ###TOA
-            abackTOA[:,0]=(bsc[:,0]+ backscat_mol[:,0]) * np.exp(-tau_aer_layer[:,0]) * np.exp(-tau_mol_layer[:,0])
-            for k in range(1,km):
-                tau_aer=0
-                tau_mol=0
-                for kk in range(0,k):
-                    tau_aer += tau_aer_layer[:,kk]
-                    tau_mol += tau_mol_layer[:,kk]
-                tau_aer += 0.5 * tau_aer_layer[:,k]
-                tau_mol += 0.5 * tau_mol_layer[:,k]
-                abackTOA[:,k] = (bsc[:,k] + backscat_mol[:,k]) * np.exp(-2*tau_aer) * np.exp(-2*tau_mol)
 
-            ###Surface
-            abackSFC[:,0]=(bsc[:,km-1]+ backscat_mol[:,km-1]) * np.exp(-tau_aer_layer[:,km-1]) * np.exp(-tau_mol_layer[:,km-1])
-            for k in range(km-2,-1,-1):
-                tau_aer=0
-                tau_mol=0
-                for kk in range(km-1,k-1,-1):
-                    tau_aer += tau_aer_layer[:,kk]
-                    tau_mol += tau_mol_layer[:,kk]
-                tau_aer += 0.5 *  tau_aer_layer[:,k]
-                tau_mol += 0.5 *  tau_mol_layer[:,k]
-                abackSFC[:,k] = (bsc[:,k] + backscat_mol[:,k]) * np.exp(-2*tau_aer) * np.exp(-2*tau_mol)
+        ### TOA
+        # sum up all the layers above but not including (reminder: layers go from top to bottom)
+        tau_aer = xr.concat([tau_aer_layer[{zdim:slice(None,i)}].sum(dim=zdim,keep_attrs=True) for i in range(nlev)],dim=zdim)
+        tau_aer = tau_aer.transpose(*dims)
+        # add half of the layer tau to get to the middle of the layer
+        tau_aer += 0.5 * tau_aer_layer
 
-        if ndims==4:
-            ###TOA
-            abackTOA[:,0,:,:]=(bsc[:,0,:,:]+ backscat_mol[:,0,:,:]) * np.exp(-tau_aer_layer[:,0,:,:]) * np.exp(-tau_mol_layer[:,0,:,:])
-            for k in range(1,km):
-                tau_aer=0
-                tau_mol=0
-                for kk in range(0,k):
-                    tau_aer += tau_aer_layer[:,kk,:,:]
-                    tau_mol += tau_mol_layer[:,kk,:,:]
-                tau_aer += 0.5 *  tau_aer_layer[:,k,:,:]
-                tau_mol += 0.5 *  tau_mol_layer[:,k,:,:]
-                abackTOA[:,k,:,:] = (bsc[:,k,:,:] + backscat_mol[:,k,:,:]) * np.exp(-2*tau_aer) * np.exp(-2*tau_mol)
+        tau_mol = xr.concat([tau_mol_layer[{zdim:slice(None,i)}].sum(dim=zdim,keep_attrs=True) for i in range(nlev)],dim=zdim)
+        tau_mol = tau_mol.transpose(*dims)
+        tau_mol += 0.5 * tau_mol_layer
+        
+        abackTOA = (bsc + backscat_mol) * np.exp(-2*tau_aer) * np.exp(-2*tau_mol)
 
-            ###Surface
-            abackSFC[:,0,:,:]=(bsc[:,km-1,:,:]+ backscat_mol[:,km-1,:,:]) * np.exp(-tau_aer_layer[:,km-1,:,:]) * np.exp(-tau_mol_layer[:,km-1,:,:])
-            for k in range(km-2,-1,-1):
-                tau_aer=0
-                tau_mol=0
-                for kk in range(km-1,k-1,-1):
-                    tau_aer += tau_aer_layer[:,kk,:,:]
-                    tau_mol += tau_mol_layer[:,kk,:,:]
-                tau_aer += 0.5 *  tau_aer_layer[:,k,:,:]
-                tau_mol += 0.5 *  tau_mol_layer[:,k,:,:]
-                abackSFC[:,k,:,:] = (bsc[:,k,:,:] + backscat_mol[:,k,:,:]) * np.exp(-2*tau_aer) * np.exp(-2*tau_mol)
+        ### Surface
+        # sum up all the layers below but not including (reminder: layers go from top to bottom)
+        tau_aer = xr.concat([tau_aer_layer[{zdim:slice(i+1,None)}].sum(dim=zdim,keep_attrs=True) for i in range(nlev)],dim=zdim)
+        tau_aer = tau_aer.transpose(*dims)
+        # add half of the layer tau to get to the middle of the layer
+        tau_aer += 0.5 * tau_aer_layer
+
+        tau_mol = xr.concat([tau_mol_layer[{zdim:slice(i+1,None)}].sum(dim=zdim,keep_attrs=True) for i in range(nlev)],dim=zdim)
+        tau_mol = tau_mol.transpose(*dims)
+        tau_mol += 0.5 * tau_mol_layer
+        abackSFC = (bsc + backscat_mol) * np.exp(-2*tau_aer) * np.exp(-2*tau_mol)
 
         return abackTOA, abackSFC
  
@@ -665,7 +641,6 @@ class G2GAOP(object):
         # pre-load RH, AIRDENS, and DELP so you don't hit dask
         # repeatedly looping through  AOP calculations
         # -------------------------------------------------------
-        a['DELP'].load()
         a['AIRDENS'].load()
         a['RH'].load()
 
@@ -679,9 +654,9 @@ class G2GAOP(object):
         # GEOS files can be inconsistent when it comes to case
         # ----------------------------------------------------
         try:
-            dp = a['DELP'] 
+            dp = a['DELP'].load() 
         except:
-            dp = a['delp']
+            dp = a['delp'].load()
 
         rh = a['RH']
 
@@ -873,7 +848,7 @@ def CLI_aop():
 
     # store doaback flag
     doaback = True
-    if args.noaback:
+    if options.noaback:
         doaback = False
 
     if options.dump:

@@ -7,7 +7,8 @@ import xarray as xr
 import numpy as np
 
 from datetime import datetime, timedelta
-from numpy    import loadtxt, ones, NaN, concatenate, array, pi, cos, sin, arccos, zeros
+from numpy    import loadtxt, ones, concatenate, array, pi, cos, sin, arccos, zeros
+from numpy    import nan as NaN
 from glob     import glob
 import gzip
 import collections
