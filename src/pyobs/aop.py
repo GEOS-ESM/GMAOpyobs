@@ -266,7 +266,7 @@ class G2GAOP(object):
         # -------------------------------------
         rhodz = dp / GRAV
         dz = rhodz / a['AIRDENS']       # column thickness
-        rh = a['RH']
+        rh = a['RH'].copy()
 
 
         # Check FIXRH option
@@ -420,7 +420,7 @@ class G2GAOP(object):
         except:
             dp = a['delp'].load()
         airdens = a['AIRDENS'].load()
-        rh = a['RH'].load()
+        rh = a['RH'].load().copy()
         
         # Check FIXRH option
         # --------------------------
@@ -648,7 +648,7 @@ class G2GAOP(object):
         # repeatedly looping through  AOP calculations
         # -------------------------------------------------------
         a['AIRDENS'].load()
-        a['RH'].load()
+        a['RH'].load().copy()
 
         # Determine PM Threshold
         # -------------------------------
