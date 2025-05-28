@@ -848,7 +848,7 @@ def CLI_aop():
 
     # store doaback flag
     doaback = True
-    if args.noaback:
+    if options.noaback:
         doaback = False
 
     if options.dump:
