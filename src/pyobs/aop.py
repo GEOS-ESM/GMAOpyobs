@@ -648,7 +648,7 @@ class G2GAOP(object):
         # repeatedly looping through  AOP calculations
         # -------------------------------------------------------
         a['AIRDENS'].load()
-        a['RH'].load().copy()
+        a['RH'].load()
 
         # Determine PM Threshold
         # -------------------------------
@@ -664,7 +664,7 @@ class G2GAOP(object):
         except:
             dp = a['delp'].load()
 
-        rh = a['RH']
+        rh = a['RH'].copy()
 
         # Check FIXRH option
         # --------------------------
