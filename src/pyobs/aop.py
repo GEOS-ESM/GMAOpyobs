@@ -616,7 +616,7 @@ class G2GAOP(object):
 
         raise AOPError("not implemented yet")
 
-    def getPM(self,Species=None,pmsize=None,fixrh=None,aerodynamic=False):
+    def getPM(self,Species=None,pmsize=None,fixrh=None,aerodynamic=False,vacuum_aerodynamic=False):
         """
         Returns an xarray Dataset with total aerosol mass smaller than the prescribed size.
 
@@ -625,7 +625,13 @@ class G2GAOP(object):
     
         PMsize: float, particle diameter threshold in microns. If None, the total PM is calculated.
 
-	Please see m2_pm25.yaml and g2g_pm25.yaml for example yaml configurations.
+    	Please see m2_pm25.yaml and g2g_pm25.yaml for example yaml configurations.
+
+        aerodynamic = use the continuum aerodynamic radius as the basis for size cutoff. 
+                      typically used for comparisons to surface sites
+        vacuum_aerodynamic = use the vacuum aerodynamic radius as the basis for size cutoff.
+                      used for comparison to aircraft AMS observations.
+        see deCarlo 2004 (DOI: 10.1080/027868290903907) for definitions of aerodynamic radius 
 
         """
 
@@ -712,7 +718,11 @@ class G2GAOP(object):
                 if aerodynamic:
                     # convert rhod from kg m-3 to g cm-3
                     rLow_ = rLow_ * np.sqrt((rhod_/1000)/self.mieTable[s]['shapefactor']) 
-                    rUp_ = rUp_ * np.sqrt((rhod_/1000)/self.mieTable[s]['shapefactor']) 
+                    rUp_ = rUp_ * np.sqrt((rhod_/1000)/self.mieTable[s]['shapefactor'])
+                elif vacuum_aerodynamic:
+                    # convert rhod from kg m-3 to g cm-3
+                    rLow_ = rLow_ * (rhod_/1000)/self.mieTable[s]['shapefactor']
+                    rUp_ = rUp_ * (rhod_/1000)/self.mieTable[s]['shapefactor']
 
                 # Find fraction of bin that is below the threshhold
                 if rPM is None:
