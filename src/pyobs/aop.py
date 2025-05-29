@@ -846,6 +846,9 @@ def CLI_aop():
     parser.add_option("--aerodynamic", dest="aerodynamic", default=False,
               help="If set to true, an aerodynamic diameter will be used to compute PM. This option is only valid for --aop=pm.")
 
+    parser.add_option("--vacuum_aerodynamic", dest="vacuum_aerodynamic", default=False,
+              help="If set to true, a vacuum aerodynamic diameter will be used to compute PM. This option is only valid for --aop=pm.")
+
     parser.add_option("-s","--size", dest="d_pm", default=None,
               help="The threshold diameter size used to compute PM in units of microns (example 2.5 for PM2.5). This option is only valid for --aop=pm.")
 
@@ -903,7 +906,8 @@ def CLI_aop():
         elif options.aop == 'rt':
             ds = g.getAOPrt(wavelength=w,vector=options.vector,fixrh=options.fixrh)
         elif options.aop == 'pm':
-            ds = g.getPM(pmsize=options.d_pm,fixrh=options.fixrh,aerodynamic=options.aerodynamic)
+            ds = g.getPM(pmsize=options.d_pm,fixrh=options.fixrh,aerodynamic=options.aerodynamic,
+                        vacuum_aerodynamic=options.vacuum_aerodynamic)
         else:
             print(options.aop)
             raise AOPError('Unknown AOP option '+options.aop)
