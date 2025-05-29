@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Added list parsing for variables in trajectory sampler
 - fixed byte string bug in aeronet.py
+- use a local copy of RH in aop calculator.  otherwise it overwrites when fixRH is used
 ### Added
 - MPL reader and plot curtain 
 - calculation of total backscatter coefficient in aop.py
