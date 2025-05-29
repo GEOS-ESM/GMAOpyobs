@@ -14,7 +14,8 @@ from . import mietable  as mt
 from . import xrctl     as xc
 
 from .constants import MAPL_GRAV as GRAV
-
+from .constants import MAPL_AVOGAD
+from .constants import MAPL_RUNIV
 # Default YAML file mapping GOCART tracers in aer_Nv and the optics files
 # -----------------------------------------------------------------------
 G2G_MieMap = """
@@ -247,6 +248,13 @@ class G2GAOP(object):
 
         a = self.aer    # aerosol mixing ratio tracers
 
+        # pre-load RH, AIRDENS, and DELP so you don't hit dask
+        # repeatedly looping through  AOP calculations
+        # -------------------------------------------------------
+        a['DELP'].load()
+        a['AIRDENS'].load()
+        a['RH'].load()
+
         # GEOS files can be inconsistent when it comes to case
         # ----------------------------------------------------
         try:
@@ -258,7 +266,7 @@ class G2GAOP(object):
         # -------------------------------------
         rhodz = dp / GRAV
         dz = rhodz / a['AIRDENS']       # column thickness
-        rh = a['RH']
+        rh = a['RH'].copy()
 
 
         # Check FIXRH option
@@ -369,7 +377,7 @@ class G2GAOP(object):
         return xr.Dataset(DA)
 
      
-    def getAOPext(self,Species=None,wavelength=None,fixrh=None):
+    def getAOPext(self,Species=None,wavelength=None,fixrh=None,doaback=True):
 
         """
         Returns an xarray Dataset with the following variables:
@@ -378,7 +386,8 @@ class G2GAOP(object):
         SCA:     aerosol scattering profile
         BSC:     aerosol backscatter profile
         DEPOL:   aerosol depolarization ratio
-
+        ABACKTOA: total attenuated backscatter from the TOA
+        ABACKSFC: total attenuated backscatter from the surface
         On inout,
 
         Species:    None, str, or list. If None, all species on file,
@@ -386,7 +395,9 @@ class G2GAOP(object):
 
         Wavelength: float, wavelength in nm.
 
-        TO DO: total attenuated backscatter, including molecular component
+        fixrh: value between 0 and 1 representing realtive humidity
+
+ 	doaback: flag to turn on/off attenuated backscatter calculation
 
         """
 
@@ -399,15 +410,18 @@ class G2GAOP(object):
 
         a = self.aer    # aerosol mixing ratio tracers
 
-        # GEOS files can be inconsistent when it comes to case
-        # ----------------------------------------------------
+        # pre-load RH, AIRDENS, T and DELP so you don't hit dask
+        # repeatedly looping through AOP calculations
+        # -------------------------------------------------------
+        #go back and see if this can be loaded in one line
+
         try:
-            dp = a['DELP']
+            dp = a['DELP'].load()
         except:
-            dp = a['delp']
-
-        rh = a['RH']
-
+            dp = a['delp'].load()
+        airdens = a['AIRDENS'].load()
+        rh = a['RH'].load().copy()
+        
         # Check FIXRH option
         # --------------------------
         if fixrh is not None:
@@ -420,9 +434,8 @@ class G2GAOP(object):
         # Relevant dimensions
         # -------------------
         space = rh.shape
-
-        ext, sca, bsc, depol1, depol2 = (np.zeros(space), np.zeros(space),
-                                         np.zeros(space), np.zeros(space),
+        ext, sca, bsc, depol1, depol2=  (np.zeros(space), np.zeros(space),
+                                         np.zeros(space), np.zeros(space), 
                                          np.zeros(space))
 
         for s in Species:   # species
@@ -444,8 +457,8 @@ class G2GAOP(object):
                 ext_ = mie.getAOP('bext', bin, rh, wavelength=wavelength).values
                 sca_ = mie.getAOP('bsca', bin, rh, wavelength=wavelength).values
                 bsc_ = mie.getAOP('bbck', bin, rh, wavelength=wavelength).values
-                p11_ = mie.getAOP('p11',  bin, rh, wavelength=wavelength).values
-                p22_ = mie.getAOP('p22',  bin, rh, wavelength=wavelength).values
+                pback11_ = mie.getAOP('pback11',  bin, rh, wavelength=wavelength).values
+                pback22_ = mie.getAOP('pback22',  bin, rh, wavelength=wavelength).values
 
                 ext_ = ext_ * q_conc
                 sca_ = sca_ * q_conc
@@ -454,10 +467,23 @@ class G2GAOP(object):
                 ext += ext_
                 sca += sca_
                 bsc += bsc_
-                depol1 += (p11_-p22_) * sca_
-                depol2 += (p11_+p22_) * sca_
+                depol1 += (pback11_-pback22_) * sca_
+                depol2 += (pback11_+pback22_) * sca_
 
                 bin += 1
+
+        if doaback:
+            # Compute Molecular Scattering and Total Attenuated Backscatter Coefficient
+            # following the methodology begining on page 147 of
+            # http://ntrs.nasa.gov/archive/nasa/casi.ntrs.nasa.gov/19960051003.pdf
+            # -----------------------------------------
+            T = a['T'].load()
+            delz  = dp / (GRAV * airdens)
+            abackTOA, abackSFC = self.calcABACK(wavelength,T,rh,dp,airdens,delz,ext,bsc)
+
+            abackTOA *= 1000. # km-1 sr-1
+            abackSFC *= 1000. # km-1 sr-1
+
 
         # Final normalization
         # -------------------
@@ -481,6 +507,9 @@ class G2GAOP(object):
                   BSC = {'long_name':'Aerosol Backscatter Coefficient', 'units':'km-1'},
                   DEPOL = {'long_name':'Depolarization Ratio', 'units':'1'}
                   )
+        if doaback:
+            A['ABACKTOA'] = {'long_name':'Total Attenuated Backscatter Coefficient from TOA','units':'km-1 sr-1'}
+            A['ABACKSFC'] = {'long_name':'Total Attenuated Backscatter Coefficient from Surface','units':'km-1 sr-1'}
 
         # Pack results into a Dataset
         # ---------------------------
@@ -490,12 +519,76 @@ class G2GAOP(object):
                     DEPOL = xr.DataArray(depol.astype('float32'),dims=rh.dims,coords=rh.coords,attrs=A['DEPOL'])
                  )
 
+        if doaback:
+            DA['ABACKTOA'] = xr.DataArray(abackTOA.astype('float32'),dims=rh.dims,coords=rh.coords,attrs=A['ABACKTOA'])
+            DA['ABACKSFC'] = xr.DataArray(abackSFC.astype('float32'),dims=rh.dims,coords=rh.coords,attrs=A['ABACKSFC'])
+
         DA['DELP'] = dp
         DA['AIRDENS'] = a['AIRDENS']
 
         return xr.Dataset(DA)
+        
+    def calcABACK(self,wavelength,T,rh,dp,airdens,delz,ext,bsc):
+        # Compute Molecular Scattering and Total Attenuated Backscatter Coefficient
+        # following the methodology begining on page 147 of
+        # http://ntrs.nasa.gov/archive/nasa/casi.ntrs.nasa.gov/19960051003.pdf
+        # -----------------------------------------
+        space = rh.shape
+        zdim = rh.dims[1]
+        nlev = space[1]
+        dims = list(rh.dims)
 
+        abackSFC = xr.DataArray(np.zeros(space),dims=dims)
+        bsc = xr.DataArray(bsc,dims=dims)
+        ext = xr.DataArray(ext,dims=dims)
+  
+        # get the pressure vertical profile
+        edge = list(space)
+        edge[1] += 1
+        pe = xr.DataArray(np.zeros(edge),dims=dims)
 
+        #assume TOA has a pressure of 1 Pa
+        pe[{zdim:0}] = 1.
+
+        for k in range(nlev):
+            pe[{zdim:k+1}] = pe[{zdim:k}] + dp[{zdim:k}]
+
+        pressure = (pe[{zdim:slice(None,-1)}] + pe[{zdim:slice(1,None)}])*0.5
+
+        # calcualte molecular backscatter
+        backscat_mol = (5.45e-32/(MAPL_RUNIV/MAPL_AVOGAD)) * (wavelength/550)**-4  * pressure / T #molecular backscatter coefficient in m-1
+
+        # calculate backscatter
+        tau_mol_layer = backscat_mol * 8 * np.pi /3 * delz
+        tau_aer_layer = ext * delz
+
+        ### TOA
+        # sum up all the layers above but not including (reminder: layers go from top to bottom)
+        tau_aer = xr.concat([tau_aer_layer[{zdim:slice(None,i)}].sum(dim=zdim,keep_attrs=True) for i in range(nlev)],dim=zdim)
+        tau_aer = tau_aer.transpose(*dims)
+        # add half of the layer tau to get to the middle of the layer
+        tau_aer += 0.5 * tau_aer_layer
+
+        tau_mol = xr.concat([tau_mol_layer[{zdim:slice(None,i)}].sum(dim=zdim,keep_attrs=True) for i in range(nlev)],dim=zdim)
+        tau_mol = tau_mol.transpose(*dims)
+        tau_mol += 0.5 * tau_mol_layer
+        
+        abackTOA = (bsc + backscat_mol) * np.exp(-2*tau_aer) * np.exp(-2*tau_mol)
+
+        ### Surface
+        # sum up all the layers below but not including (reminder: layers go from top to bottom)
+        tau_aer = xr.concat([tau_aer_layer[{zdim:slice(i+1,None)}].sum(dim=zdim,keep_attrs=True) for i in range(nlev)],dim=zdim)
+        tau_aer = tau_aer.transpose(*dims)
+        # add half of the layer tau to get to the middle of the layer
+        tau_aer += 0.5 * tau_aer_layer
+
+        tau_mol = xr.concat([tau_mol_layer[{zdim:slice(i+1,None)}].sum(dim=zdim,keep_attrs=True) for i in range(nlev)],dim=zdim)
+        tau_mol = tau_mol.transpose(*dims)
+        tau_mol += 0.5 * tau_mol_layer
+        abackSFC = (bsc + backscat_mol) * np.exp(-2*tau_aer) * np.exp(-2*tau_mol)
+
+        return abackTOA, abackSFC
+ 
     def getAOPintensive(self,Species=None,wavelength=None):
         """
         Returns an xarray Dataset with intensive properties.
@@ -523,7 +616,7 @@ class G2GAOP(object):
 
         raise AOPError("not implemented yet")
 
-    def getPM(self,Species=None,pmsize=None,fixrh=None,aerodynamic=False):
+    def getPM(self,Species=None,pmsize=None,fixrh=None,aerodynamic=False,vacuum_aerodynamic=False):
         """
         Returns an xarray Dataset with total aerosol mass smaller than the prescribed size.
 
@@ -532,7 +625,13 @@ class G2GAOP(object):
     
         PMsize: float, particle diameter threshold in microns. If None, the total PM is calculated.
 
-	Please see m2_pm25.yaml and g2g_pm25.yaml for example yaml configurations.
+    	Please see m2_pm25.yaml and g2g_pm25.yaml for example yaml configurations.
+
+        aerodynamic = use the continuum aerodynamic radius as the basis for size cutoff. 
+                      typically used for comparisons to surface sites
+        vacuum_aerodynamic = use the vacuum aerodynamic radius as the basis for size cutoff.
+                      used for comparison to aircraft AMS observations.
+        see deCarlo 2004 (DOI: 10.1080/027868290903907) for definitions of aerodynamic radius 
 
         """
 
@@ -545,6 +644,12 @@ class G2GAOP(object):
 
         a = self.aer    # aerosol mixing ratio tracers
 
+        # pre-load RH, AIRDENS, and DELP so you don't hit dask
+        # repeatedly looping through  AOP calculations
+        # -------------------------------------------------------
+        a['AIRDENS'].load()
+        a['RH'].load()
+
         # Determine PM Threshold
         # -------------------------------
         if pmsize is None:
@@ -555,11 +660,11 @@ class G2GAOP(object):
         # GEOS files can be inconsistent when it comes to case
         # ----------------------------------------------------
         try:
-            dp = a['DELP'] 
+            dp = a['DELP'].load() 
         except:
-            dp = a['delp']
+            dp = a['delp'].load()
 
-        rh = a['RH']
+        rh = a['RH'].copy()
 
         # Check FIXRH option
         # --------------------------
@@ -613,7 +718,11 @@ class G2GAOP(object):
                 if aerodynamic:
                     # convert rhod from kg m-3 to g cm-3
                     rLow_ = rLow_ * np.sqrt((rhod_/1000)/self.mieTable[s]['shapefactor']) 
-                    rUp_ = rUp_ * np.sqrt((rhod_/1000)/self.mieTable[s]['shapefactor']) 
+                    rUp_ = rUp_ * np.sqrt((rhod_/1000)/self.mieTable[s]['shapefactor'])
+                elif vacuum_aerodynamic:
+                    # convert rhod from kg m-3 to g cm-3
+                    rLow_ = rLow_ * (rhod_/1000)/self.mieTable[s]['shapefactor']
+                    rUp_ = rUp_ * (rhod_/1000)/self.mieTable[s]['shapefactor']
 
                 # Find fraction of bin that is below the threshhold
                 if rPM is None:
@@ -737,11 +846,23 @@ def CLI_aop():
     parser.add_option("--aerodynamic", dest="aerodynamic", default=False,
               help="If set to true, an aerodynamic diameter will be used to compute PM. This option is only valid for --aop=pm.")
 
+    parser.add_option("--vacuum_aerodynamic", dest="vacuum_aerodynamic", default=False,
+              help="If set to true, a vacuum aerodynamic diameter will be used to compute PM. This option is only valid for --aop=pm.")
+
     parser.add_option("-s","--size", dest="d_pm", default=None,
               help="The threshold diameter size used to compute PM in units of microns (example 2.5 for PM2.5). This option is only valid for --aop=pm.")
 
+    parser.add_option("--noaback", dest="noaback", action="store_true",
+              help="Do not calculate aerosol backscatter when --aop=ext. Note, aerosol backscatter requires a temperature vertical profile.")
+
+
 
     (options, args) = parser.parse_args()
+
+    # store doaback flag
+    doaback = True
+    if options.noaback:
+        doaback = False
 
     if options.dump:
         print(G2G_MieMap)
@@ -776,19 +897,20 @@ def CLI_aop():
 
     # Compute AOPs
     # ------------
-    aer = xc.open_mfdataset(aerDataset,parallel=True)
+    aer = xc.open_mfdataset(aerDataset,parallel=True,chunks='auto',engine='netcdf4')
     g = G2GAOP(aer,config=config,mieRootDir=options.rootDir,verbose=options.verbose)
     for w_ in options.wavelengths.split(','):
         w = float(w_)
         if options.aop == 'ext':
-            ds = g.getAOPext(wavelength=w,fixrh=options.fixrh)
+            ds = g.getAOPext(wavelength=w,fixrh=options.fixrh,doaback=doaback)
         elif options.aop == 'rt':
             ds = g.getAOPrt(wavelength=w,vector=options.vector,fixrh=options.fixrh)
         elif options.aop == 'pm':
-            ds = g.getPM(pmsize=options.d_pm,fixrh=options.fixrh,aerodynamic=options.aerodynamic)
+            ds = g.getPM(pmsize=options.d_pm,fixrh=options.fixrh,aerodynamic=options.aerodynamic,
+                        vacuum_aerodynamic=options.vacuum_aerodynamic)
         else:
             print(options.aop)
-            raise AOPError('Unknow AOP option '+options.aop)
+            raise AOPError('Unknown AOP option '+options.aop)
 
         filename = options.outFile.replace('%{w}',w_)
         if options.verbose:

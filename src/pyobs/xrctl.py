@@ -35,6 +35,8 @@ def open_mfdataset(paths,*args, time_range=None, lock=False, **kwargs):
     """
     from netCDF4 import Dataset # only needed for hack below
     opendap = False
+    compat = "no_conflicts" # variables of the same name should have no conflicts
+    coords = "different"
     paths_ = paths
     if isinstance(paths,str):
         if 'http' in paths_[:4]:
@@ -47,15 +49,31 @@ def open_mfdataset(paths,*args, time_range=None, lock=False, **kwargs):
                 paths_ = parse_ctl(paths,time_range)
         else:
             paths_ = glob(paths_) # We need this here because of the netcdf hack
-            
+    else:
+        # allow for list of grads control files
+        # able to import multiple collections
+        plist = []
+        for p in paths:
+            if p.split('.')[-1] in ('ctl','xdf', 'ddf'):  # GrADS style control file
+                plist.append(parse_ctl(p,time_range))
+            elif os.path.exists(p):
+                head = open(p,mode='rb').read(4)
+                if b'DSET' == head.upper():
+                    plist.append(parse_ctl(p,time_range))
+        if len(plist) > 0:
+            paths_ = np.array(plist).transpose().flatten()
+            compat = "override"  # if there are multiples of the same variable name, just use the one from the first dataset
+            coords = "minimal"
+       
     if isinstance(paths_,(list,tuple)):          
         _ = Dataset(paths_[0])    # hack to circumvent some bug in open_mfdataset, it seems to initialize netcdf.
 
     if opendap:
-        return xr.open_dataset(paths_)
+        ds = xr.open_dataset(paths_)
     else:
-        return xr.open_mfdataset(paths_,*args,lock=lock,**kwargs)
+        ds = xr.open_mfdataset(paths_,*args,lock=lock,**kwargs,compat=compat,coords=coords)
 
+    return ds.assign_attrs(source_file_path=paths_)
 #...........................................................................
 
 
