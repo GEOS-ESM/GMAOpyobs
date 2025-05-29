@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - xrctl supports providing a list of control files
 - parse time in MPL reader to return datetimes
 - sampler notebook that uses station sampler at an MPL
+- add option for vacuum aerodynamic size cutoff
 ### Changed
 - add auto chunking to TRAJECTORY and STATION. This enables dask
 - preload some key variables in aop.py so you don't hit dask repeatedly in for loop
