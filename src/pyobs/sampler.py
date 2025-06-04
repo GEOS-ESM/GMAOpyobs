@@ -34,7 +34,7 @@ class STATION(object):
     def __init__(self, stations, lons, lats,
                  dataset, time_range=None, times=None, 
                  verbose=False,
-                 parallel=True,chunks='auto'):
+                 parallel=True,chunks='auto',**kwargs):
         """
         Specifies dataset to be sampled at obs location.
         On input,
@@ -65,7 +65,7 @@ class STATION(object):
         # OR a glob type of template
         # --------------------------------
         elif isinstance(dataset,(list,tuple,str)):
-            self.ds = xc.open_mfdataset(dataset,time_range=time_range,parallel=parallel,chunks=chunks)
+            self.ds = xc.open_mfdataset(dataset,time_range=time_range,parallel=parallel,chunks=chunks,**kwargs)
 
         else:
             raise SamplerError("Invalid dataset specification.")
