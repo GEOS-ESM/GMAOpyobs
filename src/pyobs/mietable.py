@@ -247,7 +247,7 @@ class MIETABLE(object):
             aop   = (aot, ssa, gasym)
 
       elif name == 'pback11':
-         pback11 = self._getAOP('pback', bin, wavelength=wavelength,m=m)
+         pback11 = self._getAOP('pback', bin, wavelength=wavelength)
          aop     = pback11.interp(rh=rh).isel({"p": 0}, drop=True).rename('pback11')
 
       elif name == 'pback22':
