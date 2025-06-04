@@ -247,12 +247,12 @@ class MIETABLE(object):
             aop   = (aot, ssa, gasym)
 
       elif name == 'pback11':
-         pback11 = self.getAOP('pback', bin, rh, wavelength=wavelength)
-         aop = pback11.isel({"p": 0}, drop=True).rename('pback11')
+         pback11 = self._getAOP('pback', bin, wavelength=wavelength,m=m)
+         aop     = pback11.interp(rh=rh).isel({"p": 0}, drop=True).rename('pback11')
 
       elif name == 'pback22':
-         pback22 = self.getAOP('pback', bin, rh, wavelength=wavelength)
-         aop = pback22.isel({"p": 4}, drop=True).rename('pback22')
+         pback22 = self._getAOP('pback', bin, wavelength=wavelength)
+         aop = pback22.interp(rh=rh).isel({"p": 4}, drop=True).rename('pback22')
 
       else:
           raise MieTableError('Unknown AOP '+name)
