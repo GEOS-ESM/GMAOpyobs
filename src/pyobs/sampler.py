@@ -34,7 +34,7 @@ class STATION(object):
     def __init__(self, stations, lons, lats,
                  dataset, time_range=None, times=None, 
                  verbose=False,
-                 parallel=True,chunks='auto'):
+                 parallel=True,chunks='auto',**kwargs):
         """
         Specifies dataset to be sampled at obs location.
         On input,
@@ -65,7 +65,7 @@ class STATION(object):
         # OR a glob type of template
         # --------------------------------
         elif isinstance(dataset,(list,tuple,str)):
-            self.ds = xc.open_mfdataset(dataset,time_range=time_range,parallel=parallel,chunks=chunks)
+            self.ds = xc.open_mfdataset(dataset,time_range=time_range,parallel=parallel,chunks=chunks,**kwargs)
 
         else:
             raise SamplerError("Invalid dataset specification.")
@@ -109,7 +109,7 @@ class STATION(object):
 
 class TRAJECTORY(object):
 
-    def __init__(self, times, lons, lats, dataset, parallel=True,chunks='auto',verbose=False):
+    def __init__(self, times, lons, lats, dataset, parallel=True,chunks='auto',verbose=False,**kwargs):
         """
         Specifies dataset to be sampled at obs location.
         On input,
@@ -142,7 +142,7 @@ class TRAJECTORY(object):
         # OR a glob type of template
         # --------------------------------
         elif isinstance(dataset,(list,tuple,str)):
-            self.ds = xc.open_mfdataset(dataset,time_range=time_range,parallel=parallel,chunks=chunks) # special handles GrADS-style ctl if found
+            self.ds = xc.open_mfdataset(dataset,time_range=time_range,parallel=parallel,chunks=chunks,**kwargs) # special handles GrADS-style ctl if found
 
         else:
             raise SamplerError("Invalid dataset specification.")

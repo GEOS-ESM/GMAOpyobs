@@ -65,8 +65,8 @@ def open_mfdataset(paths,*args, time_range=None, lock=False, **kwargs):
             compat = "override"  # if there are multiples of the same variable name, just use the one from the first dataset
             coords = "minimal"
        
-    if isinstance(paths_,(list,tuple)):          
-        _ = Dataset(paths_[0])    # hack to circumvent some bug in open_mfdataset, it seems to initialize netcdf.
+#    if isinstance(paths_,(list,tuple)):          
+#        _ = Dataset(paths_[0])    # hack to circumvent some bug in open_mfdataset, it seems to initialize netcdf.
 
     if opendap:
         ds = xr.open_dataset(paths_)
