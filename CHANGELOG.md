@@ -24,6 +24,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added list parsing for variables in trajectory sampler
 - fixed byte string bug in aeronet.py
 - use a local copy of RH in aop calculator.  otherwise it overwrites when fixRH is used
+- fixed mietable runtime warning for pback calculation. don't do this recursively anymore.
+- commented out "hack" in xrctl. it wasn't doing anything but added memory overhead and runtime
 ### Added
 - MPL reader and plot curtain 
 - calculation of total backscatter coefficient in aop.py
@@ -31,6 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - parse time in MPL reader to return datetimes
 - sampler notebook that uses station sampler at an MPL
 - add option for vacuum aerodynamic size cutoff
+- can pass additional keywork arguments to TRAJECTORY and SAMPLER
 ### Changed
 - add auto chunking to TRAJECTORY and STATION. This enables dask
 - preload some key variables in aop.py so you don't hit dask repeatedly in for loop
