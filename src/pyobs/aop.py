@@ -215,7 +215,9 @@ class G2GAOP(object):
            self.p = max(self.p,dims_['p']) # max number of entries in phase matrix
            self.m = max(self.m,dims_['m']) # max number of moments in phase matrix
         
-    def getAOPrt(self,Species=None,wavelength=None,vector=False,fixrh=None,m=None):
+    def getAOPrt(self,Species=None,wavelength=None,vector=False,
+                 fixrh=None,m=None,dopmatrix=True,dopmom=False,
+                 do_g=False):
 
         """
         Returns an xarray Dataset with (aot,ssa,g) if vector is
@@ -230,6 +232,15 @@ class G2GAOP(object):
                     asymmetry parameter.
 
         m: number of pmom moments to read in. If None, reads all on file.
+
+        dopmatrix: when vector isTrue, returns the scattering phase function matrix
+                   (used for VLIDORT calculations that utilize exact single scattering calc)
+
+        dopmom: when vector is True, returns the matrix of expension 
+                coefficients for the scattering phase function matrix
+                (used for legacy VLIDORT calculations)
+
+        do_g: when vector is True, return g as well
         """
 
         # Tables must have be consistent across species
@@ -313,13 +324,16 @@ class G2GAOP(object):
                 sca += sca_
 
                 if vector:
+                    if dopmom:
 
-                    pmom_ = mie.getAOP('pmom', bin, rh, q_mass=q_mass,
-                                        wavelength=wavelength,m=m)
-                    p_, m_ = pmom_.shape[-2:]
-                    pmom_ = pmom_.values.reshape((ns,p_,m_)) * sca_.reshape((ns,1,1))
+                        pmom_ = mie.getAOP('pmom', bin, rh,
+                                            wavelength=wavelength,m=m)
+                        p_, m_ = pmom_.shape[-2:]
+                        pmom_ = pmom_.values.reshape((ns,p_,m_)) * sca_.reshape((ns,1,1))
 
-                    pmom[:,:,:m_] += pmom_[:,:,:] # If species have fewer moments, pad wih zeros
+                        pmom[:,:,:m_] += pmom_[:,:,:] # If species have fewer moments, pad wih zeros
+                    if dopmatrix:
+                        pmatrix_ += mie.getAOP('pmatrix', bin, rh, wavelength=wavelength)
                 else:
 
                     g   += sca_ * g_
@@ -343,7 +357,9 @@ class G2GAOP(object):
              I = np.where(sca.reshape(ns) == 0.0)[0]
              pmom[I,:,:] = np.nan
              pmom = pmom.reshape(space+(p,m))
-        else:
+
+             pmatrix[I,:,:] = pmatrix[I,:,:] / sca.reshape((ns,1,1))[I,:,:]
+        if do_g or not vector:
              I = np.where(sca != 0.0)
              g[I] = g[I] / sca[I]
              I = np.where(sca == 0.0)
@@ -366,11 +382,12 @@ class G2GAOP(object):
         DA['AIRDENS'] = a['AIRDENS']
 
         if vector:
-            coords = dict(rh.coords).copy()
-            coords['p'] = mie.ds.coords['p']
-            dims = space + ('p', 'm')
-            DA['PMOM'] = xr.DataArray(pmom, dims=rh.dims+('p','m'),coords=coords)
-        else:
+            if dopmom:
+                coords = dict(rh.coords).copy()
+                coords['p'] = mie.ds.coords['p']
+                dims = space + ('p', 'm')
+                DA['PMOM'] = xr.DataArray(pmom, dims=rh.dims+('p','m'),coords=coords)
+        if do_g or not vector:
             DA['G'] = xr.DataArray(g,dims=rh.dims,coords=rh.coords)
 
         return xr.Dataset(DA)
