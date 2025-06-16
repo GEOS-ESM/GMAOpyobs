@@ -6,7 +6,7 @@
 
 import os
 
-import numpy  as np 
+import numpy  as np
 import xarray as xr
 import pandas as pd
 
@@ -32,8 +32,9 @@ class SamplerError(Exception):
 class STATION(object):
 
     def __init__(self, stations, lons, lats,
-                 dataset, time_range=None, verbose=False,
-                 parallel=True,chunks='auto'):
+                 dataset, time_range=None, times=None, 
+                 verbose=False,
+                 parallel=True,chunks='auto',**kwargs):
         """
         Specifies dataset to be sampled at obs location.
         On input,
@@ -48,41 +49,42 @@ class STATION(object):
                  list,tuple: a list of file names
         time_range: when using a GrADS templates, the time interval
               to generate a list of files.
-
+        times: optional specific times to sample at, 
+              otherwise output at model time resolution
         """
 
         self.verb = verbose
-        
+
         # If dataset is an xarray dataset we are good to go
         # -------------------------------------------------
         if isinstance(dataset,xr.Dataset):
             self.ds = dataset # we are good to go...
 
         # If dataset is a list of files...
+        # OR GrADS-style ctl
+        # OR a glob type of template
         # --------------------------------
-        elif isinstance(dataset,(list,tuple)):
-            self.ds = xr.open_mfdataset(dataset,parallel=parallel,chunks=chunks)
-
-        # If datatset is a string it is either a GrADS-style ctl or
-        # a glob type of template
-        # ---------------------------------------------------------
-        elif isinstance(dataset,str):
-            # Special handles GrADS-style ctl if found
-            self.ds = xc.open_mfdataset(dataset,time_range=time_range,parallel=parallel,chunks=chunks)
+        elif isinstance(dataset,(list,tuple,str)):
+            self.ds = xc.open_mfdataset(dataset,time_range=time_range,parallel=parallel,chunks=chunks,**kwargs)
 
         else:
             raise SamplerError("Invalid dataset specification.")
-            
+
         # Save coordinates
         # ----------------
         self.stations = xr.DataArray(stations, dims='station')
         self.lons = xr.DataArray(lons, dims='station',attrs=self.ds.coords['lon'].attrs)
         self.lats = xr.DataArray(lats, dims='station',attrs=self.ds.coords['lat'].attrs)
 
+        if times is not None:
+            self.times = xr.DataArray(times,dims='time')
+        else:
+            self.times = self.ds.time
+
         # TO DO: when using xESMF for regridding, pre-compute transforms here
         # -------------------------------------------------------------------
 
-        
+
     #--
     def sample(self,Variables=None,method='linear'):
         """
@@ -99,7 +101,7 @@ class STATION(object):
 
         for vn in Variables:
             if self.verb: print('[ ] sampling ',vn)
-            sampled[vn] = self.ds[vn].interp(lon=self.lons,lat=self.lats,method=method)
+            sampled[vn] = self.ds[vn].interp(time=self.times,lon=self.lons,lat=self.lats,method=method)
 
         return xr.Dataset(sampled).assign_coords({'station': self.stations})
 
@@ -107,7 +109,7 @@ class STATION(object):
 
 class TRAJECTORY(object):
 
-    def __init__(self, times, lons, lats, dataset, parallel=True,chunks='auto',verbose=False):
+    def __init__(self, times, lons, lats, dataset, parallel=True,chunks='auto',verbose=False,**kwargs):
         """
         Specifies dataset to be sampled at obs location.
         On input,
@@ -129,25 +131,18 @@ class TRAJECTORY(object):
         time_range = times.min(), times.max()
         if isinstance(time_range[0],np.datetime64):
             time_range = pd.to_datetime(time_range)
-        
+
         # If dataset is an xarray dataset we are good to go
         # -------------------------------------------------
         if isinstance(dataset,xr.Dataset):
             self.ds = dataset # we are good to go...
 
         # If dataset is a list of files...
+        # OR GrADS-style ctl 
+        # OR a glob type of template
         # --------------------------------
-        elif isinstance(dataset,(list,tuple)):
-            self.ds = xr.open_mfdataset(dataset,parallel=parallel,chunks=chunks)
-
-        # If datatset is a string it is either a GrADS-style ctl or
-        # a glob type of template
-        # ---------------------------------------------------------
-        elif isinstance(dataset,str):
-
-            # Special handles GrADS-style ctl if found
-            # ----------------------------------------
-            self.ds = xc.open_mfdataset(dataset,time_range=time_range,parallel=parallel,chunks=chunks) # special handles GrADS-style ctl if found
+        elif isinstance(dataset,(list,tuple,str)):
+            self.ds = xc.open_mfdataset(dataset,time_range=time_range,parallel=parallel,chunks=chunks,**kwargs) # special handles GrADS-style ctl if found
 
         else:
             raise SamplerError("Invalid dataset specification.")
@@ -195,7 +190,7 @@ class TLETRAJ(TRAJECTORY):
         """
 
         from .tle import TLE
-        
+
         # Generate coordinates
         # --------------------
         times, lons, lats = TLE(tleFile).getSubpoint(t1,t2,dt)
@@ -203,7 +198,7 @@ class TLETRAJ(TRAJECTORY):
         # Initialize base class
         # ---------------------
         super().__init__(times, lons, lats, *args, **kwargs)
-        
+
 
 class WPTRAJ(TRAJECTORY):
 
@@ -221,16 +216,16 @@ class WPTRAJ(TRAJECTORY):
 
         # Initialize base class
         # ---------------------
-        times, lons, lats = traj.index.values, traj['lon'].values, traj['lat'].values 
+        times, lons, lats = traj.index.values, traj['lon'].values, traj['lat'].values
         super().__init__(times, lons, lats, *args, **kwargs)
-        
+
 
 #......................................  Station Sampler CLI ..........................................
 
 def CLI_stnSampler():
-    
+
     """
-    Parses command line and write files with resulting station sampling results. 
+    Parses command line and write files with resulting station sampling results.
     """
 
     from optparse        import OptionParser
@@ -238,7 +233,7 @@ def CLI_stnSampler():
     format = 'NETCDF4'
     outFile = 'stn_sampler.nc'
     method = 'linear'
-    
+
 #   Parse command line options
 #   --------------------------
     parser = OptionParser(usage="Usage: %prog [OPTIONS] stnFile.csv inDataset [iso_t1 iso_t2]\n"+\
@@ -258,7 +253,7 @@ def CLI_stnSampler():
 
     parser.add_option("-V", "--vars", dest="Vars", default=None,
               help="Variables to sample, comma delimited (default=All)")
-    
+
     parser.add_option("-f", "--format", dest="format", default=format,
               help="Output file format: one of NETCDF4, NETCDF4_CLASSIC, NETCDF3_64BIT,NETCDF3_CLASSIC (default=%s)"%format )
 
@@ -269,9 +264,9 @@ def CLI_stnSampler():
     parser.add_option("-v", "--verbose",
                       action="store_true", dest="verbose",
                       help="Verbose mode.")
-    
+
     (options, args) = parser.parse_args()
-    
+
     if len(args) == 4 :
         stnFile, dataset, iso_t1, iso_t2 = args
         t1, t2 = (isoparser(iso_t1), isoparser(iso_t2))
@@ -286,7 +281,7 @@ def CLI_stnSampler():
 
     if options.format not in ["NETCDF4","NETCDF4_CLASSIC","NETCDF3_64BIT","NETCDF3_CLASSIC"]:
         raise ValueError('Invalid format <%s>'%options.format)
-        
+
     # Read coordinates from CSV file
     # ------------------------------
     df = pd.read_csv(stnFile, index_col=0)
@@ -302,7 +297,7 @@ def CLI_stnSampler():
         print(ds)
         print('- Writing',options.outFile)
 
-        
+
     # Write out netcdf file
     # ---------------------
     ds.to_netcdf(options.outFile,format=options.format)
@@ -336,7 +331,7 @@ def _getTrackHSRL(hsrlFile,dt_secs=60):
     h = HSRL(hsrlFile,Nav_only=True)
     lon, lat, tyme = h.lon[:].ravel(), h.lat[:].ravel(), h.tyme[:].ravel()
     if dt_secs > 0:
-        dt = tyme[1] - tyme[0] 
+        dt = tyme[1] - tyme[0]
         idt = int(dt_secs/dt.total_seconds()+0.5)
         return (lon[::idt], lat[::idt], tyme[::idt])
     else:
@@ -349,11 +344,11 @@ def _getTrackCSV(csvFile):
     """
     df = pd.read_csv(csvFile, index_col=0)
     lon, lat, time = (df['lon'].values,df['lat'].values,pd.to_datetime(df.index).values)
-    return (lon,lat,time)   
+    return (lon,lat,time)
 
-        
+
     return ( np.array(lon), np.array(lat), np.array(tyme) )
-    
+
 def _getTrackNPZ(npzFile):
     """
     Get trajectory from a NPZ with (lon,lat,time) coordinates.
@@ -405,17 +400,19 @@ def addVertCoord(aer):
         dz = rhodz / aer['AIRDENS']       # column thickness in m
 
         # add up the thicknesses to get edge level altitudes
-        npts, nlev = dz.shape
-        ze = np.array([dz[:,i:].sum(axis=1) for i in range(nlev)])
+        nlev = dz.sizes['lev']
+        ze = xr.concat([dz.isel(lev=slice(i,None)).sum(dim='lev',keep_attrs=True) for i in range(nlev)],dim='lev')
         # append surface level, altitude = 0
-        ze = np.append(ze,np.zeros([1,npts]),axis=0)
-        # transpose to get npts, nlev again
-        ze = ze.T
+        surface = xr.DataArray(np.zeros((1,) +ze.shape[1:]),dims=ze.dims)
+        ze = xr.concat([ze,surface],dim='lev')
+        # transpose back to npts,nlev again
+        dims = list(dz.dims)
+        ze = ze.transpose(*dims)
         # convert from m to km
         ze = ze*1e-3
 
         # get mid-level altitudes
-        z = (ze[:,:-1] + ze[:,1:])*0.5
+        z = (ze.isel(lev=slice(None,-1)) + ze.isel(lev=slice(1,None)))*0.5
 
         # Attributes
         # ----------
@@ -425,8 +422,8 @@ def addVertCoord(aer):
 
         # Pack results into a DataArray
         # ---------------------------
-        DA = dict(  Z = xr.DataArray(z.astype('float32'),dims=dp.dims,coords=dp.coords,attrs=A['Z']),
-                    DZ = xr.DataArray(dz.astype('float32'),dims=dp.dims,coords=dp.coords,attrs=A['DZ'])
+        DA = dict(  Z = z.assign_attrs(A['Z']),
+                    DZ = dz.assign_attrs(A['DZ'])
                  )
 
         # Add to Dataset
@@ -437,9 +434,9 @@ def addVertCoord(aer):
 
 #................................................................................
 def CLI_trjSampler():
-    
+
     """
-    Parses command line and write files with resulting trajectory sampling results. 
+    Parses command line and write files with resulting trajectory sampling results.
     """
 
     from .waypoint import WAYPOINT
@@ -483,7 +480,7 @@ def CLI_trjSampler():
 
     parser.add_option("-V", "--vars", dest="Vars", default=None,
               help="Variables to sample, comma delimited (default=All)")
-    
+
     parser.add_option("-t", "--trajectory", dest="traj", default=None,
                       help="Trajectory file format: one of tle, ict, csv, wp, npz (default=trjFile extension except for wp)" )
 
@@ -500,7 +497,7 @@ def CLI_trjSampler():
                       help="Verbose mode.")
 
     (options, args) = parser.parse_args()
-    
+
     if options.traj == 'WP':
         trjFile, dataset = args[0:2]
         TakeOff = args[2:]
@@ -518,7 +515,10 @@ def CLI_trjSampler():
         name, ext = os.path.splitext(trjFile)
         options.traj = ext[1:]
     options.traj = options.traj.upper()
-        
+
+    if options.Vars is not None:
+        options.Vars = options.Vars.split(',')
+
     # Create consistent file name extension
     # -------------------------------------
     name, ext = os.path.splitext(options.outFile)
@@ -574,13 +574,13 @@ def CLI_trjSampler():
     # All else
     # --------
     else:
-        
+
         trj = TRAJECTORY(time,lon,lat,dataset,verbose=options.verbose)
         ds = trj.sample(Variables=options.Vars,method=method)
         if options.verbose:
             #print(ds)
             print('- Writing',outFile,'from',trjFile,'(%s)'%options.traj)
-        
+
         # Write out netcdf file
         # ---------------------
         ds.to_netcdf(options.outFile,format=options.format)
@@ -590,7 +590,7 @@ def CLI_trjSampler():
 if __name__ == "__main__":
 
       pass
-  
+
 def test_tle():
 
       tleFile = '/Users/adasilva/data/tle/terra/terra.2023-04-15.tle'
@@ -600,13 +600,13 @@ def test_tle():
       t1 = datetime(2023,4,15,0,0,0)
       t2 = datetime(2023,4,15,6,0,0)
       dt = timedelta(minutes=1)
-    
+
       wt = TLETRAJ(tleFile,t1,t2,dt,aer_Nx,verbose=True)
 
       ds = wt.sample()
 
       return ds
-  
+
 def test_waypoint():
 
       wpFile = '/Users/adasilva/data/wp/phillipines_waypoints.csv'
@@ -615,17 +615,17 @@ def test_waypoint():
 
       takeoff = '2023-04-15T08:00:00'       # either string or datetime
       takeoff = datetime(2023,4,15,8,0,0)
-      
+
       wt = WPTRAJ(wpFile,'DC8',takeoff,aer_Nx,verbose=True)
-      
+
       ds = wt.sample()
 
       return ds
-  
+
 def test_trajecgory():
-    
+
       from datetime import datetime
-    
+
       merra2_dn = '/Users/adasilva/data/merra2/Y2023/M04/'
       aer_Nx = merra2_dn + '/MERRA2.tavg1_2d_aer_Nx.????????.nc4'
 
@@ -634,14 +634,14 @@ def test_trajecgory():
       c = xr.open_dataset(traj_fn)
 
       times, lons, lats = c['time'].values, c['lon'].values, c['lat'].values
-      
+
       traj = TRAJECTORY(times, lons, lats, aer_Nx)
       ds = traj.sample(Variables=['DUEXTTAU', 'DUCMASS'])
 
       print(ds)
-      
+
 def test_stations():
-      
+
       fluxnet_fn = '/Users/adasilva/data/brdf/fluxnet_stations.csv'
 
       stations = pd.read_csv('/Users/adasilva/data/brdf/fluxnet_stations.csv',
@@ -669,4 +669,4 @@ def test_stations():
       print(ds2)
 
 
-        
+

@@ -22,10 +22,10 @@ GMAOpyobs no longer supports Python 2.7.
 
 In your `.bashrc` or `.tcshrc` or other rc file add a line:
 
-##### NCCS (SLES12)
+##### NCCS (SLES15)
 
 ```
-module use -a /discover/swdev/gmao_SIteam/modulefiles-SLES12
+module use -a /discover/swdev/gmao_SIteam/modulefiles-SLES15
 ```
 
 ##### NAS
@@ -63,16 +63,17 @@ mepo clone git@github.com:GEOS-ESM/GMAOpyobs.git
 #### Load compiler, MPI stack, and baselibs
 On tcsh:
 ```
-source @env/g5_modules
+source env@/g5_modules
 ```
 or on bash:
 ```
-source @env/g5_modules.sh
+source env@/g5_modules.sh
 ```
 #### One-step default build
-Run the cmake_it script
+Run the cmake_it script and install
 ```
 ./cmake_it
+cmake --build build --target install -j 6
 ```
 
 #### Multi-step build
