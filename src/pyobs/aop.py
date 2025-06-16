@@ -311,7 +311,6 @@ class G2GAOP(object):
 
                 aot += aot_
                 sca += sca_
-                g   += sca_ * g_
 
                 if vector:
 
