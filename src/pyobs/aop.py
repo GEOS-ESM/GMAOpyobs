@@ -198,22 +198,26 @@ class G2GAOP(object):
         # start with last species read
         dims =  self.mieTable[s]['mie'].getDims()
         self.vector = True
-        self.p, self.m = (0,0)
+        self.p, self.m, self.ang = (0,0,0)
         # loop through species and compare dims
         for s in self.mieTable:
            dims_ = self.mieTable[s]['mie'].getDims() # dimensions of Mie Tables, a dict
            if dims_['p'] is None:
                self.vector = False  # if some species is missing pmom, cannot do vector RT
-               print('Warning: PMOM is missing for '+s)
-               self.p, self.m = None, None
+               print('Warning: Phase Matrix is missing for '+s)
+               self.p, self.m, self.ang = None, None, None
                break
            if self.vector and dims_['p'] != dims['p']:
-               self.vector = False # variable size phase matrix not yet implemented
-               self.p, self.m = None, None
-               print('Warning: cannot handle variable size phase matrix for PMOM')
+               self.p, self.m, self.ang = None, None, None
+               print('Warning: cannot handle variable size phase matrix for PMOM or PMATRIX')
                break
+           if self.vector and dims_['ang'] != dims['ang']:
+               self.ang = None # variable angular resolution phase matrix not implemented
+               print('Warning: cannot handle variable angular resolution phase matrix for PMATRIX')
+                               
            self.p = max(self.p,dims_['p']) # max number of entries in phase matrix
            self.m = max(self.m,dims_['m']) # max number of moments in phase matrix
+           self.ang = max(self.ang,dims_['ang']) # number of angles in phase matrix
         
     def getAOPrt(self,Species=None,wavelength=None,vector=False,
                  fixrh=None,m=None,dopmatrix=True,dopmom=False,
@@ -296,10 +300,14 @@ class G2GAOP(object):
         if vector:
             ns = np.prod(space)
             p = self.p
-            if m is None:
-                m = self.m
+            if dopmom:
+                if m is None:
+                    m = self.m
+                pmom = np.zeros((ns,p,m)) # flatten space dimensions for convenience
+            if dopmatrix:
+                ang = self.ang
+                pmatrix = np.zeros((ns,p,ang)) #flatten space dimensions for convenience
 
-            pmom = np.zeros((ns,p,m)) # flatten space dimensions for convenience
 
         for s in Species:   # loop over species
 
@@ -333,7 +341,12 @@ class G2GAOP(object):
 
                         pmom[:,:,:m_] += pmom_[:,:,:] # If species have fewer moments, pad wih zeros
                     if dopmatrix:
-                        pmatrix_ += mie.getAOP('pmatrix', bin, rh, wavelength=wavelength)
+                        pmatrix_ = mie.getAOP('pmatrix', bin, rh, wavelength=wavelength)
+                        p_, ang_ = pmatrix_.shape[-2:]
+                        pmatrix  += pmatrix_.values.reshape((ns,p_,ang_)) * sca_.reshape((ns,1,1))
+                    
+                    if do_g:
+                        g   += sca_ * g_
                 else:
 
                     g   += sca_ * g_
@@ -352,13 +365,21 @@ class G2GAOP(object):
         ssa[I] = sca[I] / aot[I]
 
         if vector:
-             I = np.where(sca.reshape(ns) != 0.0)[0]
-             pmom[I,:,:] = pmom[I,:,:] / sca.reshape((ns,1,1))[I,:,:]
-             I = np.where(sca.reshape(ns) == 0.0)[0]
-             pmom[I,:,:] = np.nan
-             pmom = pmom.reshape(space+(p,m))
+            if dopmom:
+                I = np.where(sca.reshape(ns) != 0.0)[0]
+                pmom[I,:,:] = pmom[I,:,:] / sca.reshape((ns,1,1))[I,:,:]
+                I = np.where(sca.reshape(ns) == 0.0)[0]
+                pmom[I,:,:] = np.nan
+                pmom = pmom.reshape(space+(p,m))
 
-             pmatrix[I,:,:] = pmatrix[I,:,:] / sca.reshape((ns,1,1))[I,:,:]
+            if dopmatrix:
+                I = np.where(sca.reshape(ns) != 0.0)[0]
+                pmatrix[I,:,:] = pmatrix[I,:,:] / sca.reshape((ns,1,1))[I,:,:]
+                I = np.where(sca.reshape(ns) == 0.0)[0]
+                pmatrix[I,:,:] = np.nan
+                pmatrix = pmatrix.reshape(space+(p,ang))
+
+
         if do_g or not vector:
              I = np.where(sca != 0.0)
              g[I] = g[I] / sca[I]
@@ -369,7 +390,8 @@ class G2GAOP(object):
         A = dict (AOT = {'long_name':'Aerosol Optical Thickness', 'units':'1'},
                   SSA = {'long_name':'Aerosol Single Scattering Albedo', 'units':'1'},
                   G = {'long_name':'Aerosol Asymmetry Parameter', 'units':'1'},
-                  PMOM = {'long_name':'Aerosol Phase Matrix (non-zero elements)', 'units':'1'}
+                  PMOM = {'long_name':'Aerosol Phase Matrix Expansion Coefficients (non-zero elements)', 'units':'1'},
+                  PMATRIX = {'long_name':'Aerosol Phase Matrix (non-zero elements)', 'units':'1'}
                   )
 
         # Pack results into a Dataset
@@ -386,9 +408,17 @@ class G2GAOP(object):
                 coords = dict(rh.coords).copy()
                 coords['p'] = mie.ds.coords['p']
                 dims = space + ('p', 'm')
-                DA['PMOM'] = xr.DataArray(pmom, dims=rh.dims+('p','m'),coords=coords)
+                DA['PMOM'] = xr.DataArray(pmom, dims=rh.dims+('p','m'),coords=coords,attrs=A['PMOM'])
+
+            if dopmatrix:
+                coords = dict(rh.coords).copy()
+                coords['p'] = mie.ds.coords['p']
+                coords['ang'] = mie.ds.coords['ang']
+                dims = space + ('p', 'ang')
+                DA['PMATRIX'] = xr.DataArray(pmatrix, dims=rh.dims+('p','ang'),coords=coords,attrs=A['PMATRIX'])
+
         if do_g or not vector:
-            DA['G'] = xr.DataArray(g,dims=rh.dims,coords=rh.coords)
+            DA['G'] = xr.DataArray(g,dims=rh.dims,coords=rh.coords,attrs=A['G'])
 
         return xr.Dataset(DA)
 
