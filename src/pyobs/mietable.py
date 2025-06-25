@@ -265,12 +265,14 @@ class MIETABLE(object):
          p34 = self._getAOP('p34',bin,wavelength=wavelength)
          p22 = self._getAOP('p22',bin,wavelength=wavelength)
          p44 = self._getAOP('p44',bin,wavelength=wavelength)
-         aop = xr.concat((p11.interp(rh=rh).squeeze(),
-                          p12.interp(rh=rh).squeeze(),
-                          p33.interp(rh=rh).squeeze(),
-                          p34.interp(rh=rh).squeeze(),
-                          p22.interp(rh=rh).squeeze(),
-                          p44.interp(rh=rh).squeeze()),'p')
+         aop = xr.concat((p11.interp(rh=rh),
+                          p12.interp(rh=rh),
+                          p33.interp(rh=rh),
+                          p34.interp(rh=rh),
+                          p22.interp(rh=rh),
+                          p44.interp(rh=rh)),'p')
+         newdim = rh.dims+('p','ang')
+         aop = aop.transpose(*newdim)
          
       else:
           raise MieTableError('Unknown AOP '+name)
