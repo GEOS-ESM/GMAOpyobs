@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 ### Added
-
+- now getAOPrt returns the phase matrix as detault instead of pmom (the pmatrix expansion)
 ### Changed
 
 ### Removed
