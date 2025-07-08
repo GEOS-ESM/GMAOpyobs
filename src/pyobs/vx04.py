@@ -729,7 +729,7 @@ class Vx04_L2(object):
         """
         
         if self.syn_time == None:
-            raise ValuError("synoptic time missing, cannot write ODS")
+            raise ValueError("synoptic time missing, cannot write ODS")
             
         # Stop here if no good obs available
         # ----------------------------------
