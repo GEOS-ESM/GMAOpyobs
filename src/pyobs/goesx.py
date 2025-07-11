@@ -339,7 +339,7 @@ class GOESX_CLRSKY(object):
         from pyods import ODS # must be inported before pyhdf
   
         if self.syn_time == None:
-            raise ValuError("synoptic time missing, cannot write ODS")
+            raise ValueError("synoptic time missing, cannot write ODS")
             
         # Stop here is no good obs available
         # ----------------------------------
