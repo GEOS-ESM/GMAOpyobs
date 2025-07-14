@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - now getAOPrt returns the phase matrix as detault instead of pmom (the pmatrix expansion)
 ### Changed
 
+- Update to ESMA_cmake v3.62.1
+
 ### Removed
 
 ### Deprecated
