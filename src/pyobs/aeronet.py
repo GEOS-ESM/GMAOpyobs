@@ -210,7 +210,7 @@ class AERONET_L2(object):
 
         # Create timedate
         # ---------------
-        self.tyme = array([ isoparse('-'.join(d.decode().split(':')[-1::-1])+'T'+t.decode()) for d,t in zip(self.Date,self.Time) ])
+        self.tyme = array([ isoparse('-'.join(d.split(':')[-1::-1])+'T'+t) for d,t in zip(self.Date,self.Time) ])
 
         # Unique list of locations
         # ------------------------

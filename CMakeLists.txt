@@ -10,7 +10,7 @@ cmake_policy (SET CMP0054 NEW)
 
 project (
   GMAOpyobs
-  VERSION 1.2.3
+  VERSION 1.2.6
   LANGUAGES Fortran CXX C)  # Note - CXX is required for ESMF
 
 # Enforce out of source directory builds

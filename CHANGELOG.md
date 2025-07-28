@@ -21,6 +21,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Deprecated
 
+# [v1.2.6] - 2025-07-28
+
+### Fixed
+- hotfix in aeronet.py for double decoding
+
 
 # [v1.2.5] - 2025-06-05
 
