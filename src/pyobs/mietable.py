@@ -17,6 +17,7 @@
       rUp              (b) Dry upper radius [m]
       p                (p) Non-zero elements of phase matrix
       m                (p) Moments of phase matrix
+      ang              (a) number of scattering angles [degrees]
 
     Data Variables:
       reff             (b,r) effective radius [m]
@@ -35,6 +36,7 @@
       area             (b,r) wet particle cross section [m2 kg-1]
       refr             (b,w,r) real part of refractive index
       refi             (b,w,r) imaginary part of refractive index
+      p11,12,22,33,34,44  (b,w,r,a) scattering phase matrix elements
 
       In the above the dimensions are
 
@@ -43,6 +45,7 @@
       b   bin number
       p   number of nonzero elements in phase matrix
       m   number of moments of phase matrix
+      a   number of scattering angles
 
       See GEOSmie documentation for details.
 
@@ -60,7 +63,8 @@ __VERSION__ = '0.9.0'
 supportedAOPs = ['aot',          'ssa',     'gf',      'gasym',   'g',   'growth_factor',
                  'RefIndex',     'pmom',    'area',    'volume',  'pback11', 'pback22', 'pback',
                  'rhod',         'rhop',    'rEff',    'bbck',    'tau', 'sca',
-                 'bsca',         'bext',    'refreal', 'refimag',
+                 'bsca',         'bext',    'refreal', 'refimag', 'pmatrix',
+                 'p11', 'p12', 'p33', 'p34', 'p22', 'p44',
                  'aot_ssa_pmom',
                  'aot_ssa_gasym' ]
 
@@ -254,6 +258,22 @@ class MIETABLE(object):
          pback22 = self._getAOP('pback', bin, wavelength=wavelength)
          aop = pback22.interp(rh=rh).isel({"p": 4}, drop=True).rename('pback22')
 
+      elif name == 'pmatrix':
+         p11 = self._getAOP('p11',bin,wavelength=wavelength)
+         p12 = self._getAOP('p12',bin,wavelength=wavelength)
+         p33 = self._getAOP('p33',bin,wavelength=wavelength)
+         p34 = self._getAOP('p34',bin,wavelength=wavelength)
+         p22 = self._getAOP('p22',bin,wavelength=wavelength)
+         p44 = self._getAOP('p44',bin,wavelength=wavelength)
+         aop = xr.concat((p11.interp(rh=rh),
+                          p12.interp(rh=rh),
+                          p33.interp(rh=rh),
+                          p34.interp(rh=rh),
+                          p22.interp(rh=rh),
+                          p44.interp(rh=rh)),'p')
+         newdim = rh.dims+('p','ang')
+         aop = aop.transpose(*newdim)
+         
       else:
           raise MieTableError('Unknown AOP '+name)
 
