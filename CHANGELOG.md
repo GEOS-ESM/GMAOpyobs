@@ -9,17 +9,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Fixed some misspelled `ValueError` exceptions
-
 ### Added
-- now getAOPrt returns the phase matrix as detault instead of pmom (the pmatrix expansion)
-### Changed
 
-- Update to ESMA_cmake v3.62.1
+### Changed
 
 ### Removed
 
 ### Deprecated
+
+# [v1.3.0] - 2025-07-28
+
+### Fixed
+- Fixed some misspelled `ValueError` exceptions
+- added a min dim to aeronet reads.  fixes error when there is only 1 observation in the file
+  
+### Added
+- now getAOPrt returns the phase matrix as detault instead of pmom (the pmatrix expansion)
+
+### Changed
+- Update to ESMA_cmake v3.62.1
+
 
 # [v1.2.6] - 2025-07-28
 

@@ -299,7 +299,7 @@ class AERONET_L2(object):
         data = loadtxt(filename, delimiter=',',
                        dtype={'names':self.Vars,'formats':self.formats},
                        converters = self.converters,
-                       skiprows=self.skip, usecols=self.iVars)
+                       skiprows=self.skip, usecols=self.iVars,ndmin=1)
         N = len(data)
 
         self.nobs += N
