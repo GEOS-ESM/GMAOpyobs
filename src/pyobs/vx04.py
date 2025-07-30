@@ -154,14 +154,20 @@ ALIAS = dict (  Longitude = 'lon',
 BAD, MARGINAL, GOOD, BEST = ( 0, 1, 2, 3 ) # DT QA marks
 # for DB 0 = no retrieval, 1 = poor, 2 = moderate, 3 = good
 
-translate_sat = {'Suomi-NPP': 'SNPP'}
+translate_sat = {'Suomi-NPP': 'SNPP',
+                 'NOAA-20'  : 'NOAA20'}
 
 
 KX = dict ( SNPP_DT_OCEAN = 337,
             SNPP_DT_LAND  = 336,
             SNPP_DB_OCEAN  = 334,
             SNPP_DB_DEEP   = 335,
-            SNPP_DB_LAND  = 333, 
+            SNPP_DB_LAND  = 333,
+            NOAA20_DT_OCEAN = 342,
+            NOAA20_DT_LAND  = 341,
+            NOAA20_DB_OCEAN  = 339,
+            NOAA20_DB_DEEP   = 340,
+            NOAA20_DB_LAND  = 338,
           )
 
 KT = dict ( AOD = 45, )
@@ -171,6 +177,11 @@ IDENT = dict ( SNPP_DT_OCEAN = 'vsnppdto',
                SNPP_DB_OCEAN  = 'vsnppdbo',
                SNPP_DB_DEEP  = 'vsnppdbd',
                SNPP_DB_LAND  = 'vsnppdbl',
+               NOAA20_DT_OCEAN = 'vnoaa20dto',
+               NOAA20_DT_LAND  = 'vnoaa20dtl',
+               NOAA20_DB_OCEAN  = 'vnoaa20dbo',
+               NOAA20_DB_DEEP  = 'vnoaa20dbd',
+               NOAA20_DB_LAND  = 'vnoaa20dbl',
           )
 
 MISSING = 999.999
