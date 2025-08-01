@@ -11,6 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- add KX for lunar AERONET obs
+- add KX for NOAA-20 AOD obs
+
 ### Changed
 
 ### Removed

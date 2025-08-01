@@ -51,7 +51,8 @@ ALIAS = dict (          Longitude = 'lon',
                     AERONET_Site = 'Location', 
               )
 
-KX = 323 
+KX = 323
+KX_lunar = 343
 KT = dict ( AOD = 45, )
 
 #---- 
@@ -338,7 +339,7 @@ class AERONET_L2(object):
         savez(npzFile,**Vars)
       
 #---
-    def writeODS(self, syn_tyme, filename=None, dir='.', expid='aeronet', nsyn=8):
+    def writeODS(self, syn_tyme, filename=None, dir='.', expid='aeronet', nsyn=8,lunar=False):
         """
         Writes the un-gridded AERONET object to an ODS file.
         """
@@ -369,8 +370,10 @@ class AERONET_L2(object):
         nobs = len(lon)
 
         if nobs>0:
-
-            ods = ODS(nobs=nobs, kx=KX, kt=KT['AOD'])
+            if lunar:
+                ods = ODS(nobs=nobs, kx=KX_lunar, kt=KT['AOD'])
+            else:
+                ods = ODS(nobs=nobs, kx=KX, kt=KT['AOD'])
 
             ods.ks[:] = list(range(1,1+nobs))
             ods.lat[:] = self.lat[I]
