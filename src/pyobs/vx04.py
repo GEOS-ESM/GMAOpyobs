@@ -50,6 +50,7 @@ SDS = dict (
                'Angstrom_Exponent_2_Ocean',
                'Aerosol_Cloud_Fraction_Ocean',
                'Mean_Reflectance_Ocean',
+               'STD_Reflectance_Ocean',
                'Land_Ocean_Quality_Flag' ),
      DB_META = ('Longitude', 'Latitude', 'Scan_Start_Time',
               'Viewing_Zenith_Angle', 'Relative_Azimuth_Angle',
@@ -388,7 +389,7 @@ class Vx04_L2(object):
        if 'DB' in self.algo:
            self.rChannels = self.Reflectance_Bands  # [ 412.,  488.,  550.,  670.,  865., 1240., 1640., 2250.]
        elif self.algo == 'DT_LAND':
-           self.rChannels = np.array([480.,670.,2250.])
+           self.rChannels = np.array([480.,550.,670.,860.,1240.,1600.,2250.])
        elif self.algo == 'DT_OCEAN':
            self.rChannels = np.array([480.,550.,670.,860.,1240.,1600.,2250.])
 
