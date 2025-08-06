@@ -256,44 +256,44 @@ class AERONET_L2(object):
 
         # Locate Header
         # -------------
-        if self.columns == None: # once per file
-            i = 0
-            for line in open(filename).readlines():
-                if 'AERONET_Site' in line:
-                    self.skip = i + 1 # number of rows to skip for data
-                    columns = line[0:-1].split(',') # remove \n at end of line
-                    self.columns = [] # sanitize variable names
-                    for c in columns:                    
-                        self.columns += [c.replace('%','').replace('-','_').replace(' ','')\
-                                          .replace('AOD','AOT').replace('nm','')\
-                                          .replace('_Name','').replace('Precipitable_','')\
-                                          .split('(')[0],]
-                    break
-                i += 1
+        # the AERONET v3 headers changed half-way through 2024, so need to do this every file
+        i = 0
+        for line in open(filename).readlines():
+            if 'AERONET_Site' in line:
+                self.skip = i + 1 # number of rows to skip for data
+                columns = line[0:-1].split(',') # remove \n at end of line
+                self.columns = [] # sanitize variable names
+                for c in columns:                    
+                    self.columns += [c.replace('%','').replace('-','_').replace(' ','')\
+                                      .replace('AOD','AOT').replace('nm','')\
+                                      .replace('_Name','').replace('Precipitable_','')\
+                                      .split('(')[0],]
+                break
+            i += 1
 
-            if self.columns == None:
-                raise ValueError("Cannot find Column header")
+        if self.columns == None:
+            raise ValueError("Cannot find Column header")
 
-            # Read relevant columns from AERONET granule
-            # ----------------------------------------
-            self.iVars = ()
-            self.formats = ()
-            self.converters = {}
-            for name in self.Vars:
-                try:
-                    i = self.columns.index(name)
-                except:
-                    raise ValueError("cannot find <%s> in file <%s>"%(name,filename))
-                self.iVars += (i,)
-                if name=='Date':
-                    self.formats += ('U10',)
-                elif name=='Time':
-                    self.formats += ('U8',)
-                elif name=='AERONET_Site':
-                    self.formats += ('U20',)
-                else:
-                    self.converters[i] = _convert2Float
-                    self.formats += ('f4',)
+        # Read relevant columns from AERONET granule
+        # ----------------------------------------
+        self.iVars = ()
+        self.formats = ()
+        self.converters = {}
+        for name in self.Vars:
+            try:
+                i = self.columns.index(name)
+            except:
+                raise ValueError("cannot find <%s> in file <%s>"%(name,filename))
+            self.iVars += (i,)
+            if name=='Date':
+                self.formats += ('U10',)
+            elif name=='Time':
+                self.formats += ('U8',)
+            elif name=='AERONET_Site':
+                self.formats += ('U20',)
+            else:
+                self.converters[i] = _convert2Float
+                self.formats += ('f4',)
                     
 #       Read the data
 #       -------------
