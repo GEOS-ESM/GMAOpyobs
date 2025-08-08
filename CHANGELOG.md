@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- fixed error when duplicate variables occur in an icartt file. ICARTT now reads the first instance of the duplicate variable.
+
 ### Added
 
 - add KX for lunar AERONET obs
