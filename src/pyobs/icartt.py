@@ -340,8 +340,12 @@ class ICARTT(object):
 
         # Remove duplicates
         # -----------------
+        usecols = np.arange(self.nVars)
         for dup in [item for item, count in list(collections.Counter(self.Vars).items()) if count > 1]:
-            self.Vars.remove(dup)
+            indices = [i for i, x in enumerate(self.Vars) if x == dup]
+            indices = indices[1:]  # only read the first instance
+            self.Vars = [item for i, item in enumerate(self.Vars) if i not in indices]
+            usecols = np.delete(usecols,indices) 
         
 #       Use Config to load other attributes
 #       -----------------------------------
@@ -364,7 +368,7 @@ class ICARTT(object):
         data = loadtxt(filename, delimiter=delim,
                        dtype={'names':self.Vars,'formats':formats},
                        converters = converters,
-                       skiprows=self.n_header)
+                       skiprows=self.n_header,usecols=usecols)
  
         try:
             N = len(data)
