@@ -50,6 +50,7 @@ SDS = dict (
                'Angstrom_Exponent_2_Ocean',
                'Aerosol_Cloud_Fraction_Ocean',
                'Mean_Reflectance_Ocean',
+               'STD_Reflectance_Ocean',
                'Land_Ocean_Quality_Flag' ),
      DB_META = ('Longitude', 'Latitude', 'Scan_Start_Time',
               'Viewing_Zenith_Angle', 'Relative_Azimuth_Angle',
@@ -119,6 +120,7 @@ ALIAS = dict (  Longitude = 'lon',
                 Scattering_Angle = 'ScatteringAngle',
                 Glint_Angle = 'GlintAngle',
                 Mean_Reflectance_Land = 'reflectance',
+                STD_Reflectance_Land = 'std_reflectance',
                 Surface_Reflectance_Land = 'sfc_reflectance',
                 Corrected_Optical_Depth_Land = 'aod',
                 Aerosol_Cloud_Fraction_Land = 'cloud',
@@ -126,6 +128,7 @@ ALIAS = dict (  Longitude = 'lon',
                 Optical_Depth_Small_Average_Ocean = 'aod_fine',
                 Aerosol_Cloud_Fraction_Ocean = 'cloud',
                 Mean_Reflectance_Ocean = 'reflectance',
+                STD_Reflectance_Ocean = 'std_reflectance',
                 Spectral_Aerosol_Optical_Thickness_Land = 'aod3ch',
                 Aerosol_Optical_Thickness_550_Land = 'aod550',
                 Spectral_Surface_Reflectance = 'sfc_reflectance',
@@ -154,14 +157,20 @@ ALIAS = dict (  Longitude = 'lon',
 BAD, MARGINAL, GOOD, BEST = ( 0, 1, 2, 3 ) # DT QA marks
 # for DB 0 = no retrieval, 1 = poor, 2 = moderate, 3 = good
 
-translate_sat = {'Suomi-NPP': 'SNPP'}
+translate_sat = {'Suomi-NPP': 'SNPP',
+                 'NOAA-20'  : 'NOAA20'}
 
 
 KX = dict ( SNPP_DT_OCEAN = 337,
             SNPP_DT_LAND  = 336,
             SNPP_DB_OCEAN  = 334,
             SNPP_DB_DEEP   = 335,
-            SNPP_DB_LAND  = 333, 
+            SNPP_DB_LAND  = 333,
+            NOAA20_DT_OCEAN = 342,
+            NOAA20_DT_LAND  = 341,
+            NOAA20_DB_OCEAN  = 339,
+            NOAA20_DB_DEEP   = 340,
+            NOAA20_DB_LAND  = 338,
           )
 
 KT = dict ( AOD = 45, )
@@ -171,6 +180,11 @@ IDENT = dict ( SNPP_DT_OCEAN = 'vsnppdto',
                SNPP_DB_OCEAN  = 'vsnppdbo',
                SNPP_DB_DEEP  = 'vsnppdbd',
                SNPP_DB_LAND  = 'vsnppdbl',
+               NOAA20_DT_OCEAN = 'vnoaa20dto',
+               NOAA20_DT_LAND  = 'vnoaa20dtl',
+               NOAA20_DB_OCEAN  = 'vnoaa20dbo',
+               NOAA20_DB_DEEP  = 'vnoaa20dbd',
+               NOAA20_DB_LAND  = 'vnoaa20dbl',
           )
 
 MISSING = 999.999
@@ -377,7 +391,7 @@ class Vx04_L2(object):
        if 'DB' in self.algo:
            self.rChannels = self.Reflectance_Bands  # [ 412.,  488.,  550.,  670.,  865., 1240., 1640., 2250.]
        elif self.algo == 'DT_LAND':
-           self.rChannels = np.array([480.,670.,2250.])
+           self.rChannels = np.array([480.,550.,670.,860.,1240.,1600.,2250.])
        elif self.algo == 'DT_OCEAN':
            self.rChannels = np.array([480.,550.,670.,860.,1240.,1600.,2250.])
 
