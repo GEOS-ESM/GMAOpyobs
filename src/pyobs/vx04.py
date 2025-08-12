@@ -1060,7 +1060,7 @@ def granules ( path, algo, sat, syn_time, coll='011', nsyn=8, verbose=False ):
     if sat.upper() == 'SNPP':
         sat_prod = 'VNP' + prod
     elif 'NOAA' in sat.upper():
-        sat_prod ='VN' + sat[-2:]
+        sat_prod ='VN' + sat[-2:] + prod
 
 
     # Determine synoptic time range
