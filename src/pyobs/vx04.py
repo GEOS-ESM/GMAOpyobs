@@ -319,7 +319,7 @@ class Vx04_L2(object):
                self.iGood = self.iGood & ~self.solar_azimuth_angle.mask
        elif self.algo == 'DT_OCEAN':
            self.iGood = (self.Land_Ocean_Quality_Flag > BAD) & (~self.Effective_Optical_Depth_Average_Ocean.mask[:,1])
-           if type(self.ScatteringAngle.mask) is not np.bool:
+           if type(self.Scattering_Angle.mask) is not np.bool:
                self.iGood = self.iGood & ~self.Scattering_Angle.mask
                self.iGood = self.iGood & ~self.sensor_azimuth_angle.mask
                self.iGood = self.iGood & ~self.solar_azimuth_angle.mask               
