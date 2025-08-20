@@ -350,7 +350,7 @@ class Vx04_L2(object):
            self.cloud = self.Aerosol_Cloud_Fraction_Ocean.copy()
            mask = self.Aerosol_Cloud_Fraction_Land.mask
            self.cloud[~mask] = self.Aerosol_Cloud_Fraction_Land[~mask]
-           self.SDS += ['cloud']
+           self.SDS += ('cloud',)
            self.iGood = self.iGood & ~self.cloud.mask
 
 
