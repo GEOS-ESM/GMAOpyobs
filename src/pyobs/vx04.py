@@ -263,6 +263,9 @@ class Vx04_L2(object):
        # -----------------------------------------------
        for name in self.SDS:
            self.__dict__[name] = []
+        if use_DT_cld:
+            for name in self.SDS_DT_CLD:
+                self.__dict__[name] = []
 
        # Read each granule, appending them to the list
        # ---------------------------------------------
