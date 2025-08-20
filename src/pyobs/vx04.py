@@ -535,7 +535,7 @@ class Vx04_L2(object):
 
 
        # Create a pseudo cloud fraction for Deep Blue
-       if not use_DT_cloud and (Algo == 'DB'):
+       if not use_DT_cld and (Algo == 'DB'):
             self.cloud = 1. - self.npixels_used.astype(float)/self.npixels_valid.astype(float)
 
 
