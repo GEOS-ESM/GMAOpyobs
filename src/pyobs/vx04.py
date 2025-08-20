@@ -280,6 +280,7 @@ class Vx04_L2(object):
        if use_DT_cld:
            # this should be a second list of paths that are matched to the DB paths
            self._read2Lists(Path,use_DT_cld)
+           self.SDS += self.SDS_DT_CLD
        else:
            self._readList(Path)
 
@@ -720,7 +721,6 @@ class Vx04_L2(object):
 
             self.__dict__[sds].append(v)
 
-        self.SDS += self.SDS_DT_CLD
 
 #       Satellite name
 #       --------------
