@@ -710,7 +710,7 @@ class Vx04_L2(object):
 
             # check that DT granule aligns with DB granule
             # if not, return empty
-            if len(v) != len(self.Longitude):
+            if len(v) != len(self.Longitude[-1]):
                 print("Dark Target and Deep Blue granules do not align")
                 self.Scattering_Angle = []
                 return
