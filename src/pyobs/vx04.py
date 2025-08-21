@@ -1177,7 +1177,7 @@ def granules ( path, algo, sat, syn_time, coll='011', nsyn=8, verbose=False ):
 
     path      ---  mounting point for the MxD04 Level 2 files
     algo      ---  either DT_LAND, DT_OCEAN, DB_LAND, DB_DEEP or DB_OCEAN
-    sat       ---  SNPP
+    sat       ---  SNPP, NOAA-20, NOAA-21
     syn_time  ---  synoptic time (timedate format)
 
     coll      ---  collection: 011 (optional)
@@ -1226,6 +1226,74 @@ def granules ( path, algo, sat, syn_time, coll='011', nsyn=8, verbose=False ):
         print("WARNING: no %s collection %s granules found for"%(algo,coll), syn_time)
 
     return Granules
+
+#............................................................................
+
+def granulePairs ( path, sat, syn_time, collDT='002', collDB='002',nsyn=8, verbose=False ):
+    """
+    Returns a list of Vx04 granules pairs from DT and DB algorithms at given synoptic time.
+    On input,
+
+    path      ---  mounting point for the MxD04 Level 2 files
+    sat       ---  SNPP, NOAA-20, NOAA-21
+    syn_time  ---  synoptic time (timedate format)
+
+    collDT    ---  DT collection version: 002 (optional)
+    collDB    ---  DB collection version: 002 (optional)
+    nsyn      ---  number of synoptic times per day (optional)
+
+    """
+
+    # Get product name
+    # -----------------
+    prodDT = 'AERDT'
+    prodDB = 'AERDB'
+
+    # Get sat_prod code
+    # ----------------
+    if sat.upper() == 'SNPP':
+        sat_prodDT = 'VNP' + prodDT
+        sat_prodDB = 'VNP' + prodDB
+    elif 'NOAA' in sat.upper():
+        sat_prodDT ='VN' + sat[-2:] + prodDT
+        sat_prodDB ='VN' + sat[-2:] + prodDB
+
+
+    # Determine synoptic time range
+    # -----------------------------
+    dt = timedelta(seconds = 12. * 60. * 60. / nsyn)
+    t1, t2 = (syn_time-dt,syn_time+dt)
+
+    # Find VIIRS granules in synoptic time range
+    # ------------------------------------------
+    dt = timedelta(minutes=6)
+    t = datetime(t1.year,t1.month,t1.day,t1.hour,0,0)
+    GranulesDT = []
+    GranulesDB = []
+    while t < t2:
+        if t >= t1:
+            doy = t.timetuple()[7]
+            basenDT = "%s/%s/%s/%04d/%03d/%s_L2_VIIRS_%s.A%04d%03d.%02d%02d.%s.*.nc"\
+                     %(path,sat_prodDT,collDT,t.year,doy,prodDT,sat,t.year,doy,t.hour,t.minute,collDT)
+
+            basenDB = "%s/%s/%s/%04d/%03d/%s_L2_VIIRS_%s.A%04d%03d.%02d%02d.%s.*.nc"\
+                     %(path,sat_prodDB,collDB,t.year,doy,prodDB,sat,t.year,doy,t.hour,t.minute,collDB)
+            if (len(glob(basenDT)) > 0) and (len(glob(basenDB)) > 0):
+                filenDT = sorted(glob(basenDT))[0]
+                GranulesDT += [filenDT,]
+                filenDB = sorted(glod(basenDB))[0]
+                GranulesDB += [filenDB,]
+                if verbose:
+                    print(" [x] Found ",filenDT,fileDB)
+        t += dt
+
+    if len(GranulesDB) == 0:
+        print("WARNING: no AERDB collection %s granules found for"%(collDB), syn_time)
+    if len(GranulesDT) == 0:
+        print("WARNING: no AERDT collection %s granules found for"%(collDT), syn_time)
+
+    return GranulesDB, GranulesDT
+
 
 #--
 
