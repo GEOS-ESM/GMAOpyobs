@@ -1177,7 +1177,7 @@ def granules ( path, algo, sat, syn_time, coll='011', nsyn=8, verbose=False ):
 
     path      ---  mounting point for the MxD04 Level 2 files
     algo      ---  either DT_LAND, DT_OCEAN, DB_LAND, DB_DEEP or DB_OCEAN
-    sat       ---  SNPP, NOAA-20, NOAA-21
+    sat       ---  SNPP, NOAA20, NOAA21
     syn_time  ---  synoptic time (timedate format)
 
     coll      ---  collection: 011 (optional)
@@ -1235,7 +1235,7 @@ def granulePairs ( path, sat, syn_time, collDT='002', collDB='002',nsyn=8, verbo
     On input,
 
     path      ---  mounting point for the MxD04 Level 2 files
-    sat       ---  SNPP, NOAA-20, NOAA-21
+    sat       ---  SNPP, NOAA20, NOAA21
     syn_time  ---  synoptic time (timedate format)
 
     collDT    ---  DT collection version: 002 (optional)
@@ -1281,7 +1281,7 @@ def granulePairs ( path, sat, syn_time, collDT='002', collDB='002',nsyn=8, verbo
             if (len(glob(basenDT)) > 0) and (len(glob(basenDB)) > 0):
                 filenDT = sorted(glob(basenDT))[0]
                 GranulesDT += [filenDT,]
-                filenDB = sorted(glod(basenDB))[0]
+                filenDB = sorted(glob(basenDB))[0]
                 GranulesDB += [filenDB,]
                 if verbose:
                     print(" [x] Found ",filenDT,fileDB)
