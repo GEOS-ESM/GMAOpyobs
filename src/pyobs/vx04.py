@@ -1284,7 +1284,7 @@ def granulePairs ( path, sat, syn_time, collDT='002', collDB='002',nsyn=8, verbo
                 filenDB = sorted(glob(basenDB))[0]
                 GranulesDB += [filenDB,]
                 if verbose:
-                    print(" [x] Found ",filenDT,fileDB)
+                    print(" [x] Found ",filenDT,filenDB)
         t += dt
 
     if len(GranulesDB) == 0:
