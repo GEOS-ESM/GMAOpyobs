@@ -251,16 +251,15 @@ class G2GAOP(object):
         # pre-load RH, AIRDENS, and DELP so you don't hit dask
         # repeatedly looping through  AOP calculations
         # -------------------------------------------------------
-        a['DELP'].load()
         a['AIRDENS'].load()
         a['RH'].load()
 
         # GEOS files can be inconsistent when it comes to case
         # ----------------------------------------------------
         try:
-            dp = a['DELP']
+            dp = a['DELP'].load()
         except:
-            dp = a['delp']
+            dp = a['delp'].load()
 
         # Handy arrays for extensive properties
         # -------------------------------------
