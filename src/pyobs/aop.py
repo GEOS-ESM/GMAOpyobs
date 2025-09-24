@@ -211,9 +211,14 @@ class G2GAOP(object):
                self.p, self.m, self.ang = None, None, None
                print('Warning: cannot handle variable size phase matrix for PMOM or PMATRIX')
                break
-           if self.vector and dims_['ang'] != dims['ang']:
-               self.ang = None # variable angular resolution phase matrix not implemented
-               print('Warning: cannot handle variable angular resolution phase matrix for PMATRIX')
+           if self.vector:
+               if 'ang' not in dims:  # keep back compatibility with v1 files that don't have PMATRIX
+                   self.ang = None 
+                   print('Warning: phase matrix not implemented')
+               elif dims_['ang'] != dims['ang']:
+                   self.ang = None # variable angular resolution phase matrix not implemented
+                   print('Warning: cannot handle variable angular resolution phase matrix for PMATRIX')
+                   break
                                
            self.p = max(self.p,dims_['p']) # max number of entries in phase matrix
            self.m = max(self.m,dims_['m']) # max number of moments in phase matrix
