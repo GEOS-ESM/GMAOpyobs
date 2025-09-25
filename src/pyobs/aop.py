@@ -222,7 +222,8 @@ class G2GAOP(object):
                                
            self.p = max(self.p,dims_['p']) # max number of entries in phase matrix
            self.m = max(self.m,dims_['m']) # max number of moments in phase matrix
-           self.ang = max(self.ang,dims_['ang']) # number of angles in phase matrix
+           if self.ang is not None:
+               self.ang = max(self.ang,dims_['ang']) # number of angles in phase matrix
         
     def getAOPrt(self,Species=None,wavelength=None,vector=False,
                  fixrh=None,m=None,dopmatrix=True,dopmom=False,
