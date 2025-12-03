@@ -54,6 +54,9 @@ SDS = dict (
                'Land_Ocean_Quality_Flag' ),
      DT_CLD = ( 'Aerosol_Cloud_Fraction_Ocean',
                 'Aerosol_Cloud_Fraction_Land'),
+     DT_FILTER = ('Land_Ocean_Quality_Flag',
+                'Corrected_Optical_Depth_Land',
+                'Scattering_Angle',),
      DB_META = ('Longitude', 'Latitude', 'Scan_Start_Time',
               'Viewing_Zenith_Angle', 'Relative_Azimuth_Angle',
               'Solar_Zenith_Angle',
@@ -205,7 +208,7 @@ class Vx04_L2(object):
 
     def __init__ (self,Path,algo,syn_time=None,nsyn=8,Verb=0,
                   only_good=True,SDS=SDS,alias=None,anet_wav=False,
-                  use_DT_cld=None):
+                  use_DT_cld=None,use_DT_filter=False):
        """
        Reads individual granules or a full day of Level 2 Vx04 files
        present on a given *Path* and returns a single object with
@@ -234,7 +237,9 @@ class Vx04_L2(object):
          use_DT_cld --- for Deep Blue retrieval, use the Dark Target Cloud Fraction rather than the ad-hoc DB cloud fraction
                         if the DT data is not available, returns empty
                         Need to pass it the correct files corresponding to what's passed for DB
-
+         use_DT_filter --- for Deep Blue retrieval, filter out where DT has a valid retrieval. 
+                           This works on top of the use_DT_cld keyword
+                           If True, must provide list of DT files with the use_DT_cld keyword
        """
 
        if algo not in ('DT_LAND', 'DT_OCEAN', 'DB_LAND', 'DB_DEEP', 'DB_OCEAN'):
@@ -252,6 +257,10 @@ class Vx04_L2(object):
        if use_DT_cld:
            self.SDS_DT_CLD = SDS['DT_CLD']
 
+       self.use_DT_filter = use_DT_filter
+       if use_DT_filter:
+           self.SDS_DT_FILTER = SDS['DT_FILTER']
+
        # Add/Substitute some aliases if given
        # ------------------------------------
        self.ALIAS = ALIAS.copy()
@@ -266,6 +275,9 @@ class Vx04_L2(object):
        if use_DT_cld:
            for name in self.SDS_DT_CLD:
                self.__dict__[name] = []
+       if use_DT_filter:
+           for name in self.SDS_DT_FILTER:
+               self.__dict__[name+'_DT'] = []
 
        # Read each granule, appending them to the list
        # ---------------------------------------------
@@ -281,6 +293,10 @@ class Vx04_L2(object):
            # this should be a second list of paths that are matched to the DB paths
            self._read2Lists(Path,use_DT_cld)
            self.SDS += self.SDS_DT_CLD
+           if use_DT_filter:
+               for sds in self.SDS_DT_FILTER:
+                   self.SDS += (sds + '_DT',)
+
        else:
            self._readList(Path)
 
@@ -354,6 +370,12 @@ class Vx04_L2(object):
            self.SDS += ('cloud',)
            self.iGood = self.iGood & ~self.cloud.mask
 
+       # only keep DB obs when there is not a good DT retrieval
+       if use_DT_filter:
+           DT_Good = (self.Land_Ocean_Quality_Flag_DT == BEST) & (~self.Corrected_Optical_Depth_Land_DT.mask[:,1])
+           if type(self.Scattering_Angle_DT.mask) is not np.bool:
+               DT_Good = DT_Good & ~self.Scattering_Angle_DT.mask
+           self.iGood = self.iGood & ~DT_Good
 
        # Keep only "good" observations
        # -----------------------------
@@ -701,8 +723,12 @@ class Vx04_L2(object):
         # check that it is the same size as DB data
         #-------------------------------
         data  = ncdt.groups['geophysical_data']
+        loc   = ncdt.groups['geolocation_data']
         for sds in self.SDS_DT_CLD:
-            v = data.variables[sds][:]
+            if sds in data.variables.keys():
+                v = data.variables[sds][:]
+            else:
+                v = loc.variables[sds][:]
 
             if len(v.shape) == 3:
                 i, j, k = v.shape
@@ -721,6 +747,33 @@ class Vx04_L2(object):
 
             self.__dict__[sds].append(v)
 
+        # Read in Dark Target aerosol retrieval
+        # to be used later for filtering
+        if self.use_DT_filter:
+            for sds in self.SDS_DT_FILTER:
+                if sds in data.variables.keys():
+                    v = data.variables[sds][:]
+                else:
+                    v = loc.variables[sds][:]
+
+                if len(v.shape) == 3:
+                    i, j, k = v.shape
+                    v = v.reshape((i*j,k))
+                elif len(v.shape) == 2:
+                    v = v.ravel()
+                else:
+                    raise IndexError("invalid shape for SDS <%s>"%sds)
+
+                # check that DT granule aligns with DB granule
+                # if not, return empty
+                if len(v) != len(self.Longitude[-1]):
+                    print("Dark Target and Deep Blue granules do not align")
+                    self.Scattering_Angle = []
+                    return
+
+                self.__dict__[sds+'_DT'].append(v)
+
+            
 
 #       Satellite name
 #       --------------
