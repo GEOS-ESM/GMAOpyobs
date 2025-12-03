@@ -176,6 +176,11 @@ KX = dict ( SNPP_DT_OCEAN = 337,
             NOAA20_DB_OCEAN  = 339,
             NOAA20_DB_DEEP   = 340,
             NOAA20_DB_LAND  = 338,
+            NOAA21_DT_OCEAN = 348,
+            NOAA21_DT_LAND  = 347,
+            NOAA21_DB_OCEAN  = 345,
+            NOAA21_DB_DEEP   = 346,
+            NOAA21_DB_LAND  = 344,           
           )
 
 KT = dict ( AOD = 45, )
@@ -190,6 +195,11 @@ IDENT = dict ( SNPP_DT_OCEAN = 'vsnppdto',
                NOAA20_DB_OCEAN  = 'vnoaa20dbo',
                NOAA20_DB_DEEP  = 'vnoaa20dbd',
                NOAA20_DB_LAND  = 'vnoaa20dbl',
+               NOAA21_DT_OCEAN = 'vnoaa20dto',
+               NOAA21_DT_LAND  = 'vnoaa20dtl',
+               NOAA21_DB_OCEAN  = 'vnoaa20dbo',
+               NOAA21_DB_DEEP  = 'vnoaa20dbd',
+               NOAA21_DB_LAND  = 'vnoaa20dbl',
           )
 
 MISSING = 999.999

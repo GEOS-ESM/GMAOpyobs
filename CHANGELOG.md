@@ -9,19 +9,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- fixed error when duplicate variables occur in an icartt file. ICARTT now reads the first instance of the duplicate variable.
-- the header in the AERONET v3 time series changes part way through. aeronet.py needs to read and parse the header for each file to avoid this error.
-
 ### Added
-
-- add KX for lunar AERONET obs
-- add KX for NOAA-20 AOD obs
 
 ### Changed
 
 ### Removed
 
 ### Deprecated
+
+# [v1.4.0] - 2025-09-25
+
+### Fixed
+
+- fixed error when duplicate variables occur in an icartt file. ICARTT now reads the first instance of the duplicate variable.
+- fixed bug in aop.py that broke if you used v1.X.X optics tables (that don't include pmatrix)
+- fixed bug in aop.py that broke if you had lowercase DELP in your model files
+
+### Added
+
+- add KX for lunar AERONET obs
+- add KX for NOAA-20 and NOAA-21 AOD obs
+
 
 # [v1.3.0] - 2025-07-28
 
