@@ -15,7 +15,7 @@ from dateutil.parser import parse as isoparser
 
 class ODSreader(object):
 
-    def __init__ (self, filename, Extra=None):
+    def __init__ (self, filename, Extra=None,Vars=VARS):
         """
         Read select attributes from an ODS file.
         """ 
@@ -25,7 +25,6 @@ class ODSreader(object):
         nc.set_auto_mask(False)
         nc.set_auto_scale(False)
         
-        Vars = VARS
         if Extra is not None:
              Vars += Extra
 
@@ -84,9 +83,7 @@ class ODSreader(object):
         # ----------------
         lon = self._getVar(nc,'lon')
         I = (lon>=-180)&(lon<=180)
-        self.lon = lon[I]
 
-        Vars.remove('lon')
         for name in Vars:
             q = self._getVar(nc,name)
             self.__dict__[name] = q[I]
