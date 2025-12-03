@@ -266,11 +266,11 @@ class MIETABLE(object):
          p22 = self._getAOP('p22',bin,wavelength=wavelength)
          p44 = self._getAOP('p44',bin,wavelength=wavelength)
          aop = xr.concat((p11.interp(rh=rh),
-                          p12.interp(rh=rh),
-                          p33.interp(rh=rh),
-                          p34.interp(rh=rh),
                           p22.interp(rh=rh),
-                          p44.interp(rh=rh)),'p')
+                          p33.interp(rh=rh),
+                          p44.interp(rh=rh),
+                          p12.interp(rh=rh),
+                          p34.interp(rh=rh)),'p')
          newdim = rh.dims+('p','ang')
          aop = aop.transpose(*newdim)
          
