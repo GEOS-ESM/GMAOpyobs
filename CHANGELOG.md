@@ -17,6 +17,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Deprecated
 
+# [v1.5.0] - 2025-12-03
+
+
+### Added
+- odsreader now takes the optional argument Vars - this is the selection of variables to be read
+- vx04.py now can read in DT and DB granules together and use the DT cloud fraction to filter DB obs 
+
+
 # [v1.4.0] - 2025-09-25
 
 ### Fixed
