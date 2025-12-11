@@ -1,5 +1,5 @@
 [project]
-name = "GMAOpyobs"
+name = "pyobs"
 version = "1.5.0"
 description = "GMAO utilities for observations"
 requires-python = ">=3.14"
