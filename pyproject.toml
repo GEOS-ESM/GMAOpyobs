@@ -5,6 +5,9 @@ description = "GMAO utilities for observations"
 requires-python = ">=3.14"
 dependencies = [
     "numpy>=2.3.5",
+    "pytz>=2025.2",
+    "timezonefinder>=8.1.0",
+    "xarray>=2025.12.0",
 ]
 
 [build-system]
