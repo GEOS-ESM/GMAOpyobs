@@ -46,6 +46,11 @@ class IMPROVE(object):
     def __init__ (self,Path,xVars=None,Verbose=False,Legacy=False,site_path=None):
         """
         Base class for generic EPA AQS dataset.
+        Path: str or list of str, file paths to read
+        xVars: dict, optional, defaults to None, variables to read
+        Verbose: bool, optional, defaults to False
+        Legacy: bool, optional, defaults to False, whether or not to read legacy formated data
+        site_path: str, optional, defaults to None, path for location information of IMPROVE sites
         """
         self.Legacy = Legacy
         self.verb = Verbose
