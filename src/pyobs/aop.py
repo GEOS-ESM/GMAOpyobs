@@ -670,19 +670,27 @@ class G2GAOP(object):
     def getPM(self,Species=None,pmsize=None,fixrh=None,aerodynamic=False,vacuum_aerodynamic=False):
         """
         Returns an xarray Dataset with total aerosol mass smaller than the prescribed size.
+        Please see m2_pm25.yaml and g2g_pm25.yaml for example yaml configurations.
 
-        Species:  None, str, or list. If None, all species on file,
-                  otherwise subset of emissions.
+        Species:  None, str, or list. Default is None.
+                  If None, all species on file will be summed, otherwise sum over a subset of species.
     
-        PMsize: float, particle diameter threshold in microns. If None, the total PM is calculated.
+        PMsize: None or float. Default is None.
+                Particle diameter threshold in microns.
+                If None the total PM is calculated.
 
-    	Please see m2_pm25.yaml and g2g_pm25.yaml for example yaml configurations.
+        fixrh: None or float. Default is None.
+               Relative humidity in percent to calculate PM.
+               If None will calculate PM at the model RH.
 
-        aerodynamic = use the continuum aerodynamic radius as the basis for size cutoff. 
-                      typically used for comparisons to surface sites
-        vacuum_aerodynamic = use the vacuum aerodynamic radius as the basis for size cutoff.
-                      used for comparison to aircraft AMS observations.
-        see deCarlo 2004 (DOI: 10.1080/027868290903907) for definitions of aerodynamic radius 
+        aerodynamic: bool. Default is False.
+                     Use the continuum aerodynamic radius as the basis for size cutoff.
+                     typically used for comparisons to surface sites
+        vacuum_aerodynamic: bool. Default is False.
+                            Use the vacuum aerodynamic radius as the basis for size cutoff.
+                            Used for comparison to aircraft AMS observations.
+
+        See deCarlo 2004 (DOI: 10.1080/027868290903907) for definitions of aerodynamic radius
 
         """
 
