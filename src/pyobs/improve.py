@@ -355,6 +355,8 @@ class SITE_MAP(object):
                     self.__dict__[self.ALIAS[var]] = self.__dict__[var]
 
         else:
+            # Drop duplicates in site list
+            self.df.drop_duplicates(subset=['SiteCode'], inplace=True, ignore_index=True)
             self.Longitude = self.df.Longitude
             self.Latitude  = self.df.Latitude
 
