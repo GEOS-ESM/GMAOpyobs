@@ -171,11 +171,12 @@ class IMPROVE(object):
                     Start_Time_UTC.append(None)
                     continue # go to next ob
 
-                time_aware_local = local_timezone.localize(start_time, is_dst=None)
+                time_aware_local = local_timezone.localize(start_time, is_dst=False)
                 time_aware_utc = time_aware_local.astimezone(pytz.utc)
                 Start_Time_UTC.append(time_aware_utc)
 
             self.df['Start_Time_UTC'] = Start_Time_UTC
+            self.df['Start_Time'] = self.tyme
 
 
             # By default all is good if coordinates are ok
