@@ -670,19 +670,27 @@ class G2GAOP(object):
     def getPM(self,Species=None,pmsize=None,fixrh=None,aerodynamic=False,vacuum_aerodynamic=False):
         """
         Returns an xarray Dataset with total aerosol mass smaller than the prescribed size.
+        Please see m2_pm25.yaml and g2g_pm25.yaml for example yaml configurations.
 
-        Species:  None, str, or list. If None, all species on file,
-                  otherwise subset of emissions.
+        Species:  None, str, or list. Default is None.
+                  If None, all species on file will be summed, otherwise sum over a subset of species.
     
-        PMsize: float, particle diameter threshold in microns. If None, the total PM is calculated.
+        PMsize: None or float. Default is None.
+                Particle diameter threshold in microns.
+                If None the total PM is calculated.
 
-    	Please see m2_pm25.yaml and g2g_pm25.yaml for example yaml configurations.
+        fixrh: None or float. Default is None.
+               Relative humidity in percent to calculate PM.
+               If None will calculate PM at the model RH.
 
-        aerodynamic = use the continuum aerodynamic radius as the basis for size cutoff. 
-                      typically used for comparisons to surface sites
-        vacuum_aerodynamic = use the vacuum aerodynamic radius as the basis for size cutoff.
-                      used for comparison to aircraft AMS observations.
-        see deCarlo 2004 (DOI: 10.1080/027868290903907) for definitions of aerodynamic radius 
+        aerodynamic: bool. Default is False.
+                     Use the continuum aerodynamic radius as the basis for size cutoff.
+                     typically used for comparisons to surface sites
+        vacuum_aerodynamic: bool. Default is False.
+                            Use the vacuum aerodynamic radius as the basis for size cutoff.
+                            Used for comparison to aircraft AMS observations.
+
+        See deCarlo 2004 (DOI: 10.1080/027868290903907) for definitions of aerodynamic radius
 
         """
 
@@ -731,6 +739,7 @@ class G2GAOP(object):
         space = rh.shape
 
         pm = np.zeros(space)
+        wm = np.zeros(space)
         for s in Species:   # species
 
             if self.verbose:
@@ -793,29 +802,46 @@ class G2GAOP(object):
                 # this is based on a formulation from GEOS Chem 
                 # (https://wiki.seas.harvard.edu/geos-chem/index.php/Particulate_matter_in_GEOS-Chem)
                 # this is not the same hygroscopic growth factor that is in the GEOSmie optics files.
+                # It is the ratio of wet to dry mass.
+                # The change in radius between dry and wet conditions is treated
+                # as creating a shell of water for the purpose of calculating additional mass
+                # associated with the wet particle
                 rhow = 997.0  # density of water at 25 C and 1 atm in kg m-3
-                growthfactor= 1 + (((np.squeeze(rEff_) / np.squeeze(rEff_zero))**3 - 1) * (rhow / rhod_))
+                growthfactor= 1 + (((np.squeeze(rEff_) / np.squeeze(rEff_zero))**3 - 1) * (rhow / rhod_))  # mass wet/mass dry
                 #Compute PM
                 pm_ = q_conc * growthfactor * fPM * self.mieTable[s]['pmconversion']
                 pm += pm_
 
+                # save the mass that is water
+                waterfactor = 1 - (1./growthfactor)
+                wm += pm_ * waterfactor
+
                 bin += 1
                 
+
+        # Get the fraction of the total PM that is water
+        # ------------------------------------------------
+        # Pre-allocate an output array filled with zeros
+        result = np.zeros_like(pm)
+
+        # Perform division only where pm is not zero; otherwise, keep the value from 'out' (which is 0)
+        fwater = np.divide(wm, pm, out=result, where=pm != 0)
 
         # convert from kg m-3 to micrograms m-3
         # a more common unit for PM concentration
         # ---------------------------------------
         pm = pm*1e9
 
-
         # Attributes
         # ----------
-        A = dict (PM = {'long_name':'Particulate Matter', 'units':'microgram m-3'}
+        A = dict (PM = {'long_name':'Particulate Matter Mass', 'units':'microgram m-3'},
+                  FWATER={'long_name': 'Fraction of Particulate Matter Mass that is Water', 'units': 'none'}
                   )
         
         # Pack results into a Dataset
         # ---------------------------
-        DA = dict(  PM = xr.DataArray(pm.astype('float32'),dims=rh.dims,coords=rh.coords,attrs=A['PM'])
+        DA = dict(  PM = xr.DataArray(pm.astype('float32'),dims=rh.dims,coords=rh.coords,attrs=A['PM']),
+                    FWATER=xr.DataArray(fwater.astype('float32'), dims=rh.dims, coords=rh.coords, attrs=A['FWATER'])
                  )
 
         DA['DELP'] = dp
