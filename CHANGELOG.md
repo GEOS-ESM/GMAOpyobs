@@ -10,8 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 ### Added
+- added improve_sampler notebook example showing how to use the station sampler and aop.getPM function to compare MERRA-2 to IMPROVE surface measurements of PM2.5
+- added uv package management files pyproject.toml and uv.lock
+- added a new data variables output by getPM - the fraction of mass that is water
 
 ### Changed
+- updatde the improve.py reader to work for files obtained from CIRA.  the old files that are on calculon are no longer generated.
 
 ### Removed
 
