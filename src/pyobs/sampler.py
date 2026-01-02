@@ -15,6 +15,7 @@ from dateutil.parser import parse as isoparser
 from glob import glob
 
 from . import xrctl as xc
+import fsspec
 
 os.environ['HDF5_USE_FILE_LOCKING']='FALSE'
 
@@ -60,6 +61,10 @@ class STATION(object):
         if isinstance(dataset,xr.Dataset):
             self.ds = dataset # we are good to go...
 
+        #  if dataset is a parquet referece file
+        elif dataset[-4:] == 'parq':
+            fs = fsspec.filesystem("reference", fo=dataset, remote_protocol='file', lazy=True)
+            self.ds = xr.open_dataset(fs.get_mapper(), engine="zarr", backend_kwargs={"consolidated": False})        
         # If dataset is a list of files...
         # OR GrADS-style ctl
         # OR a glob type of template
@@ -136,7 +141,10 @@ class TRAJECTORY(object):
         # -------------------------------------------------
         if isinstance(dataset,xr.Dataset):
             self.ds = dataset # we are good to go...
-
+        #  if dataset is a parquet referece file
+        elif dataset[-4:] == 'parq':
+            fs = fsspec.filesystem("reference", fo=dataset, remote_protocol='file', lazy=True)
+            self.ds = xr.open_dataset(fs.get_mapper(), engine="zarr", backend_kwargs={"consolidated": False})
         # If dataset is a list of files...
         # OR GrADS-style ctl 
         # OR a glob type of template
