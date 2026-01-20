@@ -1274,7 +1274,7 @@ def granules ( path, algo, sat, syn_time, coll='011', nsyn=8, verbose=False ):
     while t < t2:
         if t >= t1:
             doy = t.timetuple()[7]
-            basen = "%s/%s/%s/%04d/%03d/%s_L2_VIIRS_%s.A%04d%03d.%02d%02d.%s.*.nc"\
+            basen = "%s/%s/%s/%04d/%03d/*%s_L2_VIIRS_%s.A%04d%03d.%02d%02d.%s.*.nc"\
                      %(path,sat_prod,coll,t.year,doy,prod,sat,t.year,doy,t.hour,t.minute,coll)
             try:
                 filen = glob(basen)[0]
