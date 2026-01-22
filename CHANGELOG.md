@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Minor template name change for ease of integration in ADAS
+
 ### Removed
 
 ### Deprecated
