@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 ### Added
+- made an update in ICARTT reader to allow additional vertical altitude names
+- created a simple CALIPSO L3 reader
 
 ### Changed
 
