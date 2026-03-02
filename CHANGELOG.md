@@ -8,14 +8,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 # [Unreleased] - yyyy-mm-dd
 
 ### Fixed
+### Added
+### Changed
+### Remoed
+### Deprecated
+
+# [1.7.0] - yyyy-mm-dd
+
+### Fixed
+- fixed vx04 reader. empty object is now returned when DB and DT granules do not align. 
 
 ### Added
-
-### Changed
-
-### Removed
-
-### Deprecated
+- made an update in ICARTT reader to allow additional vertical altitude names
+- created a simple CALIPSO L3 reader
 
 # [v1.6.0] - 2026-01-22
 ### Added

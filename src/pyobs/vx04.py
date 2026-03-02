@@ -610,7 +610,11 @@ class Vx04_L2(object):
         """
         for db_item,dt_item in zip(DB_List,DT_List):
             if os.path.isfile(db_item):
-                self._readGranuleDB_DT(db_item,dt_item)
+                try:
+                    self._readGranuleDB_DT(db_item,dt_item)
+                except ValueError as e:
+                    print(f"Stopping processing: {e}")
+                    return  # This stops processing the rest of the files
             else:
                 print("%s is not a valid file or directory, ignoring it"%db_item)
 
@@ -751,9 +755,8 @@ class Vx04_L2(object):
             # check that DT granule aligns with DB granule
             # if not, return empty
             if len(v) != len(self.Longitude[-1]):
-                print("Dark Target and Deep Blue granules do not align")
                 self.Scattering_Angle = []
-                return
+                raise ValueError("DT and DB granules do not align - stopping processing")
 
             self.__dict__[sds].append(v)
 
@@ -777,9 +780,8 @@ class Vx04_L2(object):
                 # check that DT granule aligns with DB granule
                 # if not, return empty
                 if len(v) != len(self.Longitude[-1]):
-                    print("Dark Target and Deep Blue granules do not align")
                     self.Scattering_Angle = []
-                    return
+                    raise ValueError("DT and DB granules do not align - stopping processing")
 
                 self.__dict__[sds+'_DT'].append(v)
 
