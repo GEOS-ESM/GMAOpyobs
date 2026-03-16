@@ -42,6 +42,12 @@ DU:
     - DU003
     - DU004
     - DU005
+  bin:
+    - 1
+    - 2
+    - 3
+    - 4
+    - 5
   shapefactor: 1.4
   rhod:
     - 2500
@@ -61,6 +67,12 @@ SS:
     - SS003
     - SS004
     - SS005
+  bin:
+    - 1
+    - 2
+    - 3
+    - 4
+    - 5
   shapefactor: 1
   rhod:
     - 2200
@@ -77,6 +89,9 @@ OC:
   tracers:
     - OCPHOBIC
     - OCPHILIC
+  bin:
+    - 1
+    - 2
   shapefactor: 1
   rhod:
     - 1800
@@ -89,6 +104,9 @@ BC:
   tracers:
     - BCPHOBIC
     - BCPHILIC
+  bin:
+    - 1
+    - 2
   shapefactor: 1
   rhod:
     - 1800
@@ -101,6 +119,9 @@ BR:
   tracers:
     - BRCPHOBIC
     - BRCPHILIC
+  bin:
+    - 1
+    - 2
   shapefactor: 1
   rhod:
     - 1800
@@ -112,6 +133,8 @@ SU:
   bandFile: ExtData/chemistry/AerosolOptics/v1.0.0/x/opticsBands_SU.v1_3.RRTMG.nc4
   tracers:
     - SO4
+  bin:
+    - 1
   shapefactor: 1
   rhod:
     - 1700
@@ -124,6 +147,10 @@ NI:
     - NO3AN1
     - NO3AN2
     - NO3AN3
+  bin:
+    - 1
+    - 2
+    - 3
   shapefactor: 1
   rhod:
     - 1725
@@ -322,8 +349,11 @@ class G2GAOP(object):
             Tracers = self.mieTable[s]['tracers']
             mie = self.mieTable[s]['mie']
 
-            bin = 1
-            for q in Tracers:
+            bins = self.mieTable[s].get('bin',[])
+            if not bins:
+                bins = list(range(1,len(Tracers)+1))
+            
+            for q,bin in zip(Tracers,bins):
 
                 if self.verbose:
                     print('   -',q)
@@ -356,8 +386,6 @@ class G2GAOP(object):
 
                     g   += sca_ * g_
 
-
-                bin += 1
 
         # Final normalization of SSA and g
         # protect against divide by zero
@@ -497,8 +525,11 @@ class G2GAOP(object):
             Tracers = self.mieTable[s]['tracers']
             mie = self.mieTable[s]['mie']
 
-            bin = 1
-            for q in Tracers:
+            bins = self.mieTable[s].get('bin',[])
+            if not bins:
+                bins = list(range(1,len(Tracers)+1))
+
+            for q,bin in zip(Tracers,bins):
 
                 if self.verbose:
                     print('   -',q)
@@ -521,7 +552,6 @@ class G2GAOP(object):
                 depol1 += (pback11_-pback22_) * sca_
                 depol2 += (pback11_+pback22_) * sca_
 
-                bin += 1
 
         if doaback:
             # Compute Molecular Scattering and Total Attenuated Backscatter Coefficient
@@ -748,8 +778,14 @@ class G2GAOP(object):
             Tracers = self.mieTable[s]['tracers']
             mie = self.mieTable[s]['mie']
 
-            bin = 1
-            for q in Tracers:
+            bins = self.mieTable[s].get('bin',[])
+            if not bins:
+                bins = list(range(1,len(Tracers)+1))
+
+            # Dry aerosol density in kg m-3
+            # rhod is not in all of the standard optics files, and is for now read from the yaml config
+            rhod = self.mieTable[s]['rhod']
+            for q,bin,rhod_ in zip(Tracers,bins,rhod):
 
                 if self.verbose:
                     print('   -',q)
@@ -758,10 +794,7 @@ class G2GAOP(object):
                 # Aerosol mass concentration in kg/m3                
                 q_conc = (a['AIRDENS'] * a[q]).values
   
-                # Dry aerosol density in kg m-3
-                # rhod is not in all of the standard optics files, and is for now read from the yaml config 
                 # rhod_ = mie.getAOP('rhod',  bin, rh, wavelength=wavelength).values
-                rhod_ = self.mieTable[s]['rhod'][bin-1] 
 
                 # Lower and upper bound of the bin's radius converted from meters to microns
                 rLow_ = mie.getBinInfo('rLow', bin)*1000000 
@@ -816,8 +849,6 @@ class G2GAOP(object):
                 waterfactor = 1 - (1./growthfactor)
                 wm += pm_ * waterfactor
 
-                bin += 1
-                
 
         # Get the fraction of the total PM that is water
         # ------------------------------------------------
