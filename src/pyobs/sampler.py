@@ -17,6 +17,7 @@ from glob import glob
 
 from . import xrctl as xc
 import fsspec
+import dask.distributed
 
 os.environ['HDF5_USE_FILE_LOCKING']='FALSE'
 
@@ -61,8 +62,9 @@ class STATION(object):
         # -------------------------------------------------
         if isinstance(dataset,xr.Dataset):
             self.ds = dataset # we are good to go...
-
-        #  if dataset is a parquet referece file
+        elif isinstance(dataset,dask.distributed.Future):
+            self.ds = xr.open_dataset(dataset, engine="zarr",chunks=chunks, backend_kwargs={"consolidated": False})
+        #  if dataset is a parquet referece file path
         elif dataset[-4:] == 'parq':
             fs = fsspec.filesystem("reference", fo=dataset, remote_protocol='file', lazy=True)
             self.ds = xr.open_dataset(fs.get_mapper(), engine="zarr",chunks=chunks, backend_kwargs={"consolidated": False})        
