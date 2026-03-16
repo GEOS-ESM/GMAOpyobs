@@ -9,8 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 ### Added
+- add optional explicit bin ordering to aop.py yaml. this allows for calculating AOP's for a single bin, or subset of bins
+
 ### Changed
-### Remoed
+- use xesmf regridder to station sampling. this is more efficient that using xarray native interp
+
+### Removed
 ### Deprecated
 
 # [1.7.0] - yyyy-mm-dd
