@@ -19,7 +19,7 @@ from pyobs.npz import NPZ
 from binObs_   import binobs2d, binobs3d, binobscnt3d
 
 try:
-    from pyods import ODS # must be inported before pyhdf
+    from pyods import ODS # must be imported before pyhdf
 except:
     pass
 
@@ -383,7 +383,7 @@ class Vx04_L2(object):
        # only keep DB obs when there is not a good DT retrieval
        if use_DT_filter:
            DT_Good = (self.Land_Ocean_Quality_Flag_DT == BEST) & (~self.Corrected_Optical_Depth_Land_DT.mask[:,1])
-           if type(self.Scattering_Angle_DT.mask) is not np.bool:
+           if not isinstance(self.Scattering_Angle_DT.mask, (bool, np.bool_)):
                DT_Good = DT_Good & ~self.Scattering_Angle_DT.mask
            self.iGood = self.iGood & ~DT_Good
 
@@ -610,7 +610,11 @@ class Vx04_L2(object):
         """
         for db_item,dt_item in zip(DB_List,DT_List):
             if os.path.isfile(db_item):
-                self._readGranuleDB_DT(db_item,dt_item)
+                try:
+                    self._readGranuleDB_DT(db_item,dt_item)
+                except ValueError as e:
+                    print(f"Stopping processing: {e}")
+                    return  # This stops processing the rest of the files
             else:
                 print("%s is not a valid file or directory, ignoring it"%db_item)
 
@@ -751,9 +755,8 @@ class Vx04_L2(object):
             # check that DT granule aligns with DB granule
             # if not, return empty
             if len(v) != len(self.Longitude[-1]):
-                print("Dark Target and Deep Blue granules do not align")
                 self.Scattering_Angle = []
-                return
+                raise ValueError("DT and DB granules do not align - stopping processing")
 
             self.__dict__[sds].append(v)
 
@@ -777,9 +780,8 @@ class Vx04_L2(object):
                 # check that DT granule aligns with DB granule
                 # if not, return empty
                 if len(v) != len(self.Longitude[-1]):
-                    print("Dark Target and Deep Blue granules do not align")
                     self.Scattering_Angle = []
-                    return
+                    raise ValueError("DT and DB granules do not align - stopping processing")
 
                 self.__dict__[sds+'_DT'].append(v)
 
@@ -1274,7 +1276,7 @@ def granules ( path, algo, sat, syn_time, coll='011', nsyn=8, verbose=False ):
     while t < t2:
         if t >= t1:
             doy = t.timetuple()[7]
-            basen = "%s/%s/%s/%04d/%03d/%s_L2_VIIRS_%s.A%04d%03d.%02d%02d.%s.*.nc"\
+            basen = "%s/%s/%s/%04d/%03d/*%s_L2_VIIRS_%s.A%04d%03d.%02d%02d.%s.*.nc"\
                      %(path,sat_prod,coll,t.year,doy,prod,sat,t.year,doy,t.hour,t.minute,coll)
             try:
                 filen = glob(basen)[0]
@@ -1336,10 +1338,10 @@ def granulePairs ( path, sat, syn_time, collDT='002', collDB='002',nsyn=8, verbo
     while t < t2:
         if t >= t1:
             doy = t.timetuple()[7]
-            basenDT = "%s/%s/%s/%04d/%03d/%s_L2_VIIRS_%s.A%04d%03d.%02d%02d.%s.*.nc"\
+            basenDT = "%s/%s/%s/%04d/%03d/*%s_L2_VIIRS_%s.A%04d%03d.%02d%02d.%s.*.nc"\
                      %(path,sat_prodDT,collDT,t.year,doy,prodDT,sat,t.year,doy,t.hour,t.minute,collDT)
 
-            basenDB = "%s/%s/%s/%04d/%03d/%s_L2_VIIRS_%s.A%04d%03d.%02d%02d.%s.*.nc"\
+            basenDB = "%s/%s/%s/%04d/%03d/*%s_L2_VIIRS_%s.A%04d%03d.%02d%02d.%s.*.nc"\
                      %(path,sat_prodDB,collDB,t.year,doy,prodDB,sat,t.year,doy,t.hour,t.minute,collDB)
             if (len(glob(basenDT)) > 0) and (len(glob(basenDB)) > 0):
                 filenDT = sorted(glob(basenDT))[0]

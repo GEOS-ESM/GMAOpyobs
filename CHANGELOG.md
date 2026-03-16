@@ -8,7 +8,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 # [Unreleased] - yyyy-mm-dd
 
 ### Fixed
+### Added
+### Changed
+### Remoed
+### Deprecated
 
+# [1.7.0] - yyyy-mm-dd
+
+### Fixed
+- fixed vx04 reader. empty object is now returned when DB and DT granules do not align. 
+
+### Added
+- made an update in ICARTT reader to allow additional vertical altitude names
+- created a simple CALIPSO L3 reader
+
+# [v1.6.0] - 2026-01-22
 ### Added
 - added improve_sampler notebook example showing how to use the station sampler and aop.getPM function to compare MERRA-2 to IMPROVE surface measurements of PM2.5
 - added uv package management files pyproject.toml and uv.lock
@@ -16,10 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - updatde the improve.py reader to work for files obtained from CIRA.  the old files that are on calculon are no longer generated.
-
-### Removed
-
-### Deprecated
+- Minor template name change for ease of integration in ADAS
 
 # [v1.5.0] - 2025-12-03
 
