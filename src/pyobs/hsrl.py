@@ -171,8 +171,8 @@ class HSRL(object):
         # -----------------------------------------------
         if self.nt != self.date.shape[0]:
           date_ = self.date[0,0]
-          yy = int(date_)/10000
-          mm = (int(date_) - yy * 10000)/100
+          yy = int(date_)//10000
+          mm = (int(date_) - yy * 10000)//100
           dd = int(date_) - yy*10000 - mm*100
           dates = '%02d/%02d/%4d'%(mm,dd,yy)
           self.date = np.array([dates for i in range(self.nt)])
