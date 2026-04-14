@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 # [Unreleased] - yyyy-mm-dd
 
 ### Fixed
+- update hsrl.py to use py3 integer divide. fixes date parsing.
+  
 ### Added
 - add optional explicit bin ordering to aop.py yaml. this allows for calculating AOP's for a single bin, or subset of bins
 
