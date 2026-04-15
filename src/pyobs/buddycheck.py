@@ -859,3 +859,28 @@ if __name__ == "__main__":
         station_meta=station_meta,
         config=config,
     )
+
+    # make diagnostic plot of station with hightest score
+    
+    # Rank Stations
+    station_scores_df.sort_values("suspect_score", ascending=False).head()
+
+    fig = plot_station_diagnostic(
+            station_id="ST001",
+            buddy_time_df=buddy_time_df,
+            station_meta=station_meta,
+            outpath="plots/ST001_diagnostic.png",
+        )
+
+    fig.show()
+
+    files = plot_flagged_stations(
+        station_scores_df=station_scores_df,
+        buddy_time_df=buddy_time_df,
+        station_meta=station_meta,
+        outdir="plots/flagged_stations",
+        only_flagged=True,
+        )
+
+
+
