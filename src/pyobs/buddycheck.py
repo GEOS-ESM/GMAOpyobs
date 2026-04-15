@@ -4,7 +4,9 @@ import numpy as np
 import pandas as pd
 from scipy.spatial import cKDTree
 from dataclasses import dataclass
-
+import math
+import matplotlib.pyplot as plt
+from pathlib import Path
 
 @dataclass
 class InnovationBuddyConfig:
@@ -409,12 +411,6 @@ def add_innovation_station_score(
         x["review_flag"] = False
 
     return x
-
-
-import math
-import matplotlib.pyplot as plt
-from pathlib import Path
-
 
 def _get_station_row(station_meta: pd.DataFrame, station_id: str) -> pd.Series:
     row = station_meta.loc[station_meta["station_id"] == station_id]
