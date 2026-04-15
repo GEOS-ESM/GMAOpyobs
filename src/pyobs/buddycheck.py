@@ -1,3 +1,137 @@
+"""
+Functions for quality control of surface observations using a "buddy-check" algorithm
+The algorithm is based on statistical analysis of innovations == observation - model and comparisons to
+innovations of a stations buddies (nearby station).  This is called an innovation-buddy residual == how 
+different your station is from neighbors after removing the model signal.
+
+These are the various innovation features analyzed
+1. Basic innovation features (station vs model)
+
+- mean_innov : average difference between station and model
+    Asks: Is this station usually higher or lower than the model?
+    Reasons for large value: badly sighted station, model bias (missing process or source), terrain mismatch
+
+- median_innov: typical difference between station and model (less sensitive to spikes)
+    Asks: What is the typical offset from the model?
+    Same as idea as mean_innov, but more robust
+
+- std_innov: how much the station-model difference varies
+    Asks: Is the disgreement with the model stable or erratic?
+
+- rmse_innov: overall magnitude of disgreement with the model
+    Asks: How big are the station-model differenes on average?
+
+2. Innovation vs buddies
+
+These features compare a station to nearby stations after removing the model signal
+
+- mean_innov_buddy_resid: average difference between a station's innovation and nearby station innovations
+    Asks: Is this station consistently different from its neighbors?
+    Key signal of a bad station
+
+- median_innov_buddy_resid: typical difference from neighbors (less sensitive to spikes)
+    Asks: What is the usual offset from nearby stations?
+    Same idea as mean_innov_buddy_resid but more robust
+
+- std_innov_buddy_resid: How variable is the disagreement with the neighbors?
+    Asks: Does this station behave consistently relative to neighbors?
+
+- rmse_innov_buddy_resid: overall magnitude of disagreement with neighbors
+    Asks: How far is this station from neighbors on average?
+
+- mean_abs_innov_buddy_resid: average absolute difference from neighbors
+    Asks: Ignoring sign, how different is this station from nearby stations?
+
+- mean_abs_innov_buddy_z: difference from neighbors normalized by how varibale the neighborhood is
+    Asks: Is this station unusual compared to how much nearby stations vary?
+    z = (innovation - buddy_innovation)/buddy_spread
+    
+3. Outlier Behavior - captures how often stations behave unusually
+
+- frac_large_buddy_outlier: fraction of times the station strongly disagrees with its own typical behavior
+    Asks: how often does this station act like an outlier?
+
+4. Correlation features - does a station behave like its neighbors
+
+- innov_buddy_corr: correlation between station innovation and neighbor innovation
+    Asks: does this station follow the same ups and downs as nearby stations?
+
+- obs_model_corr: correlation between station and model
+    Asks: does this station follow the models variability
+
+- obs_buddy_obs_corr: correlation between station and nearby stations (raw observations)
+    Asks: does this station track nearby stations directly?
+
+5. Diurnal behavior
+
+- diurnal_amp_innov: diurnal cycle amplitude of station-model difference
+    Asks: does the station model difference vary strongly over the day?
+
+- diurnal_amp_innov_buddy_resid: diurnal cycle amplitude of difference from neighbors
+    Asks: does this station behave differently from neighbors at certain times of day?
+
+6. Data coverage/reliability
+- n_total: total number of observations
+
+- n_valid_buddy: number of times we had enough nearby stations
+
+- buddy_coverage_frac: fraction of time with valid buddy comparisons
+
+- mean_n_buddies: average number of nearby stations used
+
+7. Derived scoring features that are used in final score
+
+These are just transformations of the above features that
+are designed to make everything comparable.  The derived features
+put everything in a "badness" direction (higher = worse), make the metrics scale comparable,
+and emphasize magnitude not sign
+
+- f_bias_vs_model: absolute mean differencee from model
+    f_bias_vs_model = abs(mean_innov)
+
+- f_bias_vs_buddies: absolute mean difference from neighbors
+    f_bias_vs_buddies = abs(mean_innov_buddy_resid)
+
+- f_rmse_vs_buddies: RMSE vs neighbors
+    f_rmse_vs_buddies = rmse_innov_buddy_resid
+
+- f_abs_vs_buddies: mean absolute difference vs neighbors
+    f_abs_vs_buddies = mean_abs_innov_buddy_resid
+
+- f_norm_vs_buddies: normalized difference vs neighbors
+    f_norm_vs_buddies = mean_abs_innov_buddy_z
+    
+- f_frac_outlier:  fraction of large deviations
+    f_frac_outlier = frac_large_buddy_outlier
+
+- f_diurnal: diurnal mismatch vs neighbors
+    f_diurnal = abs(diurnal_amp_innov_buddy_resid)
+
+- f_corr_innov_buddy: correlation with neighbors
+    f_corr_innov_buddy = 1 - innov_buddy_corr
+
+- f_corr_model: correlation with model
+    f_corr_model = 1 - obs_model_error
+
+A problematic station would show:
+ - large bias vs neighbors
+ - large RMSE vs neighbors
+ - high outlier frequency
+ - low correlation with neighbors
+ - abnormal diurnal mismatch
+
+The f scoring features are all normalized to a z score individually so all features are unitless and comparable
+z_f = 0.6745 * (f - median) / MAD
+
+MAD = median absolute deviation = median(abs(x_i - median(x)))
+
+The factor 0.6745 is to make MAD behave like standard deviation (MAD ~= 0.6745*sigma), so results are roughly 
+comparable to z scores, but more robust to outliers
+
+the z scores are weighted summed to produce a final score.  (Negative values are clipped to zero, so that negative values can't outweight positive values - positive values indicate unusual deviations from neighbors).
+
+"""
+
 from __future__ import annotations
 
 import numpy as np
