@@ -4,7 +4,6 @@ import numpy as np
 import pandas as pd
 from scipy.spatial import cKDTree
 from dataclasses import dataclass
-from typing import Optional
 
 
 @dataclass
@@ -376,6 +375,7 @@ def add_innovation_station_score(
         med = x[col].median(skipna=True)
         mad = np.median(np.abs(x[col].dropna() - med)) if x[col].notna().any() else np.nan
 
+        # normalize each statistic into a z-score
         if pd.isna(mad) or mad == 0:
             x[f"z_{col}"] = 0.0
         else:
@@ -414,7 +414,7 @@ def add_innovation_station_score(
 def score_stations_innovation_based(
     obs_df: pd.DataFrame,
     station_meta: pd.DataFrame,
-    config: Optional[InnovationBuddyConfig] = None
+    config: InnovationBuddyConfig | None = None
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """
     End-to-end innovation-based station scoring.
@@ -447,3 +447,21 @@ def score_stations_innovation_based(
     )
 
     return buddy_time_df, station_scores_df
+
+
+if __name__ == "__main__":
+
+    config = InnovationBuddyConfig(
+                radius_km=75.0,
+                min_neighbors=3,
+                distance_scale_km=50.0
+                buddy_method="weighted_mean",
+                outlier_sigma_thresh=2.5,
+                min_valid_buddy_count=30,
+    )
+
+    buddy_time_df, station_scores_df = score_station_innovation_based(
+        obs_df=obs_df,
+        station_meta=station_meta,
+        config=config,
+    )
