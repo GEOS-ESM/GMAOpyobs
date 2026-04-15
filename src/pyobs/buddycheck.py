@@ -141,6 +141,8 @@ from dataclasses import dataclass
 import math
 import matplotlib.pyplot as plt
 from pathlib import Path
+import cartopy.crs as ccrs
+import cartopy.feature as cfeature
 
 @dataclass
 class InnovationBuddyConfig:
@@ -517,6 +519,9 @@ def add_innovation_station_score(
         else:
             x[f"z_{col}"] = 0.6745 * (x[col] - med) / mad
 
+        # if a feature is missing, make it zero
+        x[f"z_{col}"] = x[f"z_{col}"].fillna(0.0)
+
     # Composite score
     x["suspect_score"] = (
         1.0 * x["z_f_bias_vs_model"].clip(lower=0) +
@@ -644,7 +649,7 @@ def plot_station_diagnostic(
     ax2 = fig.add_subplot(gs[1, 0])
     ax3 = fig.add_subplot(gs[1, 1])
     ax4 = fig.add_subplot(gs[2, 0])
-    ax5 = fig.add_subplot(gs[2, 1])
+    ax5 = fig.add_subplot(gs[2, 1], projection=ccrs.PlateCarree())
 
     # Panel 1: obs and model
     ax1.plot(s["time"], s["obs"], label="Obs")
@@ -695,16 +700,36 @@ def plot_station_diagnostic(
     ax4.set_ylabel("Count")
     ax4.grid(True, alpha=0.3)
 
-    # Panel 5: simple map
-    ax5.scatter(station_meta["lon"], station_meta["lat"], s=12, alpha=0.25, label="All stations")
+    # Panel 5: Map with country boundaries
+    
+    # Add map background features (Borders, Coastlines, Land, Ocean)
+    ax5.add_feature(cfeature.LAND, facecolor='lightgray', alpha=0.3)
+    ax5.add_feature(cfeature.OCEAN, facecolor='aliceblue', alpha=0.3)
+    ax5.add_feature(cfeature.COASTLINE, linewidth=0.8)
+    ax5.add_feature(cfeature.BORDERS, linestyle=':', linewidth=0.8)
+
+    # Add transform=ccrs.PlateCarree() to all scatters so Cartopy knows these are lat/lon coordinates
+    ax5.scatter(station_meta["lon"], station_meta["lat"], s=12, alpha=0.25, 
+                transform=ccrs.PlateCarree(), label="All stations")
+    
     if not map_neighbors.empty:
-        ax5.scatter(map_neighbors["lon"], map_neighbors["lat"], s=28, label="Nearby stations")
-    ax5.scatter([lon0], [lat0], s=80, marker="*", label=f"Target: {station_id}")
+        ax5.scatter(map_neighbors["lon"], map_neighbors["lat"], s=28, 
+                    transform=ccrs.PlateCarree(), label="Nearby stations")
+        
+    ax5.scatter([lon0], [lat0], s=80, marker="*", color='red',
+                transform=ccrs.PlateCarree(), label=f"Target: {station_id}")
+    
     ax5.set_title("Station location and nearby stations")
-    ax5.set_xlabel("Longitude")
-    ax5.set_ylabel("Latitude")
-    ax5.grid(True, alpha=0.3)
-    ax5.legend()
+    
+    # Optional: Zoom the map in around your target station (e.g., +/- 10 degrees)
+    # ax5.set_extent([lon0 - 10, lon0 + 10, lat0 - 10, lat0 + 10], crs=ccrs.PlateCarree())
+
+    # Cartopy handles gridlines and labels slightly differently than standard matplotlib
+    gl = ax5.gridlines(draw_labels=True, alpha=0.3, linestyle='--')
+    gl.top_labels = False    # Turn off labels on the top edge
+    gl.right_labels = False  # Turn off labels on the right edge
+    
+    ax5.legend(loc='best')
 
     # Summary text
     mean_innov = float(s["innov"].mean())
@@ -848,13 +873,13 @@ if __name__ == "__main__":
     config = InnovationBuddyConfig(
                 radius_km=75.0,
                 min_neighbors=3,
-                distance_scale_km=50.0
+                distance_scale_km=50.0,
                 buddy_method="weighted_mean",
                 outlier_sigma_thresh=2.5,
                 min_valid_buddy_count=30,
     )
 
-    buddy_time_df, station_scores_df = score_station_innovation_based(
+    buddy_time_df, station_scores_df = score_stations_innovation_based(
         obs_df=obs_df,
         station_meta=station_meta,
         config=config,
