@@ -411,6 +411,270 @@ def add_innovation_station_score(
     return x
 
 
+import math
+import matplotlib.pyplot as plt
+from pathlib import Path
+
+
+def _get_station_row(station_meta: pd.DataFrame, station_id: str) -> pd.Series:
+    row = station_meta.loc[station_meta["station_id"] == station_id]
+    if row.empty:
+        raise ValueError(f"station_id {station_id!r} not found in station_meta")
+    return row.iloc[0]
+
+
+def _get_station_neighbors_from_meta(
+    station_meta: pd.DataFrame,
+    station_id: str,
+    radius_deg: float = 1.5,
+) -> pd.DataFrame:
+    """
+    Simple fallback map-neighbor selection in lat/lon degrees for plotting only.
+    This is not used for QC calculations, just for showing nearby stations on the map.
+    """
+    srow = _get_station_row(station_meta, station_id)
+    lat0 = float(srow["lat"])
+    lon0 = float(srow["lon"])
+
+    x = station_meta.copy()
+    x = x[x["station_id"] != station_id].copy()
+    x["dlat"] = x["lat"] - lat0
+    x["dlon"] = x["lon"] - lon0
+
+    # crude local distance in degrees for plotting
+    x["rdeg"] = np.sqrt(x["dlat"] ** 2 + x["dlon"] ** 2)
+    x = x[x["rdeg"] <= radius_deg].copy()
+    return x.sort_values("rdeg")
+
+
+def plot_station_diagnostic(
+    station_id: str,
+    buddy_time_df: pd.DataFrame,
+    station_meta: pd.DataFrame,
+    outpath: str | Path | None = None,
+    max_map_buddies: int = 20,
+    time_start: str | None = None,
+    time_end: str | None = None,
+):
+    """
+    Plot a diagnostic panel for one station.
+
+    Parameters
+    ----------
+    station_id : str
+        Station to plot
+    buddy_time_df : DataFrame
+        Output from score_stations_innovation_based(...)[0]
+        Required columns:
+          station_id, time, obs, model, innov,
+          buddy_innov, innov_buddy_resid, buddy_innov_spread, n_buddies
+    station_meta : DataFrame
+        Must contain station_id, lat, lon
+    outpath : str or Path, optional
+        If given, save figure there
+    max_map_buddies : int
+        Max number of nearby stations to show on the map
+    time_start, time_end : str, optional
+        Optional time range filter
+    """
+    required = {
+        "station_id", "time", "obs", "model", "innov",
+        "buddy_innov", "innov_buddy_resid", "buddy_innov_spread", "n_buddies"
+    }
+    missing = required - set(buddy_time_df.columns)
+    if missing:
+        raise ValueError(f"buddy_time_df missing required columns: {missing}")
+
+    df = buddy_time_df.copy()
+    df["time"] = pd.to_datetime(df["time"])
+
+    if time_start is not None:
+        df = df[df["time"] >= pd.to_datetime(time_start)]
+    if time_end is not None:
+        df = df[df["time"] <= pd.to_datetime(time_end)]
+
+    s = df[df["station_id"] == station_id].copy().sort_values("time")
+    if s.empty:
+        raise ValueError(f"No rows found for station_id {station_id!r}")
+
+    s_valid = s.dropna(subset=["buddy_innov", "innov_buddy_resid"]).copy()
+
+    station_row = _get_station_row(station_meta, station_id)
+    lat0 = float(station_row["lat"])
+    lon0 = float(station_row["lon"])
+
+    map_neighbors = _get_station_neighbors_from_meta(station_meta, station_id)
+    if len(map_neighbors) > max_map_buddies:
+        map_neighbors = map_neighbors.iloc[:max_map_buddies].copy()
+
+    fig = plt.figure(figsize=(14, 10))
+    gs = fig.add_gridspec(3, 2, height_ratios=[1.1, 1.0, 1.0], hspace=0.35, wspace=0.25)
+
+    ax1 = fig.add_subplot(gs[0, :])
+    ax2 = fig.add_subplot(gs[1, 0])
+    ax3 = fig.add_subplot(gs[1, 1])
+    ax4 = fig.add_subplot(gs[2, 0])
+    ax5 = fig.add_subplot(gs[2, 1])
+
+    # Panel 1: obs and model
+    ax1.plot(s["time"], s["obs"], label="Obs")
+    ax1.plot(s["time"], s["model"], label="Model")
+    ax1.set_title(f"Station {station_id}: observation and model")
+    ax1.set_ylabel("Value")
+    ax1.grid(True, alpha=0.3)
+    ax1.legend()
+
+    # Panel 2: innovations and buddy innovations
+    ax2.plot(s["time"], s["innov"], label="Innovation (obs-model)")
+    if not s_valid.empty:
+        ax2.plot(s_valid["time"], s_valid["buddy_innov"], label="Buddy innovation")
+    ax2.axhline(0.0, linewidth=1)
+    ax2.set_title("Innovation vs buddy innovation")
+    ax2.set_ylabel("Innovation")
+    ax2.grid(True, alpha=0.3)
+    ax2.legend()
+
+    # Panel 3: innovation-buddy residual
+    if not s_valid.empty:
+        ax3.plot(s_valid["time"], s_valid["innov_buddy_resid"], label="Innov - buddy innov")
+        if "buddy_innov_spread" in s_valid.columns:
+            spread = s_valid["buddy_innov_spread"].fillna(0.0)
+            ax3.fill_between(
+                s_valid["time"],
+                -spread,
+                spread,
+                alpha=0.2,
+                label="± buddy spread",
+            )
+    ax3.axhline(0.0, linewidth=1)
+    ax3.set_title("Innovation minus buddy innovation")
+    ax3.set_ylabel("Residual")
+    ax3.grid(True, alpha=0.3)
+    ax3.legend()
+
+    # Panel 4: histogram
+    if not s_valid.empty:
+        vals = s_valid["innov_buddy_resid"].dropna().to_numpy()
+        if len(vals) > 0:
+            ax4.hist(vals, bins=min(30, max(10, int(math.sqrt(len(vals))))))
+            ax4.axvline(np.nanmean(vals), linestyle="--", label=f"mean={np.nanmean(vals):.2f}")
+            ax4.axvline(np.nanmedian(vals), linestyle=":", label=f"median={np.nanmedian(vals):.2f}")
+            ax4.legend()
+    ax4.set_title("Distribution of innovation-buddy residual")
+    ax4.set_xlabel("Innov - buddy innov")
+    ax4.set_ylabel("Count")
+    ax4.grid(True, alpha=0.3)
+
+    # Panel 5: simple map
+    ax5.scatter(station_meta["lon"], station_meta["lat"], s=12, alpha=0.25, label="All stations")
+    if not map_neighbors.empty:
+        ax5.scatter(map_neighbors["lon"], map_neighbors["lat"], s=28, label="Nearby stations")
+    ax5.scatter([lon0], [lat0], s=80, marker="*", label=f"Target: {station_id}")
+    ax5.set_title("Station location and nearby stations")
+    ax5.set_xlabel("Longitude")
+    ax5.set_ylabel("Latitude")
+    ax5.grid(True, alpha=0.3)
+    ax5.legend()
+
+    # Summary text
+    mean_innov = float(s["innov"].mean())
+    rmse_innov = float(np.sqrt(np.mean(s["innov"] ** 2)))
+    if not s_valid.empty:
+        mean_ib = float(s_valid["innov_buddy_resid"].mean())
+        rmse_ib = float(np.sqrt(np.mean(s_valid["innov_buddy_resid"] ** 2)))
+        frac_pos = float((s_valid["innov_buddy_resid"] > 0).mean())
+        n_valid = len(s_valid)
+    else:
+        mean_ib = np.nan
+        rmse_ib = np.nan
+        frac_pos = np.nan
+        n_valid = 0
+
+    subtitle = (
+        f"lat={lat0:.3f}, lon={lon0:.3f}   |   "
+        f"N={len(s)} times, valid buddy={n_valid}   |   "
+        f"mean innov={mean_innov:.3f}, RMSE innov={rmse_innov:.3f}   |   "
+        f"mean innov-buddy={mean_ib:.3f}, RMSE innov-buddy={rmse_ib:.3f}, "
+        f"frac positive={frac_pos:.2f}"
+    )
+    fig.suptitle(subtitle, y=0.98, fontsize=10)
+
+    if outpath is not None:
+        outpath = Path(outpath)
+        outpath.parent.mkdir(parents=True, exist_ok=True)
+        fig.savefig(outpath, dpi=150, bbox_inches="tight")
+
+    return fig
+
+
+def plot_flagged_stations(
+    station_scores_df: pd.DataFrame,
+    buddy_time_df: pd.DataFrame,
+    station_meta: pd.DataFrame,
+    outdir: str | Path,
+    station_id_col: str = "station_id",
+    score_col: str = "suspect_score",
+    flag_col: str = "review_flag",
+    top_n: int | None = None,
+    only_flagged: bool = True,
+    time_start: str | None = None,
+    time_end: str | None = None,
+):
+    """
+    Generate diagnostic plots for multiple stations.
+
+    Parameters
+    ----------
+    station_scores_df : DataFrame
+        Output from score_stations_innovation_based(...)[1]
+    buddy_time_df : DataFrame
+        Output from score_stations_innovation_based(...)[0]
+    station_meta : DataFrame
+        Must contain station_id, lat, lon
+    outdir : path-like
+        Directory where PNG files will be saved
+    station_id_col, score_col, flag_col : str
+        Column names in station_scores_df
+    top_n : int, optional
+        Limit number of stations plotted
+    only_flagged : bool
+        If True, use only rows where review_flag is True
+    time_start, time_end : str, optional
+        Optional time range filter
+    """
+    outdir = Path(outdir)
+    outdir.mkdir(parents=True, exist_ok=True)
+
+    x = station_scores_df.copy()
+
+    if only_flagged and flag_col in x.columns:
+        x = x[x[flag_col] == True].copy()
+
+    if score_col in x.columns:
+        x = x.sort_values(score_col, ascending=False)
+
+    if top_n is not None:
+        x = x.iloc[:top_n].copy()
+
+    made = []
+    for _, row in x.iterrows():
+        sid = row[station_id_col]
+        safe_sid = str(sid).replace("/", "_")
+        outpath = outdir / f"{safe_sid}_diagnostic.png"
+
+        fig = plot_station_diagnostic(
+            station_id=sid,
+            buddy_time_df=buddy_time_df,
+            station_meta=station_meta,
+            outpath=outpath,
+            time_start=time_start,
+            time_end=time_end,
+        )
+        plt.close(fig)
+        made.append(outpath)
+
+    return made
+
 def score_stations_innovation_based(
     obs_df: pd.DataFrame,
     station_meta: pd.DataFrame,
