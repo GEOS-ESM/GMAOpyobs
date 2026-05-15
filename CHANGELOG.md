@@ -8,17 +8,117 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 # [Unreleased] - yyyy-mm-dd
 
 ### Fixed
+- update hsrl.py to use py3 integer divide. fixes date parsing.
+  
+### Added
+- add optional explicit bin ordering to aop.py yaml. this allows for calculating AOP's for a single bin, or subset of bins
+- add configuration file for GEOS-5430 (current FP)
+- add a buddy check code for station observation QC
+
+### Changed
+- use xesmf regridder to station sampling. this is more efficient that using xarray native interp
+- changed 'compat' keyword definition in xrctl.py to make more flexible if 'override' is needed
+
+### Removed
+### Deprecated
+
+# [1.7.0] - yyyy-mm-dd
+
+### Fixed
+- fixed vx04 reader. empty object is now returned when DB and DT granules do not align. 
+
+### Added
+- made an update in ICARTT reader to allow additional vertical altitude names
+- created a simple CALIPSO L3 reader
+
+# [v1.6.0] - 2026-01-22
+### Added
+- added improve_sampler notebook example showing how to use the station sampler and aop.getPM function to compare MERRA-2 to IMPROVE surface measurements of PM2.5
+- added uv package management files pyproject.toml and uv.lock
+- added a new data variables output by getPM - the fraction of mass that is water
+
+### Changed
+- updatde the improve.py reader to work for files obtained from CIRA.  the old files that are on calculon are no longer generated.
+- Minor template name change for ease of integration in ADAS
+
+# [v1.5.0] - 2025-12-03
+
+
+### Added
+- odsreader now takes the optional argument Vars - this is the selection of variables to be read
+- vx04.py now can read in DT and DB granules together and use the DT cloud fraction to filter DB obs 
+
+
+# [v1.4.0] - 2025-09-25
+
+### Fixed
+
+- fixed error when duplicate variables occur in an icartt file. ICARTT now reads the first instance of the duplicate variable.
+- fixed bug in aop.py that broke if you used v1.X.X optics tables (that don't include pmatrix)
+- fixed bug in aop.py that broke if you had lowercase DELP in your model files
+
+### Added
+
+- add KX for lunar AERONET obs
+- add KX for NOAA-20 and NOAA-21 AOD obs
+
+
+# [v1.3.0] - 2025-07-28
+
+### Fixed
+- Fixed some misspelled `ValueError` exceptions
+- added a min dim to aeronet reads.  fixes error when there is only 1 observation in the file
+  
+### Added
+- now getAOPrt returns the phase matrix as detault instead of pmom (the pmatrix expansion)
+
+### Changed
+- Update to ESMA_cmake v3.62.1
+
+
+# [v1.2.6] - 2025-07-28
+
+### Fixed
+- hotfix in aeronet.py for double decoding
+
+
+# [v1.2.5] - 2025-06-05
+
+### Fixed
+- fixed mietable runtime warning for pback calculation. don't do this recursively anymore.
+- commented out "hack" in xrctl. it wasn't doing anything but added memory overhead and runtime
+### Added
+- can pass additional keywork arguments to TRAJECTORY and SAMPLER
+### Changed
+
+### Removed
+
+### Deprecated
+
+
+# [v1.2.4] - 2025-05-29
+
+### Fixed
 - Added list parsing for variables in trajectory sampler
 - dial.py to accomodate python change for nan
+- fixed byte string bug in aeronet.py
+- - use a local copy of RH in aop calculator.  otherwise it overwrites when fixRH is used
 ### Added
 - MPL reader and plot curtain 
 - calculation of total backscatter coefficient in aop.py
 - xrctl supports providing a list of control files
 - support for HALO in hsrl.py
+- parse time in MPL reader to return datetimes
+- sampler notebook that uses station sampler at an MPL
+- add option for vacuum aerodynamic size cutoff
 ### Changed
 - add auto chunking to TRAJECTORY and STATION. This enables dask
 - preload some key variables in aop.py so you don't hit dask repeatedly in for loop
 - rename p11 and p22 to pback11 & 22
+- updates aop aback calculation to use name indexing. generalizes to any dimensionality
+- updates station sampler to sample at an input time frequency. defaults to model time frequency
+- updates xrctl to read multiple GEOS collections at once
+- updates the compile and build instructions in the readme
 ### Removed
 
 ### Deprecated

@@ -127,6 +127,10 @@ class MPL_L15:
             print(f"Error reading NetCDF file: {str(e)}")
             return None
 
+        # convert time to datetime
+        dt_Offset = 2400000.500 # Julian date of 1858-11-17
+        instance.tyme = np.array([datetime(1858, 11, 17) + timedelta(julian_date-dt_Offset) for julian_date in instance.time])
+
         return instance
 
     def get_variable_names(self):

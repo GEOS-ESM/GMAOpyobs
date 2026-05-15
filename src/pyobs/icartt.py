@@ -7,7 +7,8 @@ import xarray as xr
 import numpy as np
 
 from datetime import datetime, timedelta
-from numpy    import loadtxt, ones, NaN, concatenate, array, pi, cos, sin, arccos, zeros
+from numpy    import loadtxt, ones, concatenate, array, pi, cos, sin, arccos, zeros
+from numpy    import nan as NaN
 from glob     import glob
 import gzip
 import collections
@@ -106,7 +107,7 @@ class ICARTT(object):
                 self.Nav['Longitude'] = self.__dict__[var]
             if VAR in ('LATITUDE', 'LATITUDE_YANG', 'LATITUDE_DEG','FMS_LAT', 'GPS_LAT', 'LAT', 'GGLAT' ):
                 self.Nav['Latitude'] = self.__dict__[var]
-            if VAR in ('GPSALT', 'MSL_GPS_ALTITUDE_YANG', 'GPSALT_M', 'FMS_ALT_PRES', 'GPS_ALT', 'GGALT','MSL_GPS_ALTITUDE'):
+            if VAR in ('GPS_ALTITUDE','ALT','GPSALT', 'MSL_GPS_ALTITUDE_YANG', 'GPSALT_M', 'FMS_ALT_PRES', 'GPS_ALT', 'GGALT','MSL_GPS_ALTITUDE'):
                 self.Nav['Altitude'] = self.__dict__[var]
             if VAR in ('PRESSURE', 'PRESSURE_YANG', 'C_STATICPRESSURE', 'STATIC_PRESSURE','PSXC',):
                 self.Nav['Pressure'] = self.__dict__[var]
@@ -339,8 +340,12 @@ class ICARTT(object):
 
         # Remove duplicates
         # -----------------
+        usecols = np.arange(self.nVars)
         for dup in [item for item, count in list(collections.Counter(self.Vars).items()) if count > 1]:
-            self.Vars.remove(dup)
+            indices = [i for i, x in enumerate(self.Vars) if x == dup]
+            indices = indices[1:]  # only read the first instance
+            self.Vars = [item for i, item in enumerate(self.Vars) if i not in indices]
+            usecols = np.delete(usecols,indices) 
         
 #       Use Config to load other attributes
 #       -----------------------------------
@@ -363,7 +368,7 @@ class ICARTT(object):
         data = loadtxt(filename, delimiter=delim,
                        dtype={'names':self.Vars,'formats':formats},
                        converters = converters,
-                       skiprows=self.n_header)
+                       skiprows=self.n_header,usecols=usecols)
  
         try:
             N = len(data)

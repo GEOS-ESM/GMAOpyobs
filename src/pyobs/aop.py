@@ -42,6 +42,12 @@ DU:
     - DU003
     - DU004
     - DU005
+  bin:
+    - 1
+    - 2
+    - 3
+    - 4
+    - 5
   shapefactor: 1.4
   rhod:
     - 2500
@@ -61,6 +67,12 @@ SS:
     - SS003
     - SS004
     - SS005
+  bin:
+    - 1
+    - 2
+    - 3
+    - 4
+    - 5
   shapefactor: 1
   rhod:
     - 2200
@@ -77,6 +89,9 @@ OC:
   tracers:
     - OCPHOBIC
     - OCPHILIC
+  bin:
+    - 1
+    - 2
   shapefactor: 1
   rhod:
     - 1800
@@ -89,6 +104,9 @@ BC:
   tracers:
     - BCPHOBIC
     - BCPHILIC
+  bin:
+    - 1
+    - 2
   shapefactor: 1
   rhod:
     - 1800
@@ -101,6 +119,9 @@ BR:
   tracers:
     - BRCPHOBIC
     - BRCPHILIC
+  bin:
+    - 1
+    - 2
   shapefactor: 1
   rhod:
     - 1800
@@ -112,6 +133,8 @@ SU:
   bandFile: ExtData/chemistry/AerosolOptics/v1.0.0/x/opticsBands_SU.v1_3.RRTMG.nc4
   tracers:
     - SO4
+  bin:
+    - 1
   shapefactor: 1
   rhod:
     - 1700
@@ -124,6 +147,10 @@ NI:
     - NO3AN1
     - NO3AN2
     - NO3AN3
+  bin:
+    - 1
+    - 2
+    - 3
   shapefactor: 1
   rhod:
     - 1725
@@ -198,24 +225,36 @@ class G2GAOP(object):
         # start with last species read
         dims =  self.mieTable[s]['mie'].getDims()
         self.vector = True
-        self.p, self.m = (0,0)
+        self.p, self.m, self.ang = (0,0,0)
         # loop through species and compare dims
         for s in self.mieTable:
            dims_ = self.mieTable[s]['mie'].getDims() # dimensions of Mie Tables, a dict
            if dims_['p'] is None:
                self.vector = False  # if some species is missing pmom, cannot do vector RT
-               print('Warning: PMOM is missing for '+s)
-               self.p, self.m = None, None
+               print('Warning: Phase Matrix is missing for '+s)
+               self.p, self.m, self.ang = None, None, None
                break
            if self.vector and dims_['p'] != dims['p']:
-               self.vector = False # variable size phase matrix not yet implemented
-               self.p, self.m = None, None
-               print('Warning: cannot handle variable size phase matrix for PMOM')
+               self.p, self.m, self.ang = None, None, None
+               print('Warning: cannot handle variable size phase matrix for PMOM or PMATRIX')
                break
+           if self.vector:
+               if 'ang' not in dims:  # keep back compatibility with v1 files that don't have PMATRIX
+                   self.ang = None 
+                   print('Warning: phase matrix not implemented')
+               elif dims_['ang'] != dims['ang']:
+                   self.ang = None # variable angular resolution phase matrix not implemented
+                   print('Warning: cannot handle variable angular resolution phase matrix for PMATRIX')
+                   break
+                               
            self.p = max(self.p,dims_['p']) # max number of entries in phase matrix
            self.m = max(self.m,dims_['m']) # max number of moments in phase matrix
+           if self.ang is not None:
+               self.ang = max(self.ang,dims_['ang']) # number of angles in phase matrix
         
-    def getAOPrt(self,Species=None,wavelength=None,vector=False,fixrh=None,m=None):
+    def getAOPrt(self,Species=None,wavelength=None,vector=False,
+                 fixrh=None,m=None,dopmatrix=True,dopmom=False,
+                 do_g=False):
 
         """
         Returns an xarray Dataset with (aot,ssa,g) if vector is
@@ -230,6 +269,15 @@ class G2GAOP(object):
                     asymmetry parameter.
 
         m: number of pmom moments to read in. If None, reads all on file.
+
+        dopmatrix: when vector isTrue, returns the scattering phase function matrix
+                   (used for VLIDORT calculations that utilize exact single scattering calc)
+
+        dopmom: when vector is True, returns the matrix of expension 
+                coefficients for the scattering phase function matrix
+                (used for legacy VLIDORT calculations)
+
+        do_g: when vector is True, return g as well
         """
 
         # Tables must have be consistent across species
@@ -251,22 +299,21 @@ class G2GAOP(object):
         # pre-load RH, AIRDENS, and DELP so you don't hit dask
         # repeatedly looping through  AOP calculations
         # -------------------------------------------------------
-        a['DELP'].load()
         a['AIRDENS'].load()
         a['RH'].load()
 
         # GEOS files can be inconsistent when it comes to case
         # ----------------------------------------------------
         try:
-            dp = a['DELP']
+            dp = a['DELP'].load()
         except:
-            dp = a['delp']
+            dp = a['delp'].load()
 
         # Handy arrays for extensive properties
         # -------------------------------------
         rhodz = dp / GRAV
         dz = rhodz / a['AIRDENS']       # column thickness
-        rh = a['RH']
+        rh = a['RH'].copy()
 
 
         # Check FIXRH option
@@ -285,10 +332,14 @@ class G2GAOP(object):
         if vector:
             ns = np.prod(space)
             p = self.p
-            if m is None:
-                m = self.m
+            if dopmom:
+                if m is None:
+                    m = self.m
+                pmom = np.zeros((ns,p,m)) # flatten space dimensions for convenience
+            if dopmatrix:
+                ang = self.ang
+                pmatrix = np.zeros((ns,p,ang)) #flatten space dimensions for convenience
 
-            pmom = np.zeros((ns,p,m)) # flatten space dimensions for convenience
 
         for s in Species:   # loop over species
 
@@ -298,8 +349,11 @@ class G2GAOP(object):
             Tracers = self.mieTable[s]['tracers']
             mie = self.mieTable[s]['mie']
 
-            bin = 1
-            for q in Tracers:
+            bins = self.mieTable[s].get('bin',[])
+            if not bins:
+                bins = list(range(1,len(Tracers)+1))
+            
+            for q,bin in zip(Tracers,bins):
 
                 if self.verbose:
                     print('   -',q)
@@ -311,22 +365,27 @@ class G2GAOP(object):
 
                 aot += aot_
                 sca += sca_
-                g   += sca_ * g_
 
                 if vector:
+                    if dopmom:
 
-                    pmom_ = mie.getAOP('pmom', bin, rh, q_mass=q_mass,
-                                        wavelength=wavelength,m=m)
-                    p_, m_ = pmom_.shape[-2:]
-                    pmom_ = pmom_.values.reshape((ns,p_,m_)) * sca_.reshape((ns,1,1))
+                        pmom_ = mie.getAOP('pmom', bin, rh,
+                                            wavelength=wavelength,m=m)
+                        p_, m_ = pmom_.shape[-2:]
+                        pmom_ = pmom_.values.reshape((ns,p_,m_)) * sca_.reshape((ns,1,1))
 
-                    pmom[:,:,:m_] += pmom_[:,:,:] # If species have fewer moments, pad wih zeros
+                        pmom[:,:,:m_] += pmom_[:,:,:] # If species have fewer moments, pad wih zeros
+                    if dopmatrix:
+                        pmatrix_ = mie.getAOP('pmatrix', bin, rh, wavelength=wavelength)
+                        p_, ang_ = pmatrix_.shape[-2:]
+                        pmatrix  += pmatrix_.values.reshape((ns,p_,ang_)) * sca_.reshape((ns,1,1))
+                    
+                    if do_g:
+                        g   += sca_ * g_
                 else:
 
                     g   += sca_ * g_
 
-
-                bin += 1
 
         # Final normalization of SSA and g
         # protect against divide by zero
@@ -339,12 +398,22 @@ class G2GAOP(object):
         ssa[I] = sca[I] / aot[I]
 
         if vector:
-             I = np.where(sca.reshape(ns) != 0.0)[0]
-             pmom[I,:,:] = pmom[I,:,:] / sca.reshape((ns,1,1))[I,:,:]
-             I = np.where(sca.reshape(ns) == 0.0)[0]
-             pmom[I,:,:] = np.nan
-             pmom = pmom.reshape(space+(p,m))
-        else:
+            if dopmom:
+                I = np.where(sca.reshape(ns) != 0.0)[0]
+                pmom[I,:,:] = pmom[I,:,:] / sca.reshape((ns,1,1))[I,:,:]
+                I = np.where(sca.reshape(ns) == 0.0)[0]
+                pmom[I,:,:] = np.nan
+                pmom = pmom.reshape(space+(p,m))
+
+            if dopmatrix:
+                I = np.where(sca.reshape(ns) != 0.0)[0]
+                pmatrix[I,:,:] = pmatrix[I,:,:] / sca.reshape((ns,1,1))[I,:,:]
+                I = np.where(sca.reshape(ns) == 0.0)[0]
+                pmatrix[I,:,:] = np.nan
+                pmatrix = pmatrix.reshape(space+(p,ang))
+
+
+        if do_g or not vector:
              I = np.where(sca != 0.0)
              g[I] = g[I] / sca[I]
              I = np.where(sca == 0.0)
@@ -354,7 +423,8 @@ class G2GAOP(object):
         A = dict (AOT = {'long_name':'Aerosol Optical Thickness', 'units':'1'},
                   SSA = {'long_name':'Aerosol Single Scattering Albedo', 'units':'1'},
                   G = {'long_name':'Aerosol Asymmetry Parameter', 'units':'1'},
-                  PMOM = {'long_name':'Aerosol Phase Matrix (non-zero elements)', 'units':'1'}
+                  PMOM = {'long_name':'Aerosol Phase Matrix Expansion Coefficients (non-zero elements)', 'units':'1'},
+                  PMATRIX = {'long_name':'Aerosol Phase Matrix (non-zero elements)', 'units':'1'}
                   )
 
         # Pack results into a Dataset
@@ -367,12 +437,21 @@ class G2GAOP(object):
         DA['AIRDENS'] = a['AIRDENS']
 
         if vector:
-            coords = dict(rh.coords).copy()
-            coords['p'] = mie.ds.coords['p']
-            dims = space + ('p', 'm')
-            DA['PMOM'] = xr.DataArray(pmom, dims=rh.dims+('p','m'),coords=coords)
-        else:
-            DA['G'] = xr.DataArray(g,dims=rh.dims,coords=rh.coords)
+            if dopmom:
+                coords = dict(rh.coords).copy()
+                coords['p'] = mie.ds.coords['p']
+                dims = space + ('p', 'm')
+                DA['PMOM'] = xr.DataArray(pmom, dims=rh.dims+('p','m'),coords=coords,attrs=A['PMOM'])
+
+            if dopmatrix:
+                coords = dict(rh.coords).copy()
+                coords['p'] = mie.ds.coords['p']
+                coords['ang'] = mie.ds.coords['ang']
+                dims = space + ('p', 'ang')
+                DA['PMATRIX'] = xr.DataArray(pmatrix, dims=rh.dims+('p','ang'),coords=coords,attrs=A['PMATRIX'])
+
+        if do_g or not vector:
+            DA['G'] = xr.DataArray(g,dims=rh.dims,coords=rh.coords,attrs=A['G'])
 
         return xr.Dataset(DA)
 
@@ -420,7 +499,7 @@ class G2GAOP(object):
         except:
             dp = a['delp'].load()
         airdens = a['AIRDENS'].load()
-        rh = a['RH'].load()
+        rh = a['RH'].load().copy()
         
         # Check FIXRH option
         # --------------------------
@@ -446,8 +525,11 @@ class G2GAOP(object):
             Tracers = self.mieTable[s]['tracers']
             mie = self.mieTable[s]['mie']
 
-            bin = 1
-            for q in Tracers:
+            bins = self.mieTable[s].get('bin',[])
+            if not bins:
+                bins = list(range(1,len(Tracers)+1))
+
+            for q,bin in zip(Tracers,bins):
 
                 if self.verbose:
                     print('   -',q)
@@ -470,7 +552,6 @@ class G2GAOP(object):
                 depol1 += (pback11_-pback22_) * sca_
                 depol2 += (pback11_+pback22_) * sca_
 
-                bin += 1
 
         if doaback:
             # Compute Molecular Scattering and Total Attenuated Backscatter Coefficient
@@ -534,26 +615,26 @@ class G2GAOP(object):
         # http://ntrs.nasa.gov/archive/nasa/casi.ntrs.nasa.gov/19960051003.pdf
         # -----------------------------------------
         space = rh.shape
-        ndims = len(space)
-        km = space[1]
+        zdim = rh.dims[1]
+        nlev = space[1]
+        dims = list(rh.dims)
 
-        abackTOA, abackSFC, pressure = (np.zeros(space), np.zeros(space), np.zeros(space))
+        abackSFC = xr.DataArray(np.zeros(space),dims=dims)
+        bsc = xr.DataArray(bsc,dims=dims)
+        ext = xr.DataArray(ext,dims=dims)
   
         # get the pressure vertical profile
-        if ndims==2:
-            pe=np.zeros((space[0],km+1))
-            pe[:,0]=1 #assume TOA has a pressure of 1 Pa
-            for k in range(0,km):
-                pe[:,k+1]=pe[:,k]+dp[:,k]
-            for k in range(km):
-                pressure[:,k]=(pe[:,k]+pe[:,k+1])/2
-        elif ndims==4:
-            pe=np.zeros((space[0],km+1,space[2],space[3]))
-            pe[:,0,:,:]=1 #assume TOA has a pressure of 1 Pa
-            for k in range(0,km):
-                pe[:,k+1,:,:]=pe[:,k,:,:]+dp[:,k,:,:]
-            for k in range(km):
-                pressure[:,k,:,:]=(pe[:,k,:,:]+pe[:,k+1,:,:])/2
+        edge = list(space)
+        edge[1] += 1
+        pe = xr.DataArray(np.zeros(edge),dims=dims)
+
+        #assume TOA has a pressure of 1 Pa
+        pe[{zdim:0}] = 1.
+
+        for k in range(nlev):
+            pe[{zdim:k+1}] = pe[{zdim:k}] + dp[{zdim:k}]
+
+        pressure = (pe[{zdim:slice(None,-1)}] + pe[{zdim:slice(1,None)}])*0.5
 
         # calcualte molecular backscatter
         backscat_mol = (5.45e-32/(MAPL_RUNIV/MAPL_AVOGAD)) * (wavelength/550)**-4  * pressure / T #molecular backscatter coefficient in m-1
@@ -561,55 +642,31 @@ class G2GAOP(object):
         # calculate backscatter
         tau_mol_layer = backscat_mol * 8 * np.pi /3 * delz
         tau_aer_layer = ext * delz
-        if ndims==2:
-            ###TOA
-            abackTOA[:,0]=(bsc[:,0]+ backscat_mol[:,0]) * np.exp(-tau_aer_layer[:,0]) * np.exp(-tau_mol_layer[:,0])
-            for k in range(1,km):
-                tau_aer=0
-                tau_mol=0
-                for kk in range(0,k):
-                    tau_aer += tau_aer_layer[:,kk]
-                    tau_mol += tau_mol_layer[:,kk]
-                tau_aer += 0.5 * tau_aer_layer[:,k]
-                tau_mol += 0.5 * tau_mol_layer[:,k]
-                abackTOA[:,k] = (bsc[:,k] + backscat_mol[:,k]) * np.exp(-2*tau_aer) * np.exp(-2*tau_mol)
 
-            ###Surface
-            abackSFC[:,0]=(bsc[:,km-1]+ backscat_mol[:,km-1]) * np.exp(-tau_aer_layer[:,km-1]) * np.exp(-tau_mol_layer[:,km-1])
-            for k in range(km-2,-1,-1):
-                tau_aer=0
-                tau_mol=0
-                for kk in range(km-1,k-1,-1):
-                    tau_aer += tau_aer_layer[:,kk]
-                    tau_mol += tau_mol_layer[:,kk]
-                tau_aer += 0.5 *  tau_aer_layer[:,k]
-                tau_mol += 0.5 *  tau_mol_layer[:,k]
-                abackSFC[:,k] = (bsc[:,k] + backscat_mol[:,k]) * np.exp(-2*tau_aer) * np.exp(-2*tau_mol)
+        ### TOA
+        # sum up all the layers above but not including (reminder: layers go from top to bottom)
+        tau_aer = xr.concat([tau_aer_layer[{zdim:slice(None,i)}].sum(dim=zdim,keep_attrs=True) for i in range(nlev)],dim=zdim)
+        tau_aer = tau_aer.transpose(*dims)
+        # add half of the layer tau to get to the middle of the layer
+        tau_aer += 0.5 * tau_aer_layer
 
-        if ndims==4:
-            ###TOA
-            abackTOA[:,0,:,:]=(bsc[:,0,:,:]+ backscat_mol[:,0,:,:]) * np.exp(-tau_aer_layer[:,0,:,:]) * np.exp(-tau_mol_layer[:,0,:,:])
-            for k in range(1,km):
-                tau_aer=0
-                tau_mol=0
-                for kk in range(0,k):
-                    tau_aer += tau_aer_layer[:,kk,:,:]
-                    tau_mol += tau_mol_layer[:,kk,:,:]
-                tau_aer += 0.5 *  tau_aer_layer[:,k,:,:]
-                tau_mol += 0.5 *  tau_mol_layer[:,k,:,:]
-                abackTOA[:,k,:,:] = (bsc[:,k,:,:] + backscat_mol[:,k,:,:]) * np.exp(-2*tau_aer) * np.exp(-2*tau_mol)
+        tau_mol = xr.concat([tau_mol_layer[{zdim:slice(None,i)}].sum(dim=zdim,keep_attrs=True) for i in range(nlev)],dim=zdim)
+        tau_mol = tau_mol.transpose(*dims)
+        tau_mol += 0.5 * tau_mol_layer
+        
+        abackTOA = (bsc + backscat_mol) * np.exp(-2*tau_aer) * np.exp(-2*tau_mol)
 
-            ###Surface
-            abackSFC[:,0,:,:]=(bsc[:,km-1,:,:]+ backscat_mol[:,km-1,:,:]) * np.exp(-tau_aer_layer[:,km-1,:,:]) * np.exp(-tau_mol_layer[:,km-1,:,:])
-            for k in range(km-2,-1,-1):
-                tau_aer=0
-                tau_mol=0
-                for kk in range(km-1,k-1,-1):
-                    tau_aer += tau_aer_layer[:,kk,:,:]
-                    tau_mol += tau_mol_layer[:,kk,:,:]
-                tau_aer += 0.5 *  tau_aer_layer[:,k,:,:]
-                tau_mol += 0.5 *  tau_mol_layer[:,k,:,:]
-                abackSFC[:,k,:,:] = (bsc[:,k,:,:] + backscat_mol[:,k,:,:]) * np.exp(-2*tau_aer) * np.exp(-2*tau_mol)
+        ### Surface
+        # sum up all the layers below but not including (reminder: layers go from top to bottom)
+        tau_aer = xr.concat([tau_aer_layer[{zdim:slice(i+1,None)}].sum(dim=zdim,keep_attrs=True) for i in range(nlev)],dim=zdim)
+        tau_aer = tau_aer.transpose(*dims)
+        # add half of the layer tau to get to the middle of the layer
+        tau_aer += 0.5 * tau_aer_layer
+
+        tau_mol = xr.concat([tau_mol_layer[{zdim:slice(i+1,None)}].sum(dim=zdim,keep_attrs=True) for i in range(nlev)],dim=zdim)
+        tau_mol = tau_mol.transpose(*dims)
+        tau_mol += 0.5 * tau_mol_layer
+        abackSFC = (bsc + backscat_mol) * np.exp(-2*tau_aer) * np.exp(-2*tau_mol)
 
         return abackTOA, abackSFC
  
@@ -640,16 +697,30 @@ class G2GAOP(object):
 
         raise AOPError("not implemented yet")
 
-    def getPM(self,Species=None,pmsize=None,fixrh=None,aerodynamic=False):
+    def getPM(self,Species=None,pmsize=None,fixrh=None,aerodynamic=False,vacuum_aerodynamic=False):
         """
         Returns an xarray Dataset with total aerosol mass smaller than the prescribed size.
+        Please see m2_pm25.yaml and g2g_pm25.yaml for example yaml configurations.
 
-        Species:  None, str, or list. If None, all species on file,
-                  otherwise subset of emissions.
+        Species:  None, str, or list. Default is None.
+                  If None, all species on file will be summed, otherwise sum over a subset of species.
     
-        PMsize: float, particle diameter threshold in microns. If None, the total PM is calculated.
+        PMsize: None or float. Default is None.
+                Particle diameter threshold in microns.
+                If None the total PM is calculated.
 
-	Please see m2_pm25.yaml and g2g_pm25.yaml for example yaml configurations.
+        fixrh: None or float. Default is None.
+               Relative humidity in percent to calculate PM.
+               If None will calculate PM at the model RH.
+
+        aerodynamic: bool. Default is False.
+                     Use the continuum aerodynamic radius as the basis for size cutoff.
+                     typically used for comparisons to surface sites
+        vacuum_aerodynamic: bool. Default is False.
+                            Use the vacuum aerodynamic radius as the basis for size cutoff.
+                            Used for comparison to aircraft AMS observations.
+
+        See deCarlo 2004 (DOI: 10.1080/027868290903907) for definitions of aerodynamic radius
 
         """
 
@@ -665,7 +736,6 @@ class G2GAOP(object):
         # pre-load RH, AIRDENS, and DELP so you don't hit dask
         # repeatedly looping through  AOP calculations
         # -------------------------------------------------------
-        a['DELP'].load()
         a['AIRDENS'].load()
         a['RH'].load()
 
@@ -679,11 +749,11 @@ class G2GAOP(object):
         # GEOS files can be inconsistent when it comes to case
         # ----------------------------------------------------
         try:
-            dp = a['DELP'] 
+            dp = a['DELP'].load() 
         except:
-            dp = a['delp']
+            dp = a['delp'].load()
 
-        rh = a['RH']
+        rh = a['RH'].copy()
 
         # Check FIXRH option
         # --------------------------
@@ -699,6 +769,7 @@ class G2GAOP(object):
         space = rh.shape
 
         pm = np.zeros(space)
+        wm = np.zeros(space)
         for s in Species:   # species
 
             if self.verbose:
@@ -707,8 +778,14 @@ class G2GAOP(object):
             Tracers = self.mieTable[s]['tracers']
             mie = self.mieTable[s]['mie']
 
-            bin = 1
-            for q in Tracers:
+            bins = self.mieTable[s].get('bin',[])
+            if not bins:
+                bins = list(range(1,len(Tracers)+1))
+
+            # Dry aerosol density in kg m-3
+            # rhod is not in all of the standard optics files, and is for now read from the yaml config
+            rhod = self.mieTable[s]['rhod']
+            for q,bin,rhod_ in zip(Tracers,bins,rhod):
 
                 if self.verbose:
                     print('   -',q)
@@ -717,10 +794,7 @@ class G2GAOP(object):
                 # Aerosol mass concentration in kg/m3                
                 q_conc = (a['AIRDENS'] * a[q]).values
   
-                # Dry aerosol density in kg m-3
-                # rhod is not in all of the standard optics files, and is for now read from the yaml config 
                 # rhod_ = mie.getAOP('rhod',  bin, rh, wavelength=wavelength).values
-                rhod_ = self.mieTable[s]['rhod'][bin-1] 
 
                 # Lower and upper bound of the bin's radius converted from meters to microns
                 rLow_ = mie.getBinInfo('rLow', bin)*1000000 
@@ -737,7 +811,11 @@ class G2GAOP(object):
                 if aerodynamic:
                     # convert rhod from kg m-3 to g cm-3
                     rLow_ = rLow_ * np.sqrt((rhod_/1000)/self.mieTable[s]['shapefactor']) 
-                    rUp_ = rUp_ * np.sqrt((rhod_/1000)/self.mieTable[s]['shapefactor']) 
+                    rUp_ = rUp_ * np.sqrt((rhod_/1000)/self.mieTable[s]['shapefactor'])
+                elif vacuum_aerodynamic:
+                    # convert rhod from kg m-3 to g cm-3
+                    rLow_ = rLow_ * (rhod_/1000)/self.mieTable[s]['shapefactor']
+                    rUp_ = rUp_ * (rhod_/1000)/self.mieTable[s]['shapefactor']
 
                 # Find fraction of bin that is below the threshhold
                 if rPM is None:
@@ -757,29 +835,44 @@ class G2GAOP(object):
                 # this is based on a formulation from GEOS Chem 
                 # (https://wiki.seas.harvard.edu/geos-chem/index.php/Particulate_matter_in_GEOS-Chem)
                 # this is not the same hygroscopic growth factor that is in the GEOSmie optics files.
+                # It is the ratio of wet to dry mass.
+                # The change in radius between dry and wet conditions is treated
+                # as creating a shell of water for the purpose of calculating additional mass
+                # associated with the wet particle
                 rhow = 997.0  # density of water at 25 C and 1 atm in kg m-3
-                growthfactor= 1 + (((np.squeeze(rEff_) / np.squeeze(rEff_zero))**3 - 1) * (rhow / rhod_))
+                growthfactor= 1 + (((np.squeeze(rEff_) / np.squeeze(rEff_zero))**3 - 1) * (rhow / rhod_))  # mass wet/mass dry
                 #Compute PM
                 pm_ = q_conc * growthfactor * fPM * self.mieTable[s]['pmconversion']
                 pm += pm_
 
-                bin += 1
-                
+                # save the mass that is water
+                waterfactor = 1 - (1./growthfactor)
+                wm += pm_ * waterfactor
+
+
+        # Get the fraction of the total PM that is water
+        # ------------------------------------------------
+        # Pre-allocate an output array filled with zeros
+        result = np.zeros_like(pm)
+
+        # Perform division only where pm is not zero; otherwise, keep the value from 'out' (which is 0)
+        fwater = np.divide(wm, pm, out=result, where=pm != 0)
 
         # convert from kg m-3 to micrograms m-3
         # a more common unit for PM concentration
         # ---------------------------------------
         pm = pm*1e9
 
-
         # Attributes
         # ----------
-        A = dict (PM = {'long_name':'Particulate Matter', 'units':'microgram m-3'}
+        A = dict (PM = {'long_name':'Particulate Matter Mass', 'units':'microgram m-3'},
+                  FWATER={'long_name': 'Fraction of Particulate Matter Mass that is Water', 'units': 'none'}
                   )
         
         # Pack results into a Dataset
         # ---------------------------
-        DA = dict(  PM = xr.DataArray(pm.astype('float32'),dims=rh.dims,coords=rh.coords,attrs=A['PM'])
+        DA = dict(  PM = xr.DataArray(pm.astype('float32'),dims=rh.dims,coords=rh.coords,attrs=A['PM']),
+                    FWATER=xr.DataArray(fwater.astype('float32'), dims=rh.dims, coords=rh.coords, attrs=A['FWATER'])
                  )
 
         DA['DELP'] = dp
@@ -861,6 +954,9 @@ def CLI_aop():
     parser.add_option("--aerodynamic", dest="aerodynamic", default=False,
               help="If set to true, an aerodynamic diameter will be used to compute PM. This option is only valid for --aop=pm.")
 
+    parser.add_option("--vacuum_aerodynamic", dest="vacuum_aerodynamic", default=False,
+              help="If set to true, a vacuum aerodynamic diameter will be used to compute PM. This option is only valid for --aop=pm.")
+
     parser.add_option("-s","--size", dest="d_pm", default=None,
               help="The threshold diameter size used to compute PM in units of microns (example 2.5 for PM2.5). This option is only valid for --aop=pm.")
 
@@ -873,7 +969,7 @@ def CLI_aop():
 
     # store doaback flag
     doaback = True
-    if args.noaback:
+    if options.noaback:
         doaback = False
 
     if options.dump:
@@ -918,7 +1014,8 @@ def CLI_aop():
         elif options.aop == 'rt':
             ds = g.getAOPrt(wavelength=w,vector=options.vector,fixrh=options.fixrh)
         elif options.aop == 'pm':
-            ds = g.getPM(pmsize=options.d_pm,fixrh=options.fixrh,aerodynamic=options.aerodynamic)
+            ds = g.getPM(pmsize=options.d_pm,fixrh=options.fixrh,aerodynamic=options.aerodynamic,
+                        vacuum_aerodynamic=options.vacuum_aerodynamic)
         else:
             print(options.aop)
             raise AOPError('Unknown AOP option '+options.aop)

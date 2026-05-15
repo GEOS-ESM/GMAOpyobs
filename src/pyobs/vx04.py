@@ -19,7 +19,7 @@ from pyobs.npz import NPZ
 from binObs_   import binobs2d, binobs3d, binobscnt3d
 
 try:
-    from pyods import ODS # must be inported before pyhdf
+    from pyods import ODS # must be imported before pyhdf
 except:
     pass
 
@@ -50,7 +50,13 @@ SDS = dict (
                'Angstrom_Exponent_2_Ocean',
                'Aerosol_Cloud_Fraction_Ocean',
                'Mean_Reflectance_Ocean',
+               'STD_Reflectance_Ocean',
                'Land_Ocean_Quality_Flag' ),
+     DT_CLD = ( 'Aerosol_Cloud_Fraction_Ocean',
+                'Aerosol_Cloud_Fraction_Land'),
+     DT_FILTER = ('Land_Ocean_Quality_Flag',
+                'Corrected_Optical_Depth_Land',
+                'Scattering_Angle',),
      DB_META = ('Longitude', 'Latitude', 'Scan_Start_Time',
               'Viewing_Zenith_Angle', 'Relative_Azimuth_Angle',
               'Solar_Zenith_Angle',
@@ -119,6 +125,7 @@ ALIAS = dict (  Longitude = 'lon',
                 Scattering_Angle = 'ScatteringAngle',
                 Glint_Angle = 'GlintAngle',
                 Mean_Reflectance_Land = 'reflectance',
+                STD_Reflectance_Land = 'std_reflectance',
                 Surface_Reflectance_Land = 'sfc_reflectance',
                 Corrected_Optical_Depth_Land = 'aod',
                 Aerosol_Cloud_Fraction_Land = 'cloud',
@@ -126,6 +133,7 @@ ALIAS = dict (  Longitude = 'lon',
                 Optical_Depth_Small_Average_Ocean = 'aod_fine',
                 Aerosol_Cloud_Fraction_Ocean = 'cloud',
                 Mean_Reflectance_Ocean = 'reflectance',
+                STD_Reflectance_Ocean = 'std_reflectance',
                 Spectral_Aerosol_Optical_Thickness_Land = 'aod3ch',
                 Aerosol_Optical_Thickness_550_Land = 'aod550',
                 Spectral_Surface_Reflectance = 'sfc_reflectance',
@@ -154,14 +162,25 @@ ALIAS = dict (  Longitude = 'lon',
 BAD, MARGINAL, GOOD, BEST = ( 0, 1, 2, 3 ) # DT QA marks
 # for DB 0 = no retrieval, 1 = poor, 2 = moderate, 3 = good
 
-translate_sat = {'Suomi-NPP': 'SNPP'}
+translate_sat = {'Suomi-NPP': 'SNPP',
+                 'NOAA-20'  : 'NOAA20'}
 
 
 KX = dict ( SNPP_DT_OCEAN = 337,
             SNPP_DT_LAND  = 336,
             SNPP_DB_OCEAN  = 334,
             SNPP_DB_DEEP   = 335,
-            SNPP_DB_LAND  = 333, 
+            SNPP_DB_LAND  = 333,
+            NOAA20_DT_OCEAN = 342,
+            NOAA20_DT_LAND  = 341,
+            NOAA20_DB_OCEAN  = 339,
+            NOAA20_DB_DEEP   = 340,
+            NOAA20_DB_LAND  = 338,
+            NOAA21_DT_OCEAN = 348,
+            NOAA21_DT_LAND  = 347,
+            NOAA21_DB_OCEAN  = 345,
+            NOAA21_DB_DEEP   = 346,
+            NOAA21_DB_LAND  = 344,           
           )
 
 KT = dict ( AOD = 45, )
@@ -171,6 +190,16 @@ IDENT = dict ( SNPP_DT_OCEAN = 'vsnppdto',
                SNPP_DB_OCEAN  = 'vsnppdbo',
                SNPP_DB_DEEP  = 'vsnppdbd',
                SNPP_DB_LAND  = 'vsnppdbl',
+               NOAA20_DT_OCEAN = 'vnoaa20dto',
+               NOAA20_DT_LAND  = 'vnoaa20dtl',
+               NOAA20_DB_OCEAN  = 'vnoaa20dbo',
+               NOAA20_DB_DEEP  = 'vnoaa20dbd',
+               NOAA20_DB_LAND  = 'vnoaa20dbl',
+               NOAA21_DT_OCEAN = 'vnoaa20dto',
+               NOAA21_DT_LAND  = 'vnoaa20dtl',
+               NOAA21_DB_OCEAN  = 'vnoaa20dbo',
+               NOAA21_DB_DEEP  = 'vnoaa20dbd',
+               NOAA21_DB_LAND  = 'vnoaa20dbl',
           )
 
 MISSING = 999.999
@@ -188,7 +217,8 @@ class Vx04_L2(object):
     """
 
     def __init__ (self,Path,algo,syn_time=None,nsyn=8,Verb=0,
-                  only_good=True,SDS=SDS,alias=None,anet_wav=False):
+                  only_good=True,SDS=SDS,alias=None,anet_wav=False,
+                  use_DT_cld=None,use_DT_filter=False):
        """
        Reads individual granules or a full day of Level 2 Vx04 files
        present on a given *Path* and returns a single object with
@@ -214,8 +244,12 @@ class Vx04_L2(object):
          ALIAS    --- dictionary of alises for SDSs
          anet_wav --- angstrom interpolate retrieved AOD to common AERONET wavelengths
                       e.g. 480 --> 490, 1600 --> 1640, 860 --> 870
-
-
+         use_DT_cld --- for Deep Blue retrieval, use the Dark Target Cloud Fraction rather than the ad-hoc DB cloud fraction
+                        if the DT data is not available, returns empty
+                        Need to pass it the correct files corresponding to what's passed for DB
+         use_DT_filter --- for Deep Blue retrieval, filter out where DT has a valid retrieval. 
+                           This works on top of the use_DT_cld keyword
+                           If True, must provide list of DT files with the use_DT_cld keyword
        """
 
        if algo not in ('DT_LAND', 'DT_OCEAN', 'DB_LAND', 'DB_DEEP', 'DB_OCEAN'):
@@ -230,6 +264,12 @@ class Vx04_L2(object):
        Algo, Surface = algo.split('_')
        self.SDS = SDS['{}_META'.format(Algo)] + SDS[algo]
        self.SDS_META = SDS['{}_META'.format(Algo)]
+       if use_DT_cld:
+           self.SDS_DT_CLD = SDS['DT_CLD']
+
+       self.use_DT_filter = use_DT_filter
+       if use_DT_filter:
+           self.SDS_DT_FILTER = SDS['DT_FILTER']
 
        # Add/Substitute some aliases if given
        # ------------------------------------
@@ -242,6 +282,12 @@ class Vx04_L2(object):
        # -----------------------------------------------
        for name in self.SDS:
            self.__dict__[name] = []
+       if use_DT_cld:
+           for name in self.SDS_DT_CLD:
+               self.__dict__[name] = []
+       if use_DT_filter:
+           for name in self.SDS_DT_FILTER:
+               self.__dict__[name+'_DT'] = []
 
        # Read each granule, appending them to the list
        # ---------------------------------------------
@@ -252,7 +298,17 @@ class Vx04_L2(object):
                return
        else:
            Path = [Path, ]
-       self._readList(Path)
+
+       if use_DT_cld:
+           # this should be a second list of paths that are matched to the DB paths
+           self._read2Lists(Path,use_DT_cld)
+           self.SDS += self.SDS_DT_CLD
+           if use_DT_filter:
+               for sds in self.SDS_DT_FILTER:
+                   self.SDS += (sds + '_DT',)
+
+       else:
+           self._readList(Path)
 
        #Protect against empty VX04 files
        # --------------------------------
@@ -299,8 +355,16 @@ class Vx04_L2(object):
        # --------------------------------------
        if self.algo == 'DT_LAND':
            self.iGood = (self.Land_Ocean_Quality_Flag == BEST) & (~self.Corrected_Optical_Depth_Land.mask[:,1])
+           if type(self.Scattering_Angle.mask) is not np.bool:
+               self.iGood = self.iGood & ~self.Scattering_Angle.mask
+               self.iGood = self.iGood & ~self.sensor_azimuth_angle.mask
+               self.iGood = self.iGood & ~self.solar_azimuth_angle.mask
        elif self.algo == 'DT_OCEAN':
            self.iGood = (self.Land_Ocean_Quality_Flag > BAD) & (~self.Effective_Optical_Depth_Average_Ocean.mask[:,1])
+           if type(self.Scattering_Angle.mask) is not np.bool:
+               self.iGood = self.iGood & ~self.Scattering_Angle.mask
+               self.iGood = self.iGood & ~self.sensor_azimuth_angle.mask
+               self.iGood = self.iGood & ~self.solar_azimuth_angle.mask               
        elif self.algo in ['DB_LAND','DB_DEEP']:
            self.iGood = self.Aerosol_Optical_Thickness_QA_Flag_Land > BAD # for now
        elif self.algo == 'DB_OCEAN':
@@ -308,6 +372,20 @@ class Vx04_L2(object):
        else:
            raise ValueError('invalid algorithm (very strange)')
 
+       # Make sure DT cloud masks are valid - if using
+       if use_DT_cld:
+           self.cloud = self.Aerosol_Cloud_Fraction_Ocean.copy()
+           mask = self.Aerosol_Cloud_Fraction_Land.mask
+           self.cloud[~mask] = self.Aerosol_Cloud_Fraction_Land[~mask]
+           self.SDS += ('cloud',)
+           self.iGood = self.iGood & ~self.cloud.mask
+
+       # only keep DB obs when there is not a good DT retrieval
+       if use_DT_filter:
+           DT_Good = (self.Land_Ocean_Quality_Flag_DT == BEST) & (~self.Corrected_Optical_Depth_Land_DT.mask[:,1])
+           if not isinstance(self.Scattering_Angle_DT.mask, (bool, np.bool_)):
+               DT_Good = DT_Good & ~self.Scattering_Angle_DT.mask
+           self.iGood = self.iGood & ~DT_Good
 
        # Keep only "good" observations
        # -----------------------------
@@ -377,7 +455,7 @@ class Vx04_L2(object):
        if 'DB' in self.algo:
            self.rChannels = self.Reflectance_Bands  # [ 412.,  488.,  550.,  670.,  865., 1240., 1640., 2250.]
        elif self.algo == 'DT_LAND':
-           self.rChannels = np.array([480.,670.,2250.])
+           self.rChannels = np.array([480.,550.,670.,860.,1240.,1600.,2250.])
        elif self.algo == 'DT_OCEAN':
            self.rChannels = np.array([480.,550.,670.,860.,1240.,1600.,2250.])
 
@@ -490,8 +568,8 @@ class Vx04_L2(object):
 
 
        # Create a pseudo cloud fraction for Deep Blue
-       if Algo == 'DB':
-           self.cloud = 1. - self.npixels_used.astype(float)/self.npixels_valid.astype(float)
+       if not use_DT_cld and (Algo == 'DB'):
+            self.cloud = 1. - self.npixels_used.astype(float)/self.npixels_valid.astype(float)
 
 
 #---
@@ -522,6 +600,24 @@ class Vx04_L2(object):
                     self._readGranuleDT(item)
             else:
                 print("%s is not a valid file or directory, ignoring it"%item)
+
+#---
+    def _read2Lists(self,DB_List,DT_List):
+        """
+        Recursively, look for files in list; list items can
+        be files or directories.
+        Special case when you need to read DB along with DT cloud mask
+        """
+        for db_item,dt_item in zip(DB_List,DT_List):
+            if os.path.isfile(db_item):
+                try:
+                    self._readGranuleDB_DT(db_item,dt_item)
+                except ValueError as e:
+                    print(f"Stopping processing: {e}")
+                    return  # This stops processing the rest of the files
+            else:
+                print("%s is not a valid file or directory, ignoring it"%db_item)
+
 #---
     def _readDir(self,dir):
         """Recursively, look for files in directory."""
@@ -586,6 +682,124 @@ class Vx04_L2(object):
 #       Reflectance Bands
 #       ------------------
         self.Reflectance_Bands = nc.variables['Reflectance_Bands'][:]
+
+#---
+    def _readGranuleDB_DT(self,db_filename,dt_filename):
+        """
+        Reads one Vx04 Deep Blue granule with Level 2 aerosol data, and one Dark Target granule cloud mask
+        """
+
+        # Don't fuss if the file cannot be opened
+        # ---------------------------------------
+        try:
+            if self.verb:
+                print("[] Working on "+db_filename)
+            nc = Dataset(db_filename)
+        except:
+            if self.verb > 2:
+                print("- %s: not recognized as an netCDF file"%db_filename)
+            return
+        try:
+            if self.verb:
+                print("[] Working on "+dt_filename)
+            ncdt = Dataset(dt_filename)
+        except:
+            if self.verb > 2:
+                print("- %s: not recognized as an netCDF file"%dt_filename)
+            return        
+
+        # Read select variables (reshape to allow concatenation later)
+        # ------------------------------------------------------------
+        for sds in self.SDS:
+            v = nc.variables[sds][:]
+            a = nc.variables[sds].ncattrs()
+            if 'scale_factor' in a:
+                scale = nc.variables[sds].getncattr('scale_factor')
+                v = scale*v
+            if 'add_offset' in a:
+                add = nc.variables[sds].getncattr('add_offset')
+                v = v + add
+
+            if len(v.shape) == 3:
+                if "TOA_Reflectance" in sds:
+                    i, j, k = v.shape
+                    v = v.reshape((i*j,k))
+                else:
+                    i, j, k = v.shape
+                    v = v.reshape((i,j*k)).T
+            elif len(v.shape) == 2:
+                v = v.ravel()
+            else:
+                raise IndexError("invalid shape for SDS <%s>"%sds)
+            self.__dict__[sds].append(v)
+
+        # Read in Dark Target cld masks
+        # check that it is the same size as DB data
+        #-------------------------------
+        data  = ncdt.groups['geophysical_data']
+        loc   = ncdt.groups['geolocation_data']
+        for sds in self.SDS_DT_CLD:
+            if sds in data.variables.keys():
+                v = data.variables[sds][:]
+            else:
+                v = loc.variables[sds][:]
+
+            if len(v.shape) == 3:
+                i, j, k = v.shape
+                v = v.reshape((i*j,k))
+            elif len(v.shape) == 2:
+                v = v.ravel()
+            else:
+                raise IndexError("invalid shape for SDS <%s>"%sds)
+
+            # check that DT granule aligns with DB granule
+            # if not, return empty
+            if len(v) != len(self.Longitude[-1]):
+                self.Scattering_Angle = []
+                raise ValueError("DT and DB granules do not align - stopping processing")
+
+            self.__dict__[sds].append(v)
+
+        # Read in Dark Target aerosol retrieval
+        # to be used later for filtering
+        if self.use_DT_filter:
+            for sds in self.SDS_DT_FILTER:
+                if sds in data.variables.keys():
+                    v = data.variables[sds][:]
+                else:
+                    v = loc.variables[sds][:]
+
+                if len(v.shape) == 3:
+                    i, j, k = v.shape
+                    v = v.reshape((i*j,k))
+                elif len(v.shape) == 2:
+                    v = v.ravel()
+                else:
+                    raise IndexError("invalid shape for SDS <%s>"%sds)
+
+                # check that DT granule aligns with DB granule
+                # if not, return empty
+                if len(v) != len(self.Longitude[-1]):
+                    self.Scattering_Angle = []
+                    raise ValueError("DT and DB granules do not align - stopping processing")
+
+                self.__dict__[sds+'_DT'].append(v)
+
+            
+
+#       Satellite name
+#       --------------
+        if self.sat is None:
+            self.sat = translate_sat[nc.platform]
+
+#       Collection
+#       ----------
+        if self.col is None:
+            self.col = nc.product_name.split('.')[-3]
+
+#       Reflectance Bands
+        self.Reflectance_Bands = nc.variables['Reflectance_Bands'][:]
+
 
 #---
     def _readGranuleDT(self,filename):
@@ -729,7 +943,7 @@ class Vx04_L2(object):
         """
         
         if self.syn_time == None:
-            raise ValuError("synoptic time missing, cannot write ODS")
+            raise ValueError("synoptic time missing, cannot write ODS")
             
         # Stop here if no good obs available
         # ----------------------------------
@@ -1028,7 +1242,7 @@ def granules ( path, algo, sat, syn_time, coll='011', nsyn=8, verbose=False ):
 
     path      ---  mounting point for the MxD04 Level 2 files
     algo      ---  either DT_LAND, DT_OCEAN, DB_LAND, DB_DEEP or DB_OCEAN
-    sat       ---  SNPP
+    sat       ---  SNPP, NOAA20, NOAA21
     syn_time  ---  synoptic time (timedate format)
 
     coll      ---  collection: 011 (optional)
@@ -1046,7 +1260,7 @@ def granules ( path, algo, sat, syn_time, coll='011', nsyn=8, verbose=False ):
     if sat.upper() == 'SNPP':
         sat_prod = 'VNP' + prod
     elif 'NOAA' in sat.upper():
-        sat_prod ='VN' + sat[-2:]
+        sat_prod ='VN' + sat[-2:] + prod
 
 
     # Determine synoptic time range
@@ -1062,7 +1276,7 @@ def granules ( path, algo, sat, syn_time, coll='011', nsyn=8, verbose=False ):
     while t < t2:
         if t >= t1:
             doy = t.timetuple()[7]
-            basen = "%s/%s/%s/%04d/%03d/%s_L2_VIIRS_%s.A%04d%03d.%02d%02d.%s.*.nc"\
+            basen = "%s/%s/%s/%04d/%03d/*%s_L2_VIIRS_%s.A%04d%03d.%02d%02d.%s.*.nc"\
                      %(path,sat_prod,coll,t.year,doy,prod,sat,t.year,doy,t.hour,t.minute,coll)
             try:
                 filen = glob(basen)[0]
@@ -1077,6 +1291,74 @@ def granules ( path, algo, sat, syn_time, coll='011', nsyn=8, verbose=False ):
         print("WARNING: no %s collection %s granules found for"%(algo,coll), syn_time)
 
     return Granules
+
+#............................................................................
+
+def granulePairs ( path, sat, syn_time, collDT='002', collDB='002',nsyn=8, verbose=False ):
+    """
+    Returns a list of Vx04 granules pairs from DT and DB algorithms at given synoptic time.
+    On input,
+
+    path      ---  mounting point for the MxD04 Level 2 files
+    sat       ---  SNPP, NOAA20, NOAA21
+    syn_time  ---  synoptic time (timedate format)
+
+    collDT    ---  DT collection version: 002 (optional)
+    collDB    ---  DB collection version: 002 (optional)
+    nsyn      ---  number of synoptic times per day (optional)
+
+    """
+
+    # Get product name
+    # -----------------
+    prodDT = 'AERDT'
+    prodDB = 'AERDB'
+
+    # Get sat_prod code
+    # ----------------
+    if sat.upper() == 'SNPP':
+        sat_prodDT = 'VNP' + prodDT
+        sat_prodDB = 'VNP' + prodDB
+    elif 'NOAA' in sat.upper():
+        sat_prodDT ='VN' + sat[-2:] + prodDT
+        sat_prodDB ='VN' + sat[-2:] + prodDB
+
+
+    # Determine synoptic time range
+    # -----------------------------
+    dt = timedelta(seconds = 12. * 60. * 60. / nsyn)
+    t1, t2 = (syn_time-dt,syn_time+dt)
+
+    # Find VIIRS granules in synoptic time range
+    # ------------------------------------------
+    dt = timedelta(minutes=6)
+    t = datetime(t1.year,t1.month,t1.day,t1.hour,0,0)
+    GranulesDT = []
+    GranulesDB = []
+    while t < t2:
+        if t >= t1:
+            doy = t.timetuple()[7]
+            basenDT = "%s/%s/%s/%04d/%03d/*%s_L2_VIIRS_%s.A%04d%03d.%02d%02d.%s.*.nc"\
+                     %(path,sat_prodDT,collDT,t.year,doy,prodDT,sat,t.year,doy,t.hour,t.minute,collDT)
+
+            basenDB = "%s/%s/%s/%04d/%03d/*%s_L2_VIIRS_%s.A%04d%03d.%02d%02d.%s.*.nc"\
+                     %(path,sat_prodDB,collDB,t.year,doy,prodDB,sat,t.year,doy,t.hour,t.minute,collDB)
+            if (len(glob(basenDT)) > 0) and (len(glob(basenDB)) > 0):
+                filenDT = sorted(glob(basenDT))[0]
+                GranulesDT += [filenDT,]
+                filenDB = sorted(glob(basenDB))[0]
+                GranulesDB += [filenDB,]
+                if verbose:
+                    print(" [x] Found ",filenDT,filenDB)
+        t += dt
+
+    if len(GranulesDB) == 0:
+        print("WARNING: no AERDB collection %s granules found for"%(collDB), syn_time)
+    if len(GranulesDT) == 0:
+        print("WARNING: no AERDT collection %s granules found for"%(collDT), syn_time)
+
+    return GranulesDB, GranulesDT
+
 
 #--
 

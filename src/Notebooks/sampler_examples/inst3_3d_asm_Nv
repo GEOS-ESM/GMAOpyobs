@@ -1,0 +1,49 @@
+dset MERRA2_all/Y%y4/M%m2/MERRA2.inst3_3d_asm_Nv.%y4%m2%d2.nc4
+OPTIONS template
+title MERRA2 inst3_3d_asm_Nv: 3d,3-Hourly,Instantaneous,Model-Level,Assimilation,Assimilated Meteorological Fields
+undef 1e+15
+dtype netcdf
+CHSUB 1 35064 MERRA2_100
+CHSUB 35065 61368 MERRA2_200
+CHSUB 61369 90584 MERRA2_300
+CHSUB 90585 160696 MERRA2_400
+xdef 576 linear -180.000000 0.625000
+ydef 361 linear -90.000000 0.500000
+zdef 72 linear 1 1
+tdef 160696 linear 00:00Z01JAN1980 3hr
+vars 17
+CLOUD=>cloud 72 t,z,y,x cloud_fraction_for_radiation (1)
+DELP=>delp 72 t,z,y,x pressure_thickness (Pa)
+EPV=>epv 72 t,z,y,x ertels_potential_vorticity (K m+2 kg-1 s-1)
+H=>h 72 t,z,y,x mid_layer_heights (m)
+O3=>o3 72 t,z,y,x ozone_mass_mixing_ratio (kg kg-1)
+OMEGA=>omega 72 t,z,y,x vertical_pressure_velocity (Pa s-1)
+PHIS=>phis 0 t,y,x surface geopotential height (m+2 s-2)
+PL=>pl 72 t,z,y,x mid_level_pressure (Pa)
+PS=>ps 0 t,y,x surface_pressure (Pa)
+QI=>qi 72 t,z,y,x mass_fraction_of_cloud_ice_water (kg kg-1)
+QL=>ql 72 t,z,y,x mass_fraction_of_cloud_liquid_water (kg kg-1)
+QV=>qv 72 t,z,y,x specific_humidity (kg kg-1)
+RH=>rh 72 t,z,y,x relative_humidity_after_moist (1)
+SLP=>slp 0 t,y,x sea_level_pressure (Pa)
+T=>t 72 t,z,y,x air_temperature (K)
+U=>u 72 t,z,y,x eastward_wind (m s-1)
+V=>v 72 t,z,y,x northward_wind (m s-1)
+endvars
+@ cloud String units 1
+@ delp String units Pa
+@ epv String units K m+2 kg-1 s-1
+@ h String units m
+@ o3 String units kg kg-1
+@ omega String units Pa s-1
+@ phis String units m+2 s-2
+@ pl String units Pa
+@ ps String units Pa
+@ qi String units kg kg-1
+@ ql String units kg kg-1
+@ qv String units kg kg-1
+@ rh String units 1
+@ slp String units Pa
+@ t String units K
+@ u String units m s-1
+@ v String units m s-1
