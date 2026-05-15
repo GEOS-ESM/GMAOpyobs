@@ -4,7 +4,7 @@
 """
 
 import h5py
-from   numpy    import ones, zeros, interp, NaN, isnan, array
+import numpy as np
 from   datetime import datetime, timedelta
 
 from .config import strTemplate
@@ -79,14 +79,21 @@ SDS_HSRL2 = {'header': ('date',),
                            'Relative_Humidity',
                          )
                }
+SDS_HALO = {
+    '/': ('lat', 'lon', 'time', 'z',
+          '1064_bsc_cloud_screened', '1064_ext', '1064_aer_dep',
+          '532_bsc_cloud_screened', '532_ext', '532_aer_dep'),
+    'Nav_Data': ('gps_date', 'date', 'gps_alt', 'gps_lat', 'gps_lon', 'gps_time'),
+    'State': ('Pressure', 'Temperature', 'Relative_Humidity')
+} 
 
-NAV = ( 'Altitude','date', 'gps_date','gps_lat','gps_lon','gps_time')
+NAV = ( 'Altitude','date', 'gps_date','gps_lat','gps_lon','gps_time','lat','lon','time','z')
 
 # Short names
 # -----------
 Short_Name = dict(
                       gps_alt = 'lev',
-                     gps_date = 'datex',
+                     gps_date = 'date',
                       gps_lat = 'lat',
                       gps_lon = 'lon',
                      gps_time = 'time',
@@ -169,13 +176,23 @@ class HSRL(object):
         
         # Handle incosistency of date across HSRL datasets
         # -----------------------------------------------
-        if self.nt != self.date.shape[0]:
+        if getattr(self, 'date', None) is None:
+            import re
+            match = re.search(r'_(\d{8})_', hsrl_filename)
+            if match:
+                dt_str = match.group(1)
+                # Format as MM/DD/YYYY to match HSRL convention
+                dates = '%s/%s/%s' % (dt_str[4:6], dt_str[6:8], dt_str[0:4])
+                self.date = np.array([dates for i in range(self.nt)])
+            else:
+                raise ValueError(f"Missing date variable and could not parse YYYYMMDD from filename: {hsrl_filename}")
+        elif self.nt != self.date.shape[0]:
           date_ = self.date[0,0]
-          yy = int(date_)/10000
-          mm = (int(date_) - yy * 10000)/100
+          yy = int(date_)//10000
+          mm = (int(date_) - yy * 10000)//100
           dd = int(date_) - yy*10000 - mm*100
           dates = '%02d/%02d/%4d'%(mm,dd,yy)
-          self.date = array([dates for i in range(self.nt)])
+          self.date = np.array([dates for i in range(self.nt)])
           
         # Create datetime
         # ---------------
@@ -184,7 +201,7 @@ class HSRL(object):
            dt = timedelta(seconds = int(self.time[i]* 60. * 60.+0.5))
            mm, dd, yy = self.date[i].split('/')
            self.Time += [datetime(int(yy), int(mm), int(dd)) + dt,]
-        self.Time = array(self.Time)
+        self.Time = np.array(self.Time)
         self.tyme = self.Time.reshape((self.nt,1))
         
         # Find bracketing synoptic times
@@ -204,7 +221,7 @@ class HSRL(object):
         # ------------------------------------------
         self.IA = [] # index and weight for time interpolation
         for t in self.syn[:-1]:
-          a = ones(self.nt)
+          a = np.ones(self.nt)
           I = (a==1.)
           for n in range(self.nt):
              I[n] = (self.Time[n]>=t)&(self.Time[n]<t+self.dt_syn)
@@ -293,9 +310,9 @@ class HSRL(object):
             if self.H.shape[1] != nz:
                   raise ValueError('inconsistent GEOS-5 vertical dimension')
 
-            v = ones((self.nt,self.nz)) # same size as HSRL arrays
+            v = np.ones((self.nt,self.nz)) # same size as HSRL arrays
             for t in range(self.nt):
-                  v[t,:] = interp(self.z,self.H[t,:],v5[t,:],left=NaN)
+                  v[t,:] = np.interp(self.z,self.H[t,:],v5[t,:],left=np.nan)
 
             return v
 
@@ -326,14 +343,14 @@ class HSRL(object):
                   v_ = v[:,:]
 
             if mask_as != None:
-                  mask = isnan(mask_as[:,:])
+                  mask = np.isnan(mask_as[:,:])
             if mask != None:
-                  v_[mask] = NaN
+                  v_[mask] = np.nan
 
             if vmin is not None:
-                  v_[v_<vmin] = NaN
+                  v_[v_<vmin] = np.nan
             if vmax is not None:
-                  v_[v_>vmax] = NaN
+                  v_[v_>vmax] = np.nan
                   
             gca().set_axis_bgcolor('black')
 
@@ -432,7 +449,7 @@ class HSRL(object):
            # Interpolate in each synoptic interval
            # -------------------------------------
            s = 0
-           v = NaN * zeros(V[0].shape)          
+           v = np.nan * np.zeros(V[0].shape)          
            for I, a in self.IA:
              a_ = a[I]
              if len(v.shape) == 1:
