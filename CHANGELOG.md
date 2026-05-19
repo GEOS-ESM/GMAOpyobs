@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - update hsrl.py to use py3 integer divide. fixes date parsing.
+- units for backscatter coeffiecient to km-1 sr-1 in output files generated with aop.py
   
 ### Added
 - add optional explicit bin ordering to aop.py yaml. this allows for calculating AOP's for a single bin, or subset of bins

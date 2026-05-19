@@ -585,7 +585,7 @@ class G2GAOP(object):
         # ----------
         A = dict (EXT = {'long_name':'Aerosol Extinction Coefficient', 'units':'km-1'},
                   SCA = {'long_name':'Aerosol Scattering Coefficient', 'units':'km-1'},
-                  BSC = {'long_name':'Aerosol Backscatter Coefficient', 'units':'km-1'},
+                  BSC = {'long_name':'Aerosol Backscatter Coefficient', 'units':'km-1 sr-1'},
                   DEPOL = {'long_name':'Depolarization Ratio', 'units':'1'}
                   )
         if doaback:
