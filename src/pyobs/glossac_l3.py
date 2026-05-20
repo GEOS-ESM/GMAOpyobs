@@ -43,7 +43,7 @@ class GLOSSAC_L3(object):
 
      # Path to data
      if Path == None:
-        fname = "/home/pcolarco/geos_aerosols/pcolarco/GloSSAC_V2.23_NC4.nc"
+        fname = "/gpfsm/dnb10/projects/p22/aerosol/data/GloSSAC/GloSSAC_V2.23_NC4.nc"
 
      # Open file
      self.aer = xr.open_mfdataset(fname)
