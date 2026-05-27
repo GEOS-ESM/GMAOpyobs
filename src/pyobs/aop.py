@@ -809,7 +809,8 @@ class G2GAOP(object):
                 rEff_ = mie.getAOP('rEff', bin, rh, wavelength=None).values*1000000 
 
                 # Effective radius at a relative humidity of 0% converted from meters to microns
-                rEff_zero = mie.getBinInfo('rEffDry', bin)*1000000 
+                rhdry = 0.
+                rEff_zero = mie.getAOP('rEff', bin, rhdry, wavelength=None).values*1000000
 
                 # If necessary, compute the aerodynamic particle radius
                 # shape factor accounts for changes in the particle's dragging coefficient (see https://doi.org/10.1029/2002JD002485 for more info)
