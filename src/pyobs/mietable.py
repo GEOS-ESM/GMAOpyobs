@@ -288,14 +288,13 @@ if __name__ == "__main__":
     
    # Sample Mie Tables
    # -----------------
-   #dirn   = '/discover/nobackup/projects/gmao/share/dasilva/fvInput/ExtData/chemistry/AerosolOptics/v0.0.0/x/'
-   dirn   = '/Users/adasilva/data/ExtData/chemistry/AerosolOptics/v1.0.0/x/'
-   Tables = [dirn + 'optics_DU.v15_5.nc4', dirn + 'optics_OC.v2_3.nc4']
+   dirn   = '/gpfsm/dnb07/projects/p10/gmao_ops/fvInput_nc3/chemistry/AerosolOptics/v2.x.x/x/'
+   dirn2  = '/gpfsm/dnb07/projects/p10/gmao_ops/fvInput_nc3/chemistry/AerosolOptics/v1.0.0/x/'
+   Tables = [dirn + 'optics_DU.v2.1.0.nc4', dirn2+'optics_BC.v1_6.nc4']
 
    # Aerosol state (all species)
    # ---------------------------
-   #aer_Nv = '/css/gmao/geos-it/products/Y2023/M02/D05/GEOS.it.asm.aer_inst_3hr_glo_C180x180x6_v72.GEOS5294.2023-02-05T1200.V01.nc4'
-   aer_Nv = '/Users/adasilva/data/sampled/aer_Nv/CAMP2Ex-GEOS-MODISonly-aer-Nv-P3B_Model_*.nc'
+   aer_Nv = '/home/pcolarco/geos_aerosols/pcolarco/c180R_v11.8.1/holding/inst3d_aer_v/201901/c180R_v11.8.1.inst3d_aer_v.20190101_0000z.nc4'
    aer    = xr.open_mfdataset(aer_Nv)
 
    try:
@@ -309,8 +308,9 @@ if __name__ == "__main__":
    # Sample variable names
    # ---------------------
    Vars = ['tau', 'aot', 'gasym', 'bext', 'bsca', 'ssa', 'bbck', 'rEff','rLow','rUp',
-           'RefIndex', 'pmom', 'pback', 'pback11', 'pback22',
-           'aot_ssa_gasym', 'aot_ssa_pmom']
+           'RefIndex']
+   #, 'pmom', 'pback', 'pback11', 'pback22',
+   #        'aot_ssa_gasym', 'aot_ssa_pmom']
 
    # Loop over Tables
    # ----------------
@@ -321,6 +321,9 @@ if __name__ == "__main__":
        print('Doing',species)
        for v in Vars:
            print('-',v)
-           AOP[species,v] = mie.getAOP(v, 1, rh, wavelength=550, q_mass=q_mass[i])
+           try:
+               AOP[species,v] = mie.getAOP(v, 1, rh, wavelength=550, q_mass=q_mass[i])
+           except:
+               AOP[species,v] = mie.getBinInfo(v, 1)
 
 

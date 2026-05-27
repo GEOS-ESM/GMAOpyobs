@@ -797,8 +797,13 @@ class G2GAOP(object):
                 # rhod_ = mie.getAOP('rhod',  bin, rh, wavelength=wavelength).values
 
                 # Lower and upper bound of the bin's radius converted from meters to microns
-                rLow_ = mie.getAOP('rLow', bin, rh, wavelength=None).values*1000000 
-                rUp_  = mie.getAOP('rUp',  bin, rh, wavelength=None).values*1000000 
+                try:
+                    rLow_ = mie.getAOP('rLow', bin, rh, wavelength=None).values*1000000 
+                    rUp_  = mie.getAOP('rUp',  bin, rh, wavelength=None).values*1000000
+                except:
+                    print("rLow and rDry provided at 0% RH only; use v2.x.x tables and later")
+                    rLow_ = mie.getBinInfo('rLow', bin)*1000000
+                    rUp_ = mie.getBinInfo('rUp', bin)*1000000
 
                 # Effective radius at the specified humidity converted from meters to microns
                 rEff_ = mie.getAOP('rEff', bin, rh, wavelength=None).values*1000000 
