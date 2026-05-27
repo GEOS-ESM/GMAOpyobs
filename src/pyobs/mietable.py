@@ -12,15 +12,15 @@
       channel          (w) channel number
       wavelengths      (w) wavelengths        [m]
       rh               (r) RH values   [fraction]
-      rLow             (b) Dry lower radius [m]
       rEffDry          (b) Dry Effective radius [m]
-      rUp              (b) Dry upper radius [m]
       p                (p) Non-zero elements of phase matrix
       m                (p) Moments of phase matrix
       ang              (a) number of scattering angles [degrees]
 
     Data Variables:
-      reff             (b,r) effective radius [m]
+      rEff             (b,r) effective radius [m]
+      rLow             (b,r) Dry lower radius [m]
+      rUp              (b,r) Dry upper radius [m]
       bext             (b,w,r) bext values [m2 kg-1]
       bsca             (b,w,r) bsca values [m2 kg-1]
       bbck             (b,w,r) bbck values [m2 kg-1]
@@ -32,7 +32,7 @@
       gf               (b,r) hygroscopic growth factor
       rhop             (b,r) wet particle density [kg m-3]
       rhod             (b,r) dry particle density [kg m-3]
-      vol              (b,r) wet particle volume [m3 kg-1]
+      volume           (b,r) wet particle volume [m3 kg-1]
       area             (b,r) wet particle cross section [m2 kg-1]
       refr             (b,w,r) real part of refractive index
       refi             (b,w,r) imaginary part of refractive index
@@ -60,10 +60,11 @@ import numpy  as np
 
 __VERSION__ = '0.9.0'
 
-supportedAOPs = ['aot',          'ssa',     'gf',      'gasym',   'g',   'growth_factor',
-                 'RefIndex',     'pmom',    'area',    'volume',  'pback11', 'pback22', 'pback',
-                 'rhod',         'rhop',    'rEff',    'bbck',    'tau', 'sca',
-                 'bsca',         'bext',    'refreal', 'refimag', 'pmatrix',
+supportedAOPs = ['aot',          'ssa',     'gf',      'gasym',   'g',       'growth_factor',
+                 'RefIndex',     'pmom',    'area',    'volume',  'pback11', 'pback22',
+                 'pback',        'rhod',    'rhop',    'rEff',    'rLow',    'rUp',
+                 'bbck',         'tau',     'sca',     'bsca',    'bext',
+                 'refreal', 'refimag', 'pmatrix',
                  'p11', 'p12', 'p33', 'p34', 'p22', 'p44',
                  'aot_ssa_pmom',
                  'aot_ssa_gasym' ]
@@ -307,7 +308,7 @@ if __name__ == "__main__":
 
    # Sample variable names
    # ---------------------
-   Vars = ['tau', 'aot', 'gasym', 'bext', 'bsca', 'ssa', 'bbck', 'rEff',
+   Vars = ['tau', 'aot', 'gasym', 'bext', 'bsca', 'ssa', 'bbck', 'rEff','rLow','rUp',
            'RefIndex', 'pmom', 'pback', 'pback11', 'pback22',
            'aot_ssa_gasym', 'aot_ssa_pmom']
 
