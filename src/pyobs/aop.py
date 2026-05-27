@@ -798,18 +798,26 @@ class G2GAOP(object):
 
                 # Lower and upper bound of the bin's radius converted from meters to microns
                 try:
-                    rLow_ = mie.getAOP('rLow', bin, rh, wavelength=None).values*1000000 
-                    rUp_  = mie.getAOP('rUp',  bin, rh, wavelength=None).values*1000000
+                    rhdry = rh.copy()
+                    rhdry[:] = 0.0
+                    rLow_ = mie.getAOP('rLow', bin, rhdry, wavelength=None).values*1000000 
+                    rUp_  = mie.getAOP('rUp',  bin, rhdry, wavelength=None).values*1000000
+                    # Force recast of rLow_ and rUp_ to be dry value (scalar) for compatibility with old code
+                    rLow_ = np.squeeze(rLow_[0,0])
+                    rUp_  = np.squeeze(rUp_[0,0])
                 except:
                     print("rLow and rDry provided at 0% RH only; use v2.x.x tables and later")
                     rLow_ = mie.getBinInfo('rLow', bin)*1000000
                     rUp_ = mie.getBinInfo('rUp', bin)*1000000
-
+                    
                 # Effective radius at the specified humidity converted from meters to microns
                 rEff_ = mie.getAOP('rEff', bin, rh, wavelength=None).values*1000000 
 
                 # Effective radius at a relative humidity of 0% converted from meters to microns
-                rEff_zero = rEff_[0]
+                rhdry = rh.copy()
+                rhdry[:] = 0.0
+                rEff_zero = mie.getAOP('rEff', bin, rhdry, wavelength=None).values*1000000 
+                rEff_zero = np.squeeze(rEff_zero[0,0])
 
                 # If necessary, compute the aerodynamic particle radius
                 # shape factor accounts for changes in the particle's dragging coefficient (see https://doi.org/10.1029/2002JD002485 for more info)
