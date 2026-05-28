@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - add optional explicit bin ordering to aop.py yaml. this allows for calculating AOP's for a single bin, or subset of bins
 - add configuration file for GEOS-5430 (current FP)
 - add a buddy check code for station observation QC
+- add reader for GloSSAC data
 
 ### Changed
 - use xesmf regridder to station sampling. this is more efficient that using xarray native interp
