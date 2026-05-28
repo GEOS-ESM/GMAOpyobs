@@ -19,6 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - use xesmf regridder to station sampling. this is more efficient that using xarray native interp
 - changed 'compat' keyword definition in xrctl.py to make more flexible if 'override' is needed
+- changed aop.py and mietable.py code to handle v2.x.x optics tables consistent with how v1.0.0
+  handled
+- changed tracer names in default aop.py configuration to be like current fp
 
 ### Removed
 ### Deprecated
