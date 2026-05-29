@@ -9,15 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - update hsrl.py to use py3 integer divide. fixes date parsing.
-  
+- units for backscatter coeffiecient to km-1 sr-1 in output files generated with aop.py
+- conversion from km to m in icartt.py 
 ### Added
 - add optional explicit bin ordering to aop.py yaml. this allows for calculating AOP's for a single bin, or subset of bins
 - add configuration file for GEOS-5430 (current FP)
 - add a buddy check code for station observation QC
+- add reader for GloSSAC data
 
 ### Changed
 - use xesmf regridder to station sampling. this is more efficient that using xarray native interp
 - changed 'compat' keyword definition in xrctl.py to make more flexible if 'override' is needed
+- changed aop.py and mietable.py code to handle v2.x.x optics tables consistent with how v1.0.0
+  handled
+- changed tracer names in default aop.py configuration to be like current fp
 
 ### Removed
 ### Deprecated
