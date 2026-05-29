@@ -2,7 +2,7 @@
 """
    Implements Python interface to the HSRL L2 data.
 """
-
+import os
 import h5py
 import numpy as np
 from   datetime import datetime, timedelta
