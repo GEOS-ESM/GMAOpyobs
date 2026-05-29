@@ -178,7 +178,7 @@ class HSRL(object):
         # -----------------------------------------------
         if getattr(self, 'date', None) is None:
             import re
-            match = re.search(r'_(\d{8})_', hsrl_filename)
+            match = re.search(r'_(\d{8})_', os.path.basename(hsrl_filename))
             if match:
                 dt_str = match.group(1)
                 # Format as MM/DD/YYYY to match HSRL convention
