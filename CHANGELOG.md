@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - changed aop.py and mietable.py code to handle v2.x.x optics tables consistent with how v1.0.0
   handled
 - changed tracer names in default aop.py configuration to be like current fp
+- updated components to latest environment stack
 
 ### Removed
 ### Deprecated
