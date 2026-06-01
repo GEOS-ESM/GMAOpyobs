@@ -32,12 +32,59 @@ class SamplerError(Exception):
         return repr(self.value)
 
 
+def build_ugrid(ds):
+    """
+    Builds an xESMF compatible unstructure grid
+    for cubed-sphere sampling
+    """
+
+    nf = ds.sizes['nf']
+    ny = ds.sizes['Ydim']
+    nx = ds.sizes['Xdim']
+    grid_size = nf * ny * nx  
+
+    # --- Cell centers ---
+    center_lat = ds['lat'].values.reshape(grid_size)   # (nf, ny, nx) -> 1D
+    center_lon = ds['lon'].values.reshape(grid_size)
+
+    # --- Cell corners (select time=0; constant in time) ---
+    corn_lat = ds['corner_lats'].isel(time=0).values  # (nf, xcdim, ycdim)
+    corn_lon = ds['corner_lons'].isel(time=0).values
+
+    corner_lat_array = np.zeros((nf, ny, nx, 4))
+    corner_lon_array = np.zeros((nf, ny, nx, 4))
+
+    # CCW from SW corner
+    corner_lat_array[..., 0] = corn_lat[:, 0:ny,   0:nx  ]   # SW
+    corner_lon_array[..., 0] = corn_lon[:, 0:ny,   0:nx  ]
+    corner_lat_array[..., 1] = corn_lat[:, 0:ny,   1:nx+1]   # SE
+    corner_lon_array[..., 1] = corn_lon[:, 0:ny,   1:nx+1]
+    corner_lat_array[..., 2] = corn_lat[:, 1:ny+1, 1:nx+1]   # NE
+    corner_lon_array[..., 2] = corn_lon[:, 1:ny+1, 1:nx+1]
+    corner_lat_array[..., 3] = corn_lat[:, 1:ny+1, 0:nx  ]   # NW
+    corner_lon_array[..., 3] = corn_lon[:, 1:ny+1, 0:nx  ]
+
+    corner_lat_array = corner_lat_array.reshape(grid_size, 4)
+    corner_lon_array = corner_lon_array.reshape(grid_size, 4)
+
+    # --- Build xESMF-compatible unstructured source grid Dataset ---
+    ds_ugrid = xr.Dataset({
+        "lat":        (["grid_size"],            center_lat),
+        "lon":        (["grid_size"],            center_lon),
+        "lat_b":      (["grid_size", "corners"], corner_lat_array),
+        "lon_b":      (["grid_size", "corners"], corner_lon_array),
+    })
+
+    return ds_ugrid
+
+
 class STATION(object):
 
     def __init__(self, stations, lons, lats,
                  dataset, time_range=None, times=None, 
                  verbose=False,
-                 parallel=True,chunks='auto',**kwargs):
+                 parallel=True,chunks='auto',cs=False,
+                 **kwargs):
         """
         Specifies dataset to be sampled at obs location.
         On input,
@@ -54,6 +101,7 @@ class STATION(object):
               to generate a list of files.
         times: optional specific times to sample at, 
               otherwise output at model time resolution
+        cs: sampling on the cubed sphere
         """
 
         self.verb = verbose
@@ -73,7 +121,7 @@ class STATION(object):
         # OR a glob type of template
         # --------------------------------
         elif isinstance(dataset,(list,tuple,str)):
-            self.ds = xc.open_mfdataset(dataset,time_range=time_range,parallel=parallel,chunks=chunks,**kwargs)
+            self.ds = xc.open_mfdataset(dataset,time_range=time_range,parallel=parallel,chunks=chunks,cs=cs,**kwargs)
 
         else:
             raise SamplerError("Invalid dataset specification.")
@@ -92,7 +140,12 @@ class STATION(object):
         # Use xESMF for regridding, pre-compute transforms here
         # -------------------------------------------------------------------
         ds_loc = xr.Dataset({"lon": self.lons, "lat": self.lats})
-        self.regridder = xe.Regridder(self.ds, ds_loc, "bilinear", locstream_out=True)
+        if cs:
+            # Build xESMF unstructured grid
+            self.ds_ugrid = build_grid(self.ds)
+            self.regridder = xe.Regridder(self.ds_ugrid,ds_loc,"bilinear", locstream_out=True)
+        else:
+            self.regridder = xe.Regridder(self.ds, ds_loc, "bilinear", locstream_out=True)
 
     #--
     def sample(self,Variables=None,method='linear'):
@@ -110,7 +163,13 @@ class STATION(object):
 
         for vn in Variables:
             if self.verb: print('[ ] sampling ',vn)
-            sampled[vn] = self.regridder(self.ds[vn])
+            if hasattr(self,'ds_ugrid'):
+                # Stack the cubed-sphere dims to match your source grid
+                ds_flat = self.ds[vn].stack(grid_size=('nf', 'Ydim', 'Xdim'))
+                sampled[vn] = self.regridder(ds_flat)
+            else:
+                sampled[vn] = self.regridder(self.ds[vn])
+
 #            sampled[vn] = self.ds[vn].interp(time=self.times,lon=self.lons,lat=self.lats,method=method)
 
             if self.times is not None:
@@ -122,7 +181,10 @@ class STATION(object):
 
 class TRAJECTORY(object):
 
-    def __init__(self, times, lons, lats, dataset, parallel=True,chunks='auto',verbose=False,**kwargs):
+    def __init__(self, times, lons, lats, dataset, 
+                  parallel=True,chunks='auto',
+                  verbose=False,cs=False,
+                  **kwargs):
         """
         Specifies dataset to be sampled at obs location.
         On input,
@@ -136,7 +198,7 @@ class TRAJECTORY(object):
         parallel: bool, whether to open dataset in parallel and return
                   dask arrays.
         verbose: bool, what it says.
-
+        cs: sample on cubed sphere
         """
 
         self.verb = verbose
@@ -158,18 +220,26 @@ class TRAJECTORY(object):
         # OR a glob type of template
         # --------------------------------
         elif isinstance(dataset,(list,tuple,str)):
-            self.ds = xc.open_mfdataset(dataset,time_range=time_range,parallel=parallel,chunks=chunks,**kwargs) # special handles GrADS-style ctl if found
+            self.ds = xc.open_mfdataset(dataset,time_range=time_range,parallel=parallel,
+                                        chunks=chunks,cs=cs,**kwargs) # special handles GrADS-style ctl if found
 
         else:
             raise SamplerError("Invalid dataset specification.")
+
 
         # Save coordinates with proper attributes
         # ---------------------------------------
         self.lons = xr.DataArray(lons, dims='time',attrs=self.ds.coords['lon'].attrs)
         self.lats = xr.DataArray(lats, dims='time',attrs=self.ds.coords['lat'].attrs)
 
-        # TO DO: when using xESMF for regridding, pre-compute transforms here
-        # -------------------------------------------------------------------
+        if cs:
+            # Use xESMF for regridding on cubed sphere, pre-compute transforms here
+            # ---------------------------------------------------------------------
+            ds_loc = xr.Dataset({"lon": xr.DataArray(lons, dims='locations'),
+                                 "lat": xr.DataArray(lats, dims='locations')})
+            # Build xESMF unstructured grid
+            self.ds_ugrid = build_grid(self.ds)
+            self.regridder = xe.Regridder(self.ds_ugrid,ds_loc,"bilinear", locstream_out=True)        
 
     #--
     def sample(self,Variables=None,method='linear'):
@@ -187,7 +257,18 @@ class TRAJECTORY(object):
 
         for vn in Variables:
             if self.verb: print('[ ] sampling',vn)
-            sampled[vn] = self.ds[vn].interp(time=self.times,lon=self.lons,lat=self.lats,method=method)
+            if hasattr(self,'ds_ugrid'):
+                ds_flat = self.ds[vn].stack(grid_size=('nf', 'Ydim', 'Xdim'))
+                ds_spatial = self.regridder(ds_flat)  # Result shape: (time, lev, locations: n_points)
+
+                # Rename locations -> time BEFORE temporal interpolation
+                ds_spatial = ds_spatial.rename({'locations': 'time'})                
+
+                # Temporally interpolate to trajectory times
+                sampled[vn] = ds_spatial.interp(time=self.times, method='linear') 
+
+            else:
+                sampled[vn] = self.ds[vn].interp(time=self.times,lon=self.lons,lat=self.lats,method=method)
 
         return xr.Dataset(sampled).assign_coords({'time': self.times})
 
@@ -281,6 +362,10 @@ def CLI_stnSampler():
                       action="store_true", dest="verbose",
                       help="Verbose mode.")
 
+    parser.add_option("--cs",
+                      action="store_true", dest="cs",
+                      help="Sampling on cubed sphere")
+
     (options, args) = parser.parse_args()
 
     if len(args) == 4 :
@@ -307,7 +392,7 @@ def CLI_stnSampler():
 
     # Sample variables at station locations
     # -------------------------------------
-    stn = STATION(stations,lons,lats,dataset,verbose=options.verbose)
+    stn = STATION(stations,lons,lats,dataset,verbose=options.verbose,cs=options.cs)
     ds = stn.sample(Variables=options.Vars,method=method)
     if options.verbose:
         print(ds)
@@ -512,6 +597,10 @@ def CLI_trjSampler():
                       action="store_true", dest="verbose",
                       help="Verbose mode.")
 
+    parser.add_option("--cs",
+                      action="store_true", dest="cs",
+                      help="Sampling on cubed sphere")
+
     (options, args) = parser.parse_args()
 
     if options.traj == 'WP':
@@ -579,7 +668,7 @@ def CLI_trjSampler():
             time = df.index.values
             lon = df['lon'].values
             lat = df['lat'].values
-            trj = TRAJECTORY(time,lon,lat,dataset,verbose=options.verbose)
+            trj = TRAJECTORY(time,lon,lat,dataset,verbose=options.verbose,cs=options.cs)
             ds = trj.sample(Variables=options.Vars,method=method)
 
             if options.verbose:
@@ -591,7 +680,7 @@ def CLI_trjSampler():
     # --------
     else:
 
-        trj = TRAJECTORY(time,lon,lat,dataset,verbose=options.verbose)
+        trj = TRAJECTORY(time,lon,lat,dataset,verbose=options.verbose,cs=options.cs)
         ds = trj.sample(Variables=options.Vars,method=method)
         if options.verbose:
             #print(ds)

@@ -9,7 +9,7 @@ import os
 
 import xarray as xr
 import numpy  as np
-
+import warnings
 from glob import glob
 
 from datetime import datetime, timedelta
@@ -27,7 +27,7 @@ class XRctlError(Exception):
 
 #...........................................................................
 
-def open_mfdataset(paths,*args, time_range=None, lock=False, **kwargs):
+def open_mfdataset(paths,*args, time_range=None, lock=False, cs=False, **kwargs):
     """
     Intercepts call to xarray open_mfdataset() and if *paths*
     is a GrADS-style ctl file, parses it generating a list of
@@ -65,13 +65,25 @@ def open_mfdataset(paths,*args, time_range=None, lock=False, **kwargs):
             compat = "override"  # if there are multiples of the same variable name, just use the one from the first dataset
             coords = "minimal"
        
-#    if isinstance(paths_,(list,tuple)):          
-#        _ = Dataset(paths_[0])    # hack to circumvent some bug in open_mfdataset, it seems to initialize netcdf.
-
     if opendap:
         ds = xr.open_dataset(paths_)
     else:
-        ds = xr.open_mfdataset(paths_,*args,lock=lock,**kwargs,compat=compat,coords=coords)
+        if cs:
+            # GEOS cubed-sphere files trigger a warning.  
+            # Suppress it and drop the offending variables
+            with warnings.catch_warnings():
+                warnings.filterwarnings(
+                    "ignore",
+                    message="Duplicate dimension names present",
+                    category=UserWarning
+                )
+                drop_variables += kwargs.pop('drop_variables',[])
+                ds = xr.open_mfdataset(paths_,*args,lock=lock,**kwargs,compat=compat,coords=coords,
+                                       drop_variables=drop_variables)
+                if 'lons' in ds.coords:
+                    ds = ds.rename({'lats': 'lat', 'lons': 'lon'})
+        else:
+            ds = xr.open_mfdataset(paths_,*args,lock=lock,**kwargs,compat=compat,coords=coords)
 
     return ds.assign_attrs(source_file_path=paths_)
 #...........................................................................
