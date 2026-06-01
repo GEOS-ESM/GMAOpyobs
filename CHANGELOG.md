@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - add a buddy check code for station observation QC
 - add reader for GloSSAC data
 - support for HALO in hsrl.py
+- support sampling on the cubed sphere
 
 ### Changed
 - use xesmf regridder to station sampling. this is more efficient that using xarray native interp
