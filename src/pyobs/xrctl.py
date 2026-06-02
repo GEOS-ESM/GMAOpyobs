@@ -15,7 +15,19 @@ from glob import glob
 from datetime import datetime, timedelta
 from dateutil.parser import parse         as isoparser
 from dateutil.relativedelta import relativedelta
-    
+
+# Suppress xarray warning triggered by GEOS cubed-sphere files which have
+# a variable ('anchor') with duplicate dimension names. The variable is
+# dropped via drop_variables but the warning fires before that filter
+# is applied, and catch_warnings() does not work with dask worker threads.
+warnings.filterwarnings(
+    "ignore",
+    message="Duplicate dimension names present",
+    category=UserWarning,
+    module="xarray",
+    append=True
+)
+
 class XRctlError(Exception):
     """
     Defines XRctl general exception errors.
@@ -69,19 +81,12 @@ def open_mfdataset(paths,*args, time_range=None, lock=False, cs=False, **kwargs)
         ds = xr.open_dataset(paths_)
     else:
         if cs:
-            # GEOS cubed-sphere files trigger a warning.  
-            # Suppress it and drop the offending variables
-            with warnings.catch_warnings():
-                warnings.filterwarnings(
-                    "ignore",
-                    message="Duplicate dimension names present",
-                    category=UserWarning
-                )
-                drop_variables += kwargs.pop('drop_variables',[])
-                ds = xr.open_mfdataset(paths_,*args,lock=lock,**kwargs,compat=compat,coords=coords,
-                                       drop_variables=drop_variables)
-                if 'lons' in ds.coords:
-                    ds = ds.rename({'lats': 'lat', 'lons': 'lon'})
+            drop_variables = ['anchor', 'contacts']
+            drop_variables += kwargs.pop('drop_variables',[])
+            ds = xr.open_mfdataset(paths_,*args,lock=lock,**kwargs,compat=compat,coords=coords,
+                                   drop_variables=drop_variables)
+            if 'lons' in ds.coords:
+                ds = ds.rename({'lats': 'lat', 'lons': 'lon'})
         else:
             ds = xr.open_mfdataset(paths_,*args,lock=lock,**kwargs,compat=compat,coords=coords)
 
