@@ -18,6 +18,8 @@ from glob import glob
 from . import xrctl as xc
 import fsspec
 import dask.distributed
+import xesmf.frontend as xef
+import dask.array as dsa
 
 os.environ['HDF5_USE_FILE_LOCKING']='FALSE'
 
@@ -31,52 +33,28 @@ class SamplerError(Exception):
     def __str__(self):
         return repr(self.value)
 
-
 def build_ugrid(ds):
     """
-    Builds an xESMF compatible unstructure grid
-    for cubed-sphere sampling
+    Builds an xESMF-compatible dataset for the GEOS cubed-sphere grid.
+    Reshapes the flattened grid to 2D (nf*ny, nx) so that:
+      - as_2d_mesh sees a (2D, 2D) pair and passes through
+      - ESMF sees no DE of width 1
+      - no bounds needed (bilinear)
     """
-
     nf = ds.sizes['nf']
     ny = ds.sizes['Ydim']
     nx = ds.sizes['Xdim']
-    grid_size = nf * ny * nx  
 
-    # --- Cell centers ---
-    center_lat = ds['lat'].values.reshape(grid_size)   # (nf, ny, nx) -> 1D
-    center_lon = ds['lon'].values.reshape(grid_size)
+    # Reshape to (nf*ny, nx) -- both dims > 1, no meshgrid, no DE-width-1
+    center_lat = ds['lat'].values.reshape(nf*ny, nx).astype(np.float64)
+    center_lon = ds['lon'].values.reshape(nf*ny, nx).astype(np.float64)
 
-    # --- Cell corners (select time=0; constant in time) ---
-    corn_lat = ds['corner_lats'].isel(time=0).values  # (nf, xcdim, ycdim)
-    corn_lon = ds['corner_lons'].isel(time=0).values
-
-    corner_lat_array = np.zeros((nf, ny, nx, 4))
-    corner_lon_array = np.zeros((nf, ny, nx, 4))
-
-    # CCW from SW corner
-    corner_lat_array[..., 0] = corn_lat[:, 0:ny,   0:nx  ]   # SW
-    corner_lon_array[..., 0] = corn_lon[:, 0:ny,   0:nx  ]
-    corner_lat_array[..., 1] = corn_lat[:, 0:ny,   1:nx+1]   # SE
-    corner_lon_array[..., 1] = corn_lon[:, 0:ny,   1:nx+1]
-    corner_lat_array[..., 2] = corn_lat[:, 1:ny+1, 1:nx+1]   # NE
-    corner_lon_array[..., 2] = corn_lon[:, 1:ny+1, 1:nx+1]
-    corner_lat_array[..., 3] = corn_lat[:, 1:ny+1, 0:nx  ]   # NW
-    corner_lon_array[..., 3] = corn_lon[:, 1:ny+1, 0:nx  ]
-
-    corner_lat_array = corner_lat_array.reshape(grid_size, 4)
-    corner_lon_array = corner_lon_array.reshape(grid_size, 4)
-
-    # --- Build xESMF-compatible unstructured source grid Dataset ---
     ds_ugrid = xr.Dataset({
-        "lat":        (["grid_size"],            center_lat),
-        "lon":        (["grid_size"],            center_lon),
-        "lat_b":      (["grid_size", "corners"], corner_lat_array),
-        "lon_b":      (["grid_size", "corners"], corner_lon_array),
+        "lat": (["y", "x"], center_lat),
+        "lon": (["y", "x"], center_lon),
     })
 
     return ds_ugrid
-
 
 class STATION(object):
 
@@ -139,11 +117,15 @@ class STATION(object):
 
         # Use xESMF for regridding, pre-compute transforms here
         # -------------------------------------------------------------------
-        ds_loc = xr.Dataset({"lon": self.lons, "lat": self.lats})
+        ds_loc = xr.Dataset({
+            "lon": (["locations"], np.asarray(lons, dtype=np.float64)),
+            "lat": (["locations"], np.asarray(lats, dtype=np.float64)),
+        })
+
         if cs:
             # Build xESMF unstructured grid
-            self.ds_ugrid = build_grid(self.ds)
-            self.regridder = xe.Regridder(self.ds_ugrid,ds_loc,"bilinear", locstream_out=True)
+            self.ds_ugrid = build_ugrid(self.ds)
+            self.regridder = xe.Regridder(self.ds_ugrid,ds_loc,"bilinear", locstream_out=True, periodic=False, unmapped_to_nan=True)
         else:
             self.regridder = xe.Regridder(self.ds, ds_loc, "bilinear", locstream_out=True)
 
@@ -154,7 +136,13 @@ class STATION(object):
 
         """
         if Variables is None:
-            Variables = list(self.ds.data_vars)
+            if hasattr(self, 'ds_ugrid'):
+                Variables = [
+                    vn for vn in self.ds.data_vars
+                    if all(d in self.ds[vn].dims for d in ('nf', 'Ydim', 'Xdim'))
+                ]
+            else:
+                Variables = list(self.ds.data_vars)
 
         elif isinstance(Variables,str):
             Variables = [Variables,]
@@ -164,18 +152,41 @@ class STATION(object):
         for vn in Variables:
             if self.verb: print('[ ] sampling ',vn)
             if hasattr(self,'ds_ugrid'):
-                # Stack the cubed-sphere dims to match your source grid
-                ds_flat = self.ds[vn].stack(grid_size=('nf', 'Ydim', 'Xdim'))
-                sampled[vn] = self.regridder(ds_flat)
+                nf = self.ds.sizes.get('nf')
+                ny = self.ds.sizes.get('Ydim')
+                nx = self.ds.sizes.get('Xdim')
+
+                hdims = ('nf', 'Ydim', 'Xdim')
+                odims = [d for d in da.dims if d not in hdims]
+
+                # Reshape horizontal dims to (nf*ny, nx) to match ds_ugrid
+                leading_shape = tuple(self.ds[vn].sizes[d] for d in odims)
+                data = dsa.reshape(self.ds[vn].data, leading_shape + (nf*ny, nx))
+                # rechunk so each (time, lev) slice is one chunk
+                data = data.rechunk({-2: nf*ny, -1: nx})
+
+                da_2d = xr.DataArray(
+                    data,
+                    dims=odims + ['y', 'x'],
+                    coords={d: da.coords[d] for d in odims if d in da.coords}
+                )
+
+                # Spatial regrid: (..., locations)
+                ds_spatial = self.regridder(da_2d)
+
+                # Rename locations -> station
+                sampled[vn] = ds_spatial.assign_coords(time=('locations', self.stations.values)).rename({'locations': 'station'})
+
             else:
                 sampled[vn] = self.regridder(self.ds[vn])
+                sampled[vn] = sampled[vn].assign_coords(time=('locations', self.stations.values)).rename({'locations': 'station'})
 
 #            sampled[vn] = self.ds[vn].interp(time=self.times,lon=self.lons,lat=self.lats,method=method)
 
             if self.times is not None:
                 sampled[vn] = sampled[vn].interp(time=self.times,method=method)
 
-        return xr.Dataset(sampled).assign_coords({'station': self.stations})
+        return xr.Dataset(sampled)
 
 #......................................................................................
 
@@ -202,7 +213,7 @@ class TRAJECTORY(object):
         """
 
         self.verb = verbose
-        self.times = xr.DataArray(times,dims='time')
+        self.times = xr.DataArray(times,dims='time',coords={'time': times})
         time_range = times.min(), times.max()
         if isinstance(time_range[0],np.datetime64):
             time_range = pd.to_datetime(time_range)
@@ -235,11 +246,11 @@ class TRAJECTORY(object):
         if cs:
             # Use xESMF for regridding on cubed sphere, pre-compute transforms here
             # ---------------------------------------------------------------------
-            ds_loc = xr.Dataset({"lon": xr.DataArray(lons, dims='locations'),
-                                 "lat": xr.DataArray(lats, dims='locations')})
+            ds_loc = xr.Dataset({"lon": (["locations"], lons),
+                                 "lat": (["locations"], lats)})
             # Build xESMF unstructured grid
-            self.ds_ugrid = build_grid(self.ds)
-            self.regridder = xe.Regridder(self.ds_ugrid,ds_loc,"bilinear", locstream_out=True)        
+            self.ds_ugrid = build_ugrid(self.ds)
+            self.regridder = xe.Regridder(self.ds_ugrid,ds_loc,"bilinear", locstream_out=True,periodic=False,unmapped_to_nan=True)        
 
     #--
     def sample(self,Variables=None,method='linear'):
@@ -248,7 +259,15 @@ class TRAJECTORY(object):
 
         """
         if Variables is None:
-            Variables = list(self.ds.data_vars)
+            if hasattr(self, 'ds_ugrid'):
+                # Only include variables with standard horizontal dims
+                Variables = [
+                    vn for vn in self.ds.data_vars
+                    if all(d in self.ds[vn].dims for d in ('nf', 'Ydim', 'Xdim'))
+                ]
+            else:
+                Variables = list(self.ds.data_vars)
+
 
         elif isinstance(Variables,str):
             Variables = [Variables,]
@@ -258,19 +277,41 @@ class TRAJECTORY(object):
         for vn in Variables:
             if self.verb: print('[ ] sampling',vn)
             if hasattr(self,'ds_ugrid'):
-                ds_flat = self.ds[vn].stack(grid_size=('nf', 'Ydim', 'Xdim'))
-                ds_spatial = self.regridder(ds_flat)  # Result shape: (time, lev, locations: n_points)
 
-                # Rename locations -> time BEFORE temporal interpolation
-                ds_spatial = ds_spatial.rename({'locations': 'time'})                
+                nf = self.ds.sizes['nf']
+                ny = self.ds.sizes['Ydim']
+                nx = self.ds.sizes['Xdim']
+
+                # Identify non-horizontal dims (e.g. time, lev)
+                hdims = ('nf', 'Ydim', 'Xdim')
+                odims = [d for d in self.ds[vn].dims if d not in hdims]
+
+                # Reshape horizontal dims to (nf*ny, nx) to match ds_ugrid
+                leading_shape = tuple(self.ds[vn].sizes[d] for d in odims)
+                data = dsa.reshape(self.ds[vn].data, leading_shape + (nf*ny, nx))
+                # rechunk so each (time, lev) slice is one chunk
+                data = data.rechunk({-2: nf*ny, -1: nx})
+
+                da_2d = xr.DataArray(
+                    data,
+                    dims=odims + ['y', 'x'],
+                    coords={d: self.ds[vn].coords[d] for d in odims if d in self.ds[vn].coords}
+                )
+
+                ds_spatial = self.regridder(da_2d)  # (..., locations)
+                times_da = xr.DataArray(self.times.values, dims='locations')
 
                 # Temporally interpolate to trajectory times
-                sampled[vn] = ds_spatial.interp(time=self.times, method='linear') 
+                sampled[vn] = ds_spatial.interp(time=times_da, method='linear')
+
+                # rename locations -> time
+                sampled[vn] = sampled[vn].assign_coords(time=('locations', self.times.values)).swap_dims({'locations': 'time'}) 
 
             else:
                 sampled[vn] = self.ds[vn].interp(time=self.times,lon=self.lons,lat=self.lats,method=method)
+                sampled[vn] = sampled[vn].assign_coords({'time': self.times})
 
-        return xr.Dataset(sampled).assign_coords({'time': self.times})
+        return xr.Dataset(sampled)
 
 #......................................................................................
 
