@@ -221,7 +221,7 @@ class CSBIN(object):
 
         return 
     
-    def binObs ( self, obs ):
+    def binObs ( self, obs, average = True ):
         """
         Given a list of longitude and latitudes in (lons,lats),
         bin list of observations *obs* on the cubed sphere,
@@ -257,8 +257,12 @@ class CSBIN(object):
             # ---------
             gObs = MAPL_UNDEF * np.ones(face_size, dtype=float)
             K = nObs>0
-            gObs[K] = aObs[K] / nObs[K]
-            
+
+            if (average) :
+               gObs[K] = aObs[K] / nObs[K]
+            else :
+               gObs[K] = aObs[K]
+
             csObs[f] = np.reshape(gObs, (self.Xdim, self.Xdim))
         # All done
         # --------
