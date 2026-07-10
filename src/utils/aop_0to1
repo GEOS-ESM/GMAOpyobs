@@ -43,7 +43,7 @@ if __name__ == "__main__":
         # Change order of dimensions, renaming some of them
         # --------------------------------------------------
 #        ds_ = ds.transpose('radius','lambda','nPol','nMom','rh',missing_dims="ignore").\
-        ds_ = ds.transpose('radius','lambda','rh','nPol','nMom',missing_dims="ignore").\
+        ds_ = ds.transpose('radius','lambda','rh','nPol','nMom','ang',missing_dims="ignore").\
                  rename({'lambda':'wavelength','radius':'bin'})
 
         if 'nPol' in ds.dims:
