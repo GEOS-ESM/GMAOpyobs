@@ -18,8 +18,9 @@ from glob import glob
 from . import xrctl as xc
 import fsspec
 import dask.distributed
-import xesmf.frontend as xef
 import dask.array as dsa
+import esmpy as ESMF
+from scipy.spatial import ConvexHull
 
 os.environ['HDF5_USE_FILE_LOCKING']='FALSE'
 
@@ -33,28 +34,58 @@ class SamplerError(Exception):
     def __str__(self):
         return repr(self.value)
 
-def build_ugrid(ds):
+def build_dual_mesh(ds):
     """
-    Builds an xESMF-compatible dataset for the GEOS cubed-sphere grid.
-    Reshapes the flattened grid to 2D (nf*ny, nx) so that:
-      - as_2d_mesh sees a (2D, 2D) pair and passes through
-      - ESMF sees no DE of width 1
-      - no bounds needed (bilinear)
+    Builds a continuous triangulated mesh using the cell centers as the nodes.
+    This allows ESMF to perform Bilinear interpolation from cubed-sphere centers.
     """
-    nf = ds.sizes['nf']
-    ny = ds.sizes['Ydim']
-    nx = ds.sizes['Xdim']
+    # Grab the cell center coordinates (usually 'lon' and 'lat' with dims: nf, Ydim, Xdim)
+    if 'time' in ds['lon'].dims:
+        lon = ds['lon'].isel(time=0).values
+        lat = ds['lat'].isel(time=0).values
+    else:
+        lon = ds['lon'].values
+        lat = ds['lat'].values
 
-    # Reshape to (nf*ny, nx) -- both dims > 1, no meshgrid, no DE-width-1
-    center_lat = ds['lat'].values.reshape(nf*ny, nx).astype(np.float64)
-    center_lon = ds['lon'].values.reshape(nf*ny, nx).astype(np.float64)
+    flat_lon = lon.ravel()
+    flat_lat = lat.ravel()
+    n_nodes = len(flat_lon)
 
-    ds_ugrid = xr.Dataset({
-        "lat": (["y", "x"], center_lat),
-        "lon": (["y", "x"], center_lon),
-    })
+    # Convert lat/lon to 3D Cartesian coordinates
+    lon_rad = np.radians(flat_lon)
+    lat_rad = np.radians(flat_lat)
+    x = np.cos(lat_rad) * np.cos(lon_rad)
+    y = np.cos(lat_rad) * np.sin(lon_rad)
+    z = np.sin(lat_rad)
+    
+    # Use ConvexHull to automatically triangulate the sphere
+    coords_3d = np.column_stack((x, y, z))
+    hull = ConvexHull(coords_3d)
+    
+    # hull.simplices contains the 0-based indices for the 3 corners of every triangle
+    triangles = hull.simplices
 
-    return ds_ugrid
+    # Create ESMF Mesh
+    mesh = ESMF.Mesh(parametric_dim=2, spatial_dim=2, coord_sys=ESMF.CoordSys.SPH_DEG)
+    
+    # Add the cell centers as NODES
+    node_ids = np.arange(1, n_nodes + 1, dtype=np.int32)
+    node_coords = np.empty(2 * n_nodes, dtype=np.float64)
+    node_coords[0::2] = flat_lon
+    node_coords[1::2] = flat_lat
+    node_owners = np.zeros(n_nodes, dtype=np.int32)
+    
+    mesh.add_nodes(n_nodes, node_ids, node_coords, node_owners)
+    
+    # Add the Triangles as ELEMENTS
+    n_elems = len(triangles)
+    elem_ids = np.arange(1, n_elems + 1, dtype=np.int32)
+    elem_types = np.full(n_elems, ESMF.MeshElemType.TRI, dtype=np.int32)
+    elem_conn = triangles.ravel().astype(np.int32) # ConvexHull is natively 0-based, perfect for esmpy!
+    
+    mesh.add_elements(n_elems, elem_ids, elem_types, elem_conn)
+    
+    return mesh
 
 class STATION(object):
 
@@ -117,17 +148,33 @@ class STATION(object):
 
         # Use xESMF for regridding, pre-compute transforms here
         # -------------------------------------------------------------------
-        ds_loc = xr.Dataset({
-            "lon": (["locations"], np.asarray(lons, dtype=np.float64)),
-            "lat": (["locations"], np.asarray(lats, dtype=np.float64)),
-        })
-
         if cs:
-            # Build xESMF unstructured grid
-            self.ds_ugrid = build_ugrid(self.ds)
-            self.regridder = xe.Regridder(self.ds_ugrid,ds_loc,"bilinear", locstream_out=True, periodic=False, unmapped_to_nan=True)
+            # Build ESMF mesh
+            self.src_mesh = build_dual_mesh(self.ds)
+
+            n_stations = len(lons)
+
+            # Create locstream
+            self.dst_locstream = ESMF.LocStream(n_stations, coord_sys=ESMF.CoordSys.SPH_DEG)
+            self.dst_locstream["ESMF:Lon"] = np.asarray(lons, dtype=np.float64)
+            self.dst_locstream["ESMF:Lat"] = np.asarray(lats, dtype=np.float64)
+
+            self.src_field = ESMF.Field(self.src_mesh, meshloc=ESMF.MeshLoc.NODE)
+            self.dst_field = ESMF.Field(self.dst_locstream, name='dst')
+
+            self.regridder = ESMF.Regrid(self.src_field,
+                                         self.dst_field,
+                                         regrid_method=ESMF.RegridMethod.BILINEAR,
+                                         unmapped_action=ESMF.UnmappedAction.IGNORE)
         else:
+            ds_loc = xr.Dataset({
+                "lon": (["locations"], np.asarray(lons, dtype=np.float64)),
+                "lat": (["locations"], np.asarray(lats, dtype=np.float64)),
+            })
+
             self.regridder = xe.Regridder(self.ds, ds_loc, "bilinear", locstream_out=True)
+
+        self.cs = cs
 
     #--
     def sample(self,Variables=None,method='linear'):
@@ -136,7 +183,8 @@ class STATION(object):
 
         """
         if Variables is None:
-            if hasattr(self, 'ds_ugrid'):
+            if self.cs:
+                # Only grab variables that actually have cubed-sphere spatial dimensions
                 Variables = [
                     vn for vn in self.ds.data_vars
                     if all(d in self.ds[vn].dims for d in ('nf', 'Ydim', 'Xdim'))
@@ -151,31 +199,58 @@ class STATION(object):
 
         for vn in Variables:
             if self.verb: print('[ ] sampling ',vn)
-            if hasattr(self,'ds_ugrid'):
-                nf = self.ds.sizes.get('nf')
-                ny = self.ds.sizes.get('Ydim')
-                nx = self.ds.sizes.get('Xdim')
+            if self.cs:
 
-                hdims = ('nf', 'Ydim', 'Xdim')
-                odims = [d for d in da.dims if d not in hdims]
-
-                # Reshape horizontal dims to (nf*ny, nx) to match ds_ugrid
-                leading_shape = tuple(self.ds[vn].sizes[d] for d in odims)
-                data = dsa.reshape(self.ds[vn].data, leading_shape + (nf*ny, nx))
-                # rechunk so each (time, lev) slice is one chunk
-                data = data.rechunk({-2: nf*ny, -1: nx})
-
-                da_2d = xr.DataArray(
-                    data,
-                    dims=odims + ['y', 'x'],
-                    coords={d: da.coords[d] for d in odims if d in da.coords}
+                da_var = self.ds[vn]
+                # Identify extra dimensions (anything not part of the spatial cubed-sphere grid)
+                spatial_dims = ('nf', 'Ydim', 'Xdim')
+                extra_dims = [d for d in da_var.dims if d not in spatial_dims]
+                
+                # Reorder the DataArray so extra dimensions come first, spatial dims at the end
+                da_var = da_var.transpose(*extra_dims, *spatial_dims)
+                
+                # Calculate shapes
+                extra_shape = tuple(da_var.sizes[d] for d in extra_dims)
+                num_slices = int(np.prod(extra_shape)) if extra_shape else 1
+                num_elements = int(np.prod([da_var.sizes[d] for d in spatial_dims]))
+                num_stations = len(self.stations)
+                
+                # Reshape data into a 2D array: (total_extra_slices, total_spatial_elements)
+                # If there are no extra dims, this just becomes (1, num_elements)
+                flat_data_2d = da_var.values.reshape(num_slices, num_elements)
+                
+                # Pre-allocate array for the interpolated results
+                interpolated_results = np.empty((num_slices, num_stations), dtype=da_var.dtype)
+                
+                # Loop over each slice, regrid, and save
+                for i in range(num_slices):
+                    # Assign the 1D spatial data slice to the source field
+                    self.src_field.data[...] = flat_data_2d[i, :]
+                    
+                    # Perform the regridding
+                    self.regridder(self.src_field, self.dst_field)
+                    
+                    # Store the result
+                    interpolated_results[i, :] = self.dst_field.data
+                
+                # Reshape results back to (*extra_shape, num_stations)
+                final_shape = extra_shape + (num_stations,)
+                interpolated_results = interpolated_results.reshape(final_shape)
+                
+                # Package back into an xarray DataArray
+                # Gather coordinates for the extra dimensions + the stations
+                out_coords = {d: da_var.coords[d] for d in extra_dims if d in da_var.coords}
+                out_coords['station'] = self.stations.values
+                
+                da_spatial = xr.DataArray(
+                    interpolated_results,
+                    dims=extra_dims + ['station'],
+                    coords=out_coords,
+                    name=vn,
+                    attrs=da_var.attrs
                 )
 
-                # Spatial regrid: (..., locations)
-                ds_spatial = self.regridder(da_2d)
-
-                # Rename locations -> station
-                sampled[vn] = ds_spatial.assign_coords(time=('locations', self.stations.values)).rename({'locations': 'station'})
+                sampled[vn] = da_spatial
 
             else:
                 sampled[vn] = self.regridder(self.ds[vn])
@@ -244,14 +319,27 @@ class TRAJECTORY(object):
         self.lats = xr.DataArray(lats, dims='time',attrs=self.ds.coords['lat'].attrs)
 
         if cs:
-            # Use xESMF for regridding on cubed sphere, pre-compute transforms here
-            # ---------------------------------------------------------------------
-            ds_loc = xr.Dataset({"lon": (["locations"], lons),
-                                 "lat": (["locations"], lats)})
-            # Build xESMF unstructured grid
-            self.ds_ugrid = build_ugrid(self.ds)
-            self.regridder = xe.Regridder(self.ds_ugrid,ds_loc,"bilinear", locstream_out=True,periodic=False,unmapped_to_nan=True)        
+            # Build ESMF unstructured mesh
+            self.src_mesh = build_dual_mesh(self.ds)
 
+            nobs = len(lons)
+            # Create locstream
+            self.dst_locstream = ESMF.LocStream(nobs, coord_sys=ESMF.CoordSys.SPH_DEG)
+            self.dst_locstream["ESMF:Lon"] = np.asarray(lons, dtype=np.float64)
+            self.dst_locstream["ESMF:Lat"] = np.asarray(lats, dtype=np.float64)
+            
+            self.src_field = ESMF.Field(self.src_mesh, name='src', meshloc=ESMF.MeshLoc.NODE)
+            self.dst_field = ESMF.Field(self.dst_locstream, name='dst')
+            
+            self.regridder = ESMF.Regrid(
+                self.src_field, 
+                self.dst_field,
+                regrid_method=ESMF.RegridMethod.BILINEAR,
+                unmapped_action=ESMF.UnmappedAction.IGNORE
+            )
+
+        self.cs = cs
+            
     #--
     def sample(self,Variables=None,method='linear'):
         """
@@ -259,7 +347,7 @@ class TRAJECTORY(object):
 
         """
         if Variables is None:
-            if hasattr(self, 'ds_ugrid'):
+            if self.cs:
                 # Only include variables with standard horizontal dims
                 Variables = [
                     vn for vn in self.ds.data_vars
@@ -276,36 +364,56 @@ class TRAJECTORY(object):
 
         for vn in Variables:
             if self.verb: print('[ ] sampling',vn)
-            if hasattr(self,'ds_ugrid'):
-
-                nf = self.ds.sizes['nf']
-                ny = self.ds.sizes['Ydim']
-                nx = self.ds.sizes['Xdim']
-
-                # Identify non-horizontal dims (e.g. time, lev)
-                hdims = ('nf', 'Ydim', 'Xdim')
-                odims = [d for d in self.ds[vn].dims if d not in hdims]
-
-                # Reshape horizontal dims to (nf*ny, nx) to match ds_ugrid
-                leading_shape = tuple(self.ds[vn].sizes[d] for d in odims)
-                data = dsa.reshape(self.ds[vn].data, leading_shape + (nf*ny, nx))
-                # rechunk so each (time, lev) slice is one chunk
-                data = data.rechunk({-2: nf*ny, -1: nx})
-
-                da_2d = xr.DataArray(
-                    data,
-                    dims=odims + ['y', 'x'],
-                    coords={d: self.ds[vn].coords[d] for d in odims if d in self.ds[vn].coords}
+            if self.cs:
+                da_var = self.ds[vn]
+                
+                # Identify extra dims (like time, lev)
+                spatial_dims = ('nf', 'Ydim', 'Xdim')
+                extra_dims = [d for d in da_var.dims if d not in spatial_dims]
+                
+                # Reorder so extra dims are first
+                da_var = da_var.transpose(*extra_dims, *spatial_dims)
+                
+                # Calculate shapes
+                extra_shape = tuple(da_var.sizes[d] for d in extra_dims)
+                num_slices = int(np.prod(extra_shape)) if extra_shape else 1
+                num_elements = int(np.prod([da_var.sizes[d] for d in spatial_dims]))
+                num_locations = len(self.lons)
+                
+                # Reshape data into 2D and pre-allocate results
+                flat_data_2d = da_var.values.reshape(num_slices, num_elements)
+                interpolated_results = np.empty((num_slices, num_locations), dtype=da_var.dtype)
+                
+                # Spatial Regridding Loop
+                for i in range(num_slices):
+                    self.src_field.data[...] = flat_data_2d[i, :]
+                    self.regridder(self.src_field, self.dst_field)
+                    interpolated_results[i, :] = self.dst_field.data
+                    
+                # Reshape spatial results back to multidimensional
+                final_shape = extra_shape + (num_locations,)
+                interpolated_results = interpolated_results.reshape(final_shape)
+                
+                # Package into xarray DataArray for temporal interpolation
+                out_coords = {d: da_var.coords[d] for d in extra_dims if d in da_var.coords}
+                out_coords['locations'] = np.arange(num_locations) # temporary coordinate
+                
+                ds_spatial = xr.DataArray(
+                    interpolated_results,
+                    dims=extra_dims + ['locations'],
+                    coords=out_coords,
+                    attrs=da_var.attrs
                 )
-
-                ds_spatial = self.regridder(da_2d)  # (..., locations)
-                times_da = xr.DataArray(self.times.values, dims='locations')
-
-                # Temporally interpolate to trajectory times
-                sampled[vn] = ds_spatial.interp(time=times_da, method='linear')
-
-                # rename locations -> time
-                sampled[vn] = sampled[vn].assign_coords(time=('locations', self.times.values)).swap_dims({'locations': 'time'}) 
+                
+                # Temporal interpolation (if 'time' is a dimension)
+                if 'time' in extra_dims:
+                    times_da = xr.DataArray(self.times.values, dims='locations')
+                    da_traj = ds_spatial.interp(time=times_da, method='linear')
+                else:
+                    da_traj = ds_spatial
+                
+                # Rename locations -> time (matching the trajectory format)
+                sampled[vn] = da_traj.assign_coords(time=('locations', self.times.values)).swap_dims({'locations': 'time'}).drop_vars('locations', errors='ignore')
 
             else:
                 sampled[vn] = self.ds[vn].interp(time=self.times,lon=self.lons,lat=self.lats,method=method)
