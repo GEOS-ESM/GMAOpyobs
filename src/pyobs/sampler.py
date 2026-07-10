@@ -18,7 +18,6 @@ from glob import glob
 from . import xrctl as xc
 import fsspec
 import dask.distributed
-import dask.array as dsa
 import esmpy as ESMF
 from scipy.spatial import ConvexHull
 
