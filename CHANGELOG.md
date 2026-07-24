@@ -8,14 +8,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 # [Unreleased] - yyyy-mm-dd
 
 ### Fixed
-
+- dial.py to accomodate python change for nan
+- update hsrl.py to use py3 integer divide. fixes date parsing.
+- units for backscatter coeffiecient to km-1 sr-1 in output files generated with aop.py
+- conversion from km to m in icartt.py 
 ### Added
+- add optional explicit bin ordering to aop.py yaml. this allows for calculating AOP's for a single bin, or subset of bins
+- add configuration file for GEOS-5430 (current FP)
+- add a buddy check code for station observation QC
+- add reader for GloSSAC data
+- support for HALO in hsrl.py
 
 ### Changed
+- use xesmf regridder to station sampling. this is more efficient that using xarray native interp
+- changed 'compat' keyword definition in xrctl.py to make more flexible if 'override' is needed
+- changed aop.py and mietable.py code to handle v2.x.x optics tables consistent with how v1.0.0
+  handled
+- changed tracer names in default aop.py configuration to be like current fp
+- updated components to latest environment stack
 
 ### Removed
-
 ### Deprecated
+
+# [1.7.0] - yyyy-mm-dd
+
+### Fixed
+- fixed vx04 reader. empty object is now returned when DB and DT granules do not align. 
+
+### Added
+- made an update in ICARTT reader to allow additional vertical altitude names
+- created a simple CALIPSO L3 reader
+
+# [v1.6.0] - 2026-01-22
+### Added
+- added improve_sampler notebook example showing how to use the station sampler and aop.getPM function to compare MERRA-2 to IMPROVE surface measurements of PM2.5
+- added uv package management files pyproject.toml and uv.lock
+- added a new data variables output by getPM - the fraction of mass that is water
+
+### Changed
+- updatde the improve.py reader to work for files obtained from CIRA.  the old files that are on calculon are no longer generated.
+- Minor template name change for ease of integration in ADAS
+
+# [v1.5.0] - 2025-12-03
+
+
+### Added
+- odsreader now takes the optional argument Vars - this is the selection of variables to be read
+- vx04.py now can read in DT and DB granules together and use the DT cloud fraction to filter DB obs 
+
 
 # [v1.4.0] - 2025-09-25
 
@@ -69,7 +109,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Added list parsing for variables in trajectory sampler
 - fixed byte string bug in aeronet.py
-- - use a local copy of RH in aop calculator.  otherwise it overwrites when fixRH is used
+- use a local copy of RH in aop calculator.  otherwise it overwrites when fixRH is used
 ### Added
 - MPL reader and plot curtain 
 - calculation of total backscatter coefficient in aop.py

@@ -35,7 +35,7 @@ def open_mfdataset(paths,*args, time_range=None, lock=False, **kwargs):
     """
     from netCDF4 import Dataset # only needed for hack below
     opendap = False
-    compat = "no_conflicts" # variables of the same name should have no conflicts
+    compat = kwargs.pop('compat','no_conflicts')
     coords = "different"
     paths_ = paths
     if isinstance(paths,str):

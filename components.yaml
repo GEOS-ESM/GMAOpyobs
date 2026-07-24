@@ -5,16 +5,16 @@ GMAOpyobs:
 env:
   local: ./env@
   remote: ../ESMA_env.git
-  tag: v4.36.0+py3.13
+  tag: v5.22.0
   develop: main
 
 cmake:
   local: ./cmake@
   remote: ../ESMA_cmake.git
-  tag: v3.62.1
+  tag: v4.37.0
   develop: develop
 
 ecbuild:
   local: ./cmake@/ecbuild@
   remote: ../ecbuild.git
-  tag: geos/v1.3.0
+  tag: geos/v3.13.1

@@ -8,6 +8,7 @@ import os
 
 import numpy  as np
 import xarray as xr
+import xesmf as xe
 import pandas as pd
 
 from datetime import datetime, timedelta
@@ -15,6 +16,8 @@ from dateutil.parser import parse as isoparser
 from glob import glob
 
 from . import xrctl as xc
+import fsspec
+import dask.distributed
 
 os.environ['HDF5_USE_FILE_LOCKING']='FALSE'
 
@@ -59,7 +62,12 @@ class STATION(object):
         # -------------------------------------------------
         if isinstance(dataset,xr.Dataset):
             self.ds = dataset # we are good to go...
-
+        elif isinstance(dataset,dask.distributed.Future):
+            self.ds = xr.open_dataset(dataset, engine="zarr",chunks=chunks, backend_kwargs={"consolidated": False})
+        #  if dataset is a parquet referece file path
+        elif dataset[-4:] == 'parq':
+            fs = fsspec.filesystem("reference", fo=dataset, remote_protocol='file', lazy=True)
+            self.ds = xr.open_dataset(fs.get_mapper(), engine="zarr",chunks=chunks, backend_kwargs={"consolidated": False})        
         # If dataset is a list of files...
         # OR GrADS-style ctl
         # OR a glob type of template
@@ -79,11 +87,12 @@ class STATION(object):
         if times is not None:
             self.times = xr.DataArray(times,dims='time')
         else:
-            self.times = self.ds.time
+            self.times = times
 
-        # TO DO: when using xESMF for regridding, pre-compute transforms here
+        # Use xESMF for regridding, pre-compute transforms here
         # -------------------------------------------------------------------
-
+        ds_loc = xr.Dataset({"lon": self.lons, "lat": self.lats})
+        self.regridder = xe.Regridder(self.ds, ds_loc, "bilinear", locstream_out=True)
 
     #--
     def sample(self,Variables=None,method='linear'):
@@ -101,7 +110,11 @@ class STATION(object):
 
         for vn in Variables:
             if self.verb: print('[ ] sampling ',vn)
-            sampled[vn] = self.ds[vn].interp(time=self.times,lon=self.lons,lat=self.lats,method=method)
+            sampled[vn] = self.regridder(self.ds[vn])
+#            sampled[vn] = self.ds[vn].interp(time=self.times,lon=self.lons,lat=self.lats,method=method)
+
+            if self.times is not None:
+                sampled[vn] = sampled[vn].interp(time=self.times,method=method)
 
         return xr.Dataset(sampled).assign_coords({'station': self.stations})
 
@@ -136,7 +149,10 @@ class TRAJECTORY(object):
         # -------------------------------------------------
         if isinstance(dataset,xr.Dataset):
             self.ds = dataset # we are good to go...
-
+        #  if dataset is a parquet referece file
+        elif dataset[-4:] == 'parq':
+            fs = fsspec.filesystem("reference", fo=dataset, remote_protocol='file', lazy=True)
+            self.ds = xr.open_dataset(fs.get_mapper(), engine="zarr", chunks=chunks, backend_kwargs={"consolidated": False})
         # If dataset is a list of files...
         # OR GrADS-style ctl 
         # OR a glob type of template
