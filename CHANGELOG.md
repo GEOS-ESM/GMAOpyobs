@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - add configuration file for GEOS-5430 (current FP)
 - add a buddy check code for station observation QC
 - add reader for GloSSAC data
+- add a new altitude name for icartt.py for ER-2 in INSPYRE
 
 ### Changed
 - use xesmf regridder to station sampling. this is more efficient that using xarray native interp
