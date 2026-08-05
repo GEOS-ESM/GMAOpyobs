@@ -83,7 +83,7 @@ class ICARTT(object):
                    self.Units[var].upper() == "KILOMETERS" or \
                    self.Units[var].upper() == "KM":
                     self.Units[var] = 'm'
-                    self.__dict__[var] = self.__dict__[var] / 1000.
+                    self.__dict__[var] = self.__dict__[var] * 1000.
                 if self.Units[var].upper() == "KNOT" or \
                    self.Units[var].upper() == "KNOTS":
                     self.Units[var] = 'm s-1'

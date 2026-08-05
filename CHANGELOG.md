@@ -8,19 +8,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 # [Unreleased] - yyyy-mm-dd
 
 ### Fixed
+- dial.py to accomodate python change for nan
 - update hsrl.py to use py3 integer divide. fixes date parsing.
 - units for backscatter coeffiecient to km-1 sr-1 in output files generated with aop.py
-  
+- conversion from km to m in icartt.py 
 ### Added
 - add optional explicit bin ordering to aop.py yaml. this allows for calculating AOP's for a single bin, or subset of bins
 - add configuration file for GEOS-5430 (current FP)
 - add a buddy check code for station observation QC
 - add reader for GloSSAC data
 - add a new altitude name for icartt.py for ER-2 in INSPYRE
+- support for HALO in hsrl.py
 
 ### Changed
 - use xesmf regridder to station sampling. this is more efficient that using xarray native interp
 - changed 'compat' keyword definition in xrctl.py to make more flexible if 'override' is needed
+- changed aop.py and mietable.py code to handle v2.x.x optics tables consistent with how v1.0.0
+  handled
+- changed tracer names in default aop.py configuration to be like current fp
+- updated components to latest environment stack
 
 ### Removed
 ### Deprecated
@@ -104,7 +110,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Added list parsing for variables in trajectory sampler
 - fixed byte string bug in aeronet.py
-- - use a local copy of RH in aop calculator.  otherwise it overwrites when fixRH is used
+- use a local copy of RH in aop calculator.  otherwise it overwrites when fixRH is used
 ### Added
 - MPL reader and plot curtain 
 - calculation of total backscatter coefficient in aop.py

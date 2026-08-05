@@ -2,7 +2,7 @@
 """
    Implements Python interface to the HSRL L2 data.
 """
-
+import os
 import h5py
 import numpy as np
 from   datetime import datetime, timedelta
@@ -79,8 +79,15 @@ SDS_HSRL2 = {'header': ('date',),
                            'Relative_Humidity',
                          )
                }
+SDS_HALO = {
+    '/': ('lat', 'lon', 'time', 'z',
+          '1064_bsc_cloud_screened', '1064_ext', '1064_aer_dep',
+          '532_bsc_cloud_screened', '532_ext', '532_aer_dep'),
+    'Nav_Data': ('gps_date', 'date', 'gps_alt', 'gps_lat', 'gps_lon', 'gps_time'),
+    'State': ('Pressure', 'Temperature', 'Relative_Humidity')
+} 
 
-NAV = ( 'Altitude','date', 'gps_date','gps_lat','gps_lon','gps_time')
+NAV = ( 'Altitude','date', 'gps_date','gps_lat','gps_lon','gps_time','lat','lon','time','z')
 
 # Short names
 # -----------
@@ -169,7 +176,17 @@ class HSRL(object):
         
         # Handle incosistency of date across HSRL datasets
         # -----------------------------------------------
-        if self.nt != self.date.shape[0]:
+        if getattr(self, 'date', None) is None:
+            import re
+            match = re.search(r'_(\d{8})_', os.path.basename(hsrl_filename))
+            if match:
+                dt_str = match.group(1)
+                # Format as MM/DD/YYYY to match HSRL convention
+                dates = '%s/%s/%s' % (dt_str[4:6], dt_str[6:8], dt_str[0:4])
+                self.date = np.array([dates for i in range(self.nt)])
+            else:
+                raise ValueError(f"Missing date variable and could not parse YYYYMMDD from filename: {hsrl_filename}")
+        elif self.nt != self.date.shape[0]:
           date_ = self.date[0,0]
           yy = int(date_)//10000
           mm = (int(date_) - yy * 10000)//100
