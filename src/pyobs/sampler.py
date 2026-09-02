@@ -336,7 +336,13 @@ class TRAJECTORY(object):
                 regrid_method=ESMF.RegridMethod.BILINEAR,
                 unmapped_action=ESMF.UnmappedAction.IGNORE
             )
-
+        else:
+            # Handling of pathological dateline cases particularly for low resolution model
+            nx = len(self.ds.lon.values)
+            dx = 360./nx
+            self.ds = self.ds.pad(lon=1,mode="wrap")
+            self.ds = self.ds.assign_coords(lon=np.arange(0,nx+2,dx)-(180.+dx))
+        
         self.cs = cs
             
     #--
