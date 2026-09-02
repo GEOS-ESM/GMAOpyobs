@@ -103,13 +103,13 @@ class ICARTT(object):
         self.Nav = dict ( Time=self.tyme, Longitude=None, Latitude=None, Altitude=None, Pressure=None )
         for var in self.Vars:
             VAR = var.upper()
-            if VAR in ('LONGITUDE', 'LONGITUDE_YANG', 'LONGITUDE_DEG','FMS_LON', 'GPS_LON', 'LON', 'GGLON'):
+            if VAR in ('LONGITUDE', 'LONGITUDE_YANG', 'LONGITUDE_DEG','FMS_LON', 'GPS_LON', 'LON', 'GGLON', 'G_LONG_MMS'):
                 self.Nav['Longitude'] = self.__dict__[var]
-            if VAR in ('LATITUDE', 'LATITUDE_YANG', 'LATITUDE_DEG','FMS_LAT', 'GPS_LAT', 'LAT', 'GGLAT' ):
+            if VAR in ('LATITUDE', 'LATITUDE_YANG', 'LATITUDE_DEG','FMS_LAT', 'GPS_LAT', 'LAT', 'GGLAT', 'G_LAT_MMS' ):
                 self.Nav['Latitude'] = self.__dict__[var]
-            if VAR in ('GPS_ALTITUDE','ALT','GPSALT', 'MSL_GPS_ALTITUDE_YANG', 'GPSALT_M', 'FMS_ALT_PRES', 'GPS_ALT', 'GGALT','MSL_GPS_ALTITUDE'):
+            if VAR in ('GPS_ALTITUDE','ALT','GPSALT', 'MSL_GPS_ALTITUDE_YANG', 'GPSALT_M', 'FMS_ALT_PRES', 'GPS_ALT', 'GGALT','MSL_GPS_ALTITUDE','G_ALT_MMS'):
                 self.Nav['Altitude'] = self.__dict__[var]
-            if VAR in ('PRESSURE', 'PRESSURE_YANG', 'C_STATICPRESSURE', 'STATIC_PRESSURE','PSXC',):
+            if VAR in ('PRESSURE', 'PRESSURE_YANG', 'C_STATICPRESSURE', 'STATIC_PRESSURE','PSXC','P_MMS',):
                 self.Nav['Pressure'] = self.__dict__[var]
 
         # Navigation shorthands
