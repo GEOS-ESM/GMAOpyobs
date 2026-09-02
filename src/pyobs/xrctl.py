@@ -9,13 +9,25 @@ import os
 
 import xarray as xr
 import numpy  as np
-
+import warnings
 from glob import glob
 
 from datetime import datetime, timedelta
 from dateutil.parser import parse         as isoparser
 from dateutil.relativedelta import relativedelta
-    
+
+# Suppress xarray warning triggered by GEOS cubed-sphere files which have
+# a variable ('anchor') with duplicate dimension names. The variable is
+# dropped via drop_variables but the warning fires before that filter
+# is applied, and catch_warnings() does not work with dask worker threads.
+warnings.filterwarnings(
+    "ignore",
+    message="Duplicate dimension names present",
+    category=UserWarning,
+    module="xarray",
+    append=True
+)
+
 class XRctlError(Exception):
     """
     Defines XRctl general exception errors.
@@ -27,7 +39,7 @@ class XRctlError(Exception):
 
 #...........................................................................
 
-def open_mfdataset(paths,*args, time_range=None, lock=False, **kwargs):
+def open_mfdataset(paths,*args, time_range=None, lock=False, cs=False, **kwargs):
     """
     Intercepts call to xarray open_mfdataset() and if *paths*
     is a GrADS-style ctl file, parses it generating a list of
@@ -65,13 +77,18 @@ def open_mfdataset(paths,*args, time_range=None, lock=False, **kwargs):
             compat = "override"  # if there are multiples of the same variable name, just use the one from the first dataset
             coords = "minimal"
        
-#    if isinstance(paths_,(list,tuple)):          
-#        _ = Dataset(paths_[0])    # hack to circumvent some bug in open_mfdataset, it seems to initialize netcdf.
-
     if opendap:
         ds = xr.open_dataset(paths_)
     else:
-        ds = xr.open_mfdataset(paths_,*args,lock=lock,**kwargs,compat=compat,coords=coords)
+        if cs:
+            drop_variables = ['anchor', 'contacts']
+            drop_variables += kwargs.pop('drop_variables',[])
+            ds = xr.open_mfdataset(paths_,*args,lock=lock,**kwargs,compat=compat,coords=coords,
+                                   drop_variables=drop_variables)
+            if 'lons' in ds.coords:
+                ds = ds.rename({'lats': 'lat', 'lons': 'lon'})
+        else:
+            ds = xr.open_mfdataset(paths_,*args,lock=lock,**kwargs,compat=compat,coords=coords)
 
     return ds.assign_attrs(source_file_path=paths_)
 #...........................................................................
