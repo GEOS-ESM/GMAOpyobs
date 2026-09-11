@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - units for backscatter coeffiecient to km-1 sr-1 in output files generated with aop.py
 - conversion from km to m in icartt.py 
 - fixed an edge case for low model resolution sampling for trajectories across dateline
+  subsequent bugfix introduced for not-considering 1x1 resolution
 
 ### Added
 - add optional explicit bin ordering to aop.py yaml. this allows for calculating AOP's for a single bin, or subset of bins
@@ -21,7 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - add reader for GloSSAC data
 - support for HALO in hsrl.py
 - support sampling on the cubed sphere
-- additional lat/lon/altitude variable possibility in icartt.py
+- additional lat/lon/altitude variable possibility in icartt.py (updated for CPEX)
 
 ### Changed
 - use xesmf regridder to station sampling. this is more efficient that using xarray native interp
