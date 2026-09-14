@@ -6,13 +6,14 @@ import os
 
 from numpy             import sum, zeros, ones, sqrt, std, mean, unique, \
                               concatenate, where, linspace, meshgrid, exp, savez, \
-                              percentile
+                              percentile as prctile, mgrid, reshape, random, rot90
 from matplotlib        import cm, ticker
 
 from matplotlib.pyplot import plot, title, xlabel, ylabel, figure, imshow, \
                               grid, colorbar, draw, axes, legend
 
-from scipy             import stats, mgrid, c_, reshape, random, rot90
+from scipy             import stats
+from numpy             import c_
 
 MISSING = 1.e15
 
@@ -304,4 +305,3 @@ def writeg_del(obs, ana, bkg, lon, lat, vname, units,
        if Verbose:
            print("[w] Wrote file "+filename)
            
-

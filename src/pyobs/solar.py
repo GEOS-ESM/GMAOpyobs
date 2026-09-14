@@ -196,7 +196,7 @@ def test_angles():
     # compute solar zenith angle and azimuth (be careful with azimuth: I haven't checked this at all)
     saz, sza = solar_angles(t, lon.ravel(), lat.ravel())
 
-    print "Solar Zenith Angle: ", np.cos(np.pi*sza/180.)
+    print("Solar Zenith Angle: ", np.cos(np.pi*sza/180.))
 
 #.................................................................................
 if __name__ == "__main__":
@@ -224,8 +224,8 @@ if __name__ == "__main__":
     cosz_ngt = cosz[I]
     cosz_day = cosz[J]
 
-    print "cosz night: ", cosz_ngt.min(), cosz_ngt.max()
-    print "cosz day: ",   cosz_day.min(), cosz_day.max()
+    print("cosz night: ", cosz_ngt.min(), cosz_ngt.max())
+    print("cosz day: ",   cosz_day.min(), cosz_day.max())
     
 
 

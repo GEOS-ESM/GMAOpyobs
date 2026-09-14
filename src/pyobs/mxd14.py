@@ -11,7 +11,7 @@ import os
 import numpy as np
 
 from pyhdf.SD    import *
-from scipy.stats import kde
+from scipy.stats import gaussian_kde
 from datetime    import date, timedelta
 
 DAY = timedelta(seconds=60*60*24)
@@ -362,7 +362,7 @@ def do_kde(X,range=None,N=256):
     else:
         a, b = range
     bins = np.linspace(a,b,N)
-    kernel = kde.gaussian_kde(X.ravel())
+    kernel = gaussian_kde(X.ravel())
     return bins, kernel(bins)
 
 def plot_kde(X,a=None,b=None,N=256,Title=None,Label=None):
@@ -375,7 +375,7 @@ def plot_kde(X,a=None,b=None,N=256,Title=None,Label=None):
     if Title is None: 
         Title = 'Kernel Density Function'
     bins = np.linspace(a,b,N)
-    kernel = kde.gaussian_kde(X.ravel())
+    kernel = gaussian_kde(X.ravel())
     plot(bins,kernel(bins))
     ylabel('PDF')
     title(Title)

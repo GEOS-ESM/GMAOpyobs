@@ -9,7 +9,7 @@ from pyhdf.SD import SD
 
 from glob import glob
 
-from numpy import zeros, ones, array, int, savez, mod
+from numpy import zeros, ones, array, savez, mod
 
 class MCD43GF(object):
 
