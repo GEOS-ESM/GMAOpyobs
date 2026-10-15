@@ -737,8 +737,11 @@ class Vx04_L2(object):
         for sds in self.SDS_DT_CLD:
             if sds in data.variables.keys():
                 v = data.variables[sds][:]
-            else:
+            elif sds in loc.variables.keys():
                 v = loc.variables[sds][:]
+            else: # v22 nrt
+                alt_sds = "_".join([word.capitalize() for word in sds.split("_")])
+                v = loc.variables[alt_sds][:]
 
             if len(v.shape) == 3:
                 i, j, k = v.shape
@@ -763,9 +766,11 @@ class Vx04_L2(object):
             for sds in self.SDS_DT_FILTER:
                 if sds in data.variables.keys():
                     v = data.variables[sds][:]
-                else:
+                elif sds in loc.variables.keys():
                     v = loc.variables[sds][:]
-
+                else: #v22 nrt    
+                    alt_sds = "_".join([word.capitalize() for word in sds.split("_")])
+                    v = loc.variables[alt_sds][:]
                 if len(v.shape) == 3:
                     i, j, k = v.shape
                     v = v.reshape((i*j,k))
@@ -820,7 +825,16 @@ class Vx04_L2(object):
         # ------------------------------------------------------------
         for sds in self.SDS:
             if sds in self.SDS_META:
-                vobj = loc.variables[sds]
+                try: # try lowercase for v2.0, v2.1 first
+                  vobj = loc.variables[sds]
+                except KeyError:
+                    alt_sds = sds.title()
+                    # specific fix for v22nrt -> 'Sensor_Zenith_Angle' instead of 'Sensor_zenith_angle'
+                    alt_sds = "_".join([word.capitalize() for word in sds.split("_")])
+                    try:
+                        vobj = loc.variables[alt_sds]
+                    except KeyError:
+                        raise KeyError(f"Variable {sds} (or {alt_sds}) not found in geolocation_data")
             else:
                 vobj = data.variables[sds]
 
@@ -1292,7 +1306,7 @@ def granules ( path, algo, sat, syn_time, coll='011', nsyn=8, verbose=False ):
 
 #............................................................................
 
-def granulePairs ( path, sat, syn_time, collDT='002', collDB='002',nsyn=8, verbose=False ):
+def granulePairs ( path, sat, syn_time, collDT='022', collDB='002',nsyn=8, verbose=False ):
     """
     Returns a list of Vx04 granules pairs from DT and DB algorithms at given synoptic time.
     On input,
@@ -1301,7 +1315,7 @@ def granulePairs ( path, sat, syn_time, collDT='002', collDB='002',nsyn=8, verbo
     sat       ---  SNPP, NOAA20, NOAA21
     syn_time  ---  synoptic time (timedate format)
 
-    collDT    ---  DT collection version: 002 (optional)
+    collDT    ---  DT collection version: 022 (optional), updated NRT
     collDB    ---  DB collection version: 002 (optional)
     nsyn      ---  number of synoptic times per day (optional)
 
