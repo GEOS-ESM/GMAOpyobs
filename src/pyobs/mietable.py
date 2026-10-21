@@ -12,15 +12,15 @@
       channel          (w) channel number
       wavelengths      (w) wavelengths        [m]
       rh               (r) RH values   [fraction]
-      rLow             (b) Dry lower radius [m]
       rEffDry          (b) Dry Effective radius [m]
-      rUp              (b) Dry upper radius [m]
       p                (p) Non-zero elements of phase matrix
       m                (p) Moments of phase matrix
       ang              (a) number of scattering angles [degrees]
 
     Data Variables:
-      reff             (b,r) effective radius [m]
+      rEff             (b,r) effective radius [m]
+      rLow             (b,r) Dry lower radius [m]
+      rUp              (b,r) Dry upper radius [m]
       bext             (b,w,r) bext values [m2 kg-1]
       bsca             (b,w,r) bsca values [m2 kg-1]
       bbck             (b,w,r) bbck values [m2 kg-1]
@@ -32,7 +32,7 @@
       gf               (b,r) hygroscopic growth factor
       rhop             (b,r) wet particle density [kg m-3]
       rhod             (b,r) dry particle density [kg m-3]
-      vol              (b,r) wet particle volume [m3 kg-1]
+      volume           (b,r) wet particle volume [m3 kg-1]
       area             (b,r) wet particle cross section [m2 kg-1]
       refr             (b,w,r) real part of refractive index
       refi             (b,w,r) imaginary part of refractive index
@@ -60,10 +60,11 @@ import numpy  as np
 
 __VERSION__ = '0.9.0'
 
-supportedAOPs = ['aot',          'ssa',     'gf',      'gasym',   'g',   'growth_factor',
-                 'RefIndex',     'pmom',    'area',    'volume',  'pback11', 'pback22', 'pback',
-                 'rhod',         'rhop',    'rEff',    'bbck',    'tau', 'sca',
-                 'bsca',         'bext',    'refreal', 'refimag', 'pmatrix',
+supportedAOPs = ['aot',          'ssa',     'gf',      'gasym',   'g',       'growth_factor',
+                 'RefIndex',     'pmom',    'area',    'volume',  'pback11', 'pback22',
+                 'pback',        'rhod',    'rhop',    'rEff',    'rLow',    'rUp',
+                 'bbck',         'tau',     'sca',     'bsca',    'bext',
+                 'refreal', 'refimag', 'pmatrix',
                  'p11', 'p12', 'p33', 'p34', 'p22', 'p44',
                  'aot_ssa_pmom',
                  'aot_ssa_gasym' ]
@@ -287,14 +288,13 @@ if __name__ == "__main__":
     
    # Sample Mie Tables
    # -----------------
-   #dirn   = '/discover/nobackup/projects/gmao/share/dasilva/fvInput/ExtData/chemistry/AerosolOptics/v0.0.0/x/'
-   dirn   = '/Users/adasilva/data/ExtData/chemistry/AerosolOptics/v1.0.0/x/'
-   Tables = [dirn + 'optics_DU.v15_5.nc4', dirn + 'optics_OC.v2_3.nc4']
+   dirn   = '/gpfsm/dnb07/projects/p10/gmao_ops/fvInput_nc3/chemistry/AerosolOptics/v2.x.x/x/'
+   dirn2  = '/gpfsm/dnb07/projects/p10/gmao_ops/fvInput_nc3/chemistry/AerosolOptics/v1.0.0/x/'
+   Tables = [dirn + 'optics_DU.v2.1.0.nc4', dirn2+'optics_BC.v1_6.nc4']
 
    # Aerosol state (all species)
    # ---------------------------
-   #aer_Nv = '/css/gmao/geos-it/products/Y2023/M02/D05/GEOS.it.asm.aer_inst_3hr_glo_C180x180x6_v72.GEOS5294.2023-02-05T1200.V01.nc4'
-   aer_Nv = '/Users/adasilva/data/sampled/aer_Nv/CAMP2Ex-GEOS-MODISonly-aer-Nv-P3B_Model_*.nc'
+   aer_Nv = '/home/pcolarco/geos_aerosols/pcolarco/c180R_v11.8.1/holding/inst3d_aer_v/201901/c180R_v11.8.1.inst3d_aer_v.20190101_0000z.nc4'
    aer    = xr.open_mfdataset(aer_Nv)
 
    try:
@@ -307,9 +307,10 @@ if __name__ == "__main__":
 
    # Sample variable names
    # ---------------------
-   Vars = ['tau', 'aot', 'gasym', 'bext', 'bsca', 'ssa', 'bbck', 'rEff',
-           'RefIndex', 'pmom', 'pback', 'pback11', 'pback22',
-           'aot_ssa_gasym', 'aot_ssa_pmom']
+   Vars = ['tau', 'aot', 'gasym', 'bext', 'bsca', 'ssa', 'bbck', 'rEff','rLow','rUp',
+           'RefIndex']
+   #, 'pmom', 'pback', 'pback11', 'pback22',
+   #        'aot_ssa_gasym', 'aot_ssa_pmom']
 
    # Loop over Tables
    # ----------------
@@ -320,6 +321,9 @@ if __name__ == "__main__":
        print('Doing',species)
        for v in Vars:
            print('-',v)
-           AOP[species,v] = mie.getAOP(v, 1, rh, wavelength=550, q_mass=q_mass[i])
+           try:
+               AOP[species,v] = mie.getAOP(v, 1, rh, wavelength=550, q_mass=q_mass[i])
+           except:
+               AOP[species,v] = mie.getBinInfo(v, 1)
 
 
