@@ -10,7 +10,7 @@ cmake_policy (SET CMP0054 NEW)
 
 project (
   GMAOpyobs
-  VERSION 1.2.6
+  VERSION 1.8.0
   LANGUAGES Fortran CXX C)  # Note - CXX is required for ESMF
 
 # Enforce out of source directory builds
@@ -23,14 +23,14 @@ project (
 # Set the default build type to release
 # -------------------------------------
 if (NOT CMAKE_BUILD_TYPE)
-  
+
      message (STATUS "Setting build type to 'Release' as none was specified.")
      set (CMAKE_BUILD_TYPE Release CACHE STRING "Choose the type of build." FORCE)
-     
+
      # Set the possible values of build type for cmake-gui
      # ---------------------------------------------------
      set_property (CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS
-                   "Debug" "Release" "Aggressive") 
+                   "Debug" "Release" "Aggressive")
   endif ()
 
 # Where to find relevant cmake macros
@@ -43,7 +43,7 @@ if (NOT CMAKE_BUILD_TYPE)
               CACHE PATH "Path to ESMA_cmake code")
        endif ()
     endforeach ()
-  
+
     include (esma)
 
     set (PYOBS_STANDALONE TRUE)
@@ -79,4 +79,4 @@ if (NOT CMAKE_BUILD_TYPE)
 # --------------------------
   if (PYOBS_STANDALONE)
     include(esma_cpack OPTIONAL)
-  endif ()  
+  endif ()
