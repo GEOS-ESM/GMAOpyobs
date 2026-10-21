@@ -8,6 +8,7 @@ import os
 
 import numpy  as np
 import xarray as xr
+import xesmf as xe
 import pandas as pd
 
 from datetime import datetime, timedelta
@@ -15,6 +16,10 @@ from dateutil.parser import parse as isoparser
 from glob import glob
 
 from . import xrctl as xc
+import fsspec
+import dask.distributed
+import esmpy as ESMF
+from scipy.spatial import ConvexHull
 
 os.environ['HDF5_USE_FILE_LOCKING']='FALSE'
 
@@ -28,13 +33,66 @@ class SamplerError(Exception):
     def __str__(self):
         return repr(self.value)
 
+def build_dual_mesh(ds):
+    """
+    Builds a continuous triangulated mesh using the cell centers as the nodes.
+    This allows ESMF to perform Bilinear interpolation from cubed-sphere centers.
+    """
+    # Grab the cell center coordinates (usually 'lon' and 'lat' with dims: nf, Ydim, Xdim)
+    if 'time' in ds['lon'].dims:
+        lon = ds['lon'].isel(time=0).values
+        lat = ds['lat'].isel(time=0).values
+    else:
+        lon = ds['lon'].values
+        lat = ds['lat'].values
+
+    flat_lon = lon.ravel()
+    flat_lat = lat.ravel()
+    n_nodes = len(flat_lon)
+
+    # Convert lat/lon to 3D Cartesian coordinates
+    lon_rad = np.radians(flat_lon)
+    lat_rad = np.radians(flat_lat)
+    x = np.cos(lat_rad) * np.cos(lon_rad)
+    y = np.cos(lat_rad) * np.sin(lon_rad)
+    z = np.sin(lat_rad)
+    
+    # Use ConvexHull to automatically triangulate the sphere
+    coords_3d = np.column_stack((x, y, z))
+    hull = ConvexHull(coords_3d)
+    
+    # hull.simplices contains the 0-based indices for the 3 corners of every triangle
+    triangles = hull.simplices
+
+    # Create ESMF Mesh
+    mesh = ESMF.Mesh(parametric_dim=2, spatial_dim=2, coord_sys=ESMF.CoordSys.SPH_DEG)
+    
+    # Add the cell centers as NODES
+    node_ids = np.arange(1, n_nodes + 1, dtype=np.int32)
+    node_coords = np.empty(2 * n_nodes, dtype=np.float64)
+    node_coords[0::2] = flat_lon
+    node_coords[1::2] = flat_lat
+    node_owners = np.zeros(n_nodes, dtype=np.int32)
+    
+    mesh.add_nodes(n_nodes, node_ids, node_coords, node_owners)
+    
+    # Add the Triangles as ELEMENTS
+    n_elems = len(triangles)
+    elem_ids = np.arange(1, n_elems + 1, dtype=np.int32)
+    elem_types = np.full(n_elems, ESMF.MeshElemType.TRI, dtype=np.int32)
+    elem_conn = triangles.ravel().astype(np.int32) # ConvexHull is natively 0-based, perfect for esmpy!
+    
+    mesh.add_elements(n_elems, elem_ids, elem_types, elem_conn)
+    
+    return mesh
 
 class STATION(object):
 
     def __init__(self, stations, lons, lats,
                  dataset, time_range=None, times=None, 
                  verbose=False,
-                 parallel=True,chunks='auto',**kwargs):
+                 parallel=True,chunks='auto',cs=False,
+                 **kwargs):
         """
         Specifies dataset to be sampled at obs location.
         On input,
@@ -51,6 +109,7 @@ class STATION(object):
               to generate a list of files.
         times: optional specific times to sample at, 
               otherwise output at model time resolution
+        cs: sampling on the cubed sphere
         """
 
         self.verb = verbose
@@ -59,13 +118,18 @@ class STATION(object):
         # -------------------------------------------------
         if isinstance(dataset,xr.Dataset):
             self.ds = dataset # we are good to go...
-
+        elif isinstance(dataset,dask.distributed.Future):
+            self.ds = xr.open_dataset(dataset, engine="zarr",chunks=chunks, backend_kwargs={"consolidated": False})
+        #  if dataset is a parquet referece file path
+        elif dataset[-4:] == 'parq':
+            fs = fsspec.filesystem("reference", fo=dataset, remote_protocol='file', lazy=True)
+            self.ds = xr.open_dataset(fs.get_mapper(), engine="zarr",chunks=chunks, backend_kwargs={"consolidated": False})        
         # If dataset is a list of files...
         # OR GrADS-style ctl
         # OR a glob type of template
         # --------------------------------
         elif isinstance(dataset,(list,tuple,str)):
-            self.ds = xc.open_mfdataset(dataset,time_range=time_range,parallel=parallel,chunks=chunks,**kwargs)
+            self.ds = xc.open_mfdataset(dataset,time_range=time_range,parallel=parallel,chunks=chunks,cs=cs,**kwargs)
 
         else:
             raise SamplerError("Invalid dataset specification.")
@@ -79,11 +143,37 @@ class STATION(object):
         if times is not None:
             self.times = xr.DataArray(times,dims='time')
         else:
-            self.times = self.ds.time
+            self.times = times
 
-        # TO DO: when using xESMF for regridding, pre-compute transforms here
+        # Use xESMF for regridding, pre-compute transforms here
         # -------------------------------------------------------------------
+        if cs:
+            # Build ESMF mesh
+            self.src_mesh = build_dual_mesh(self.ds)
 
+            n_stations = len(lons)
+
+            # Create locstream
+            self.dst_locstream = ESMF.LocStream(n_stations, coord_sys=ESMF.CoordSys.SPH_DEG)
+            self.dst_locstream["ESMF:Lon"] = np.asarray(lons, dtype=np.float64)
+            self.dst_locstream["ESMF:Lat"] = np.asarray(lats, dtype=np.float64)
+
+            self.src_field = ESMF.Field(self.src_mesh, meshloc=ESMF.MeshLoc.NODE)
+            self.dst_field = ESMF.Field(self.dst_locstream, name='dst')
+
+            self.regridder = ESMF.Regrid(self.src_field,
+                                         self.dst_field,
+                                         regrid_method=ESMF.RegridMethod.BILINEAR,
+                                         unmapped_action=ESMF.UnmappedAction.IGNORE)
+        else:
+            ds_loc = xr.Dataset({
+                "lon": (["locations"], np.asarray(lons, dtype=np.float64)),
+                "lat": (["locations"], np.asarray(lats, dtype=np.float64)),
+            })
+
+            self.regridder = xe.Regridder(self.ds, ds_loc, "bilinear", locstream_out=True)
+
+        self.cs = cs
 
     #--
     def sample(self,Variables=None,method='linear'):
@@ -92,7 +182,14 @@ class STATION(object):
 
         """
         if Variables is None:
-            Variables = list(self.ds.data_vars)
+            if self.cs:
+                # Only grab variables that actually have cubed-sphere spatial dimensions
+                Variables = [
+                    vn for vn in self.ds.data_vars
+                    if all(d in self.ds[vn].dims for d in ('nf', 'Ydim', 'Xdim'))
+                ]
+            else:
+                Variables = list(self.ds.data_vars)
 
         elif isinstance(Variables,str):
             Variables = [Variables,]
@@ -101,15 +198,78 @@ class STATION(object):
 
         for vn in Variables:
             if self.verb: print('[ ] sampling ',vn)
-            sampled[vn] = self.ds[vn].interp(time=self.times,lon=self.lons,lat=self.lats,method=method)
+            if self.cs:
 
-        return xr.Dataset(sampled).assign_coords({'station': self.stations})
+                da_var = self.ds[vn]
+                # Identify extra dimensions (anything not part of the spatial cubed-sphere grid)
+                spatial_dims = ('nf', 'Ydim', 'Xdim')
+                extra_dims = [d for d in da_var.dims if d not in spatial_dims]
+                
+                # Reorder the DataArray so extra dimensions come first, spatial dims at the end
+                da_var = da_var.transpose(*extra_dims, *spatial_dims)
+                
+                # Calculate shapes
+                extra_shape = tuple(da_var.sizes[d] for d in extra_dims)
+                num_slices = int(np.prod(extra_shape)) if extra_shape else 1
+                num_elements = int(np.prod([da_var.sizes[d] for d in spatial_dims]))
+                num_stations = len(self.stations)
+                
+                # Reshape data into a 2D array: (total_extra_slices, total_spatial_elements)
+                # If there are no extra dims, this just becomes (1, num_elements)
+                flat_data_2d = da_var.values.reshape(num_slices, num_elements)
+                
+                # Pre-allocate array for the interpolated results
+                interpolated_results = np.empty((num_slices, num_stations), dtype=da_var.dtype)
+                
+                # Loop over each slice, regrid, and save
+                for i in range(num_slices):
+                    # Assign the 1D spatial data slice to the source field
+                    self.src_field.data[...] = flat_data_2d[i, :]
+                    
+                    # Perform the regridding
+                    self.regridder(self.src_field, self.dst_field)
+                    
+                    # Store the result
+                    interpolated_results[i, :] = self.dst_field.data
+                
+                # Reshape results back to (*extra_shape, num_stations)
+                final_shape = extra_shape + (num_stations,)
+                interpolated_results = interpolated_results.reshape(final_shape)
+                
+                # Package back into an xarray DataArray
+                # Gather coordinates for the extra dimensions + the stations
+                out_coords = {d: da_var.coords[d] for d in extra_dims if d in da_var.coords}
+                out_coords['station'] = self.stations.values
+                
+                da_spatial = xr.DataArray(
+                    interpolated_results,
+                    dims=extra_dims + ['station'],
+                    coords=out_coords,
+                    name=vn,
+                    attrs=da_var.attrs
+                )
+
+                sampled[vn] = da_spatial
+
+            else:
+                sampled[vn] = self.regridder(self.ds[vn])
+                sampled[vn] = sampled[vn].assign_coords(time=('locations', self.stations.values)).rename({'locations': 'station'})
+
+#            sampled[vn] = self.ds[vn].interp(time=self.times,lon=self.lons,lat=self.lats,method=method)
+
+            if self.times is not None:
+                sampled[vn] = sampled[vn].interp(time=self.times,method=method)
+
+        return xr.Dataset(sampled)
 
 #......................................................................................
 
 class TRAJECTORY(object):
 
-    def __init__(self, times, lons, lats, dataset, parallel=True,chunks='auto',verbose=False,**kwargs):
+    def __init__(self, times, lons, lats, dataset, 
+                  parallel=True,chunks='auto',
+                  verbose=False,cs=False,
+                  **kwargs):
         """
         Specifies dataset to be sampled at obs location.
         On input,
@@ -123,11 +283,11 @@ class TRAJECTORY(object):
         parallel: bool, whether to open dataset in parallel and return
                   dask arrays.
         verbose: bool, what it says.
-
+        cs: sample on cubed sphere
         """
 
         self.verb = verbose
-        self.times = xr.DataArray(times,dims='time')
+        self.times = xr.DataArray(times,dims='time',coords={'time': times})
         time_range = times.min(), times.max()
         if isinstance(time_range[0],np.datetime64):
             time_range = pd.to_datetime(time_range)
@@ -136,25 +296,55 @@ class TRAJECTORY(object):
         # -------------------------------------------------
         if isinstance(dataset,xr.Dataset):
             self.ds = dataset # we are good to go...
-
+        #  if dataset is a parquet referece file
+        elif dataset[-4:] == 'parq':
+            fs = fsspec.filesystem("reference", fo=dataset, remote_protocol='file', lazy=True)
+            self.ds = xr.open_dataset(fs.get_mapper(), engine="zarr", chunks=chunks, backend_kwargs={"consolidated": False})
         # If dataset is a list of files...
         # OR GrADS-style ctl 
         # OR a glob type of template
         # --------------------------------
         elif isinstance(dataset,(list,tuple,str)):
-            self.ds = xc.open_mfdataset(dataset,time_range=time_range,parallel=parallel,chunks=chunks,**kwargs) # special handles GrADS-style ctl if found
+            self.ds = xc.open_mfdataset(dataset,time_range=time_range,parallel=parallel,
+                                        chunks=chunks,cs=cs,**kwargs) # special handles GrADS-style ctl if found
 
         else:
             raise SamplerError("Invalid dataset specification.")
+
 
         # Save coordinates with proper attributes
         # ---------------------------------------
         self.lons = xr.DataArray(lons, dims='time',attrs=self.ds.coords['lon'].attrs)
         self.lats = xr.DataArray(lats, dims='time',attrs=self.ds.coords['lat'].attrs)
 
-        # TO DO: when using xESMF for regridding, pre-compute transforms here
-        # -------------------------------------------------------------------
+        if cs:
+            # Build ESMF unstructured mesh
+            self.src_mesh = build_dual_mesh(self.ds)
 
+            nobs = len(lons)
+            # Create locstream
+            self.dst_locstream = ESMF.LocStream(nobs, coord_sys=ESMF.CoordSys.SPH_DEG)
+            self.dst_locstream["ESMF:Lon"] = np.asarray(lons, dtype=np.float64)
+            self.dst_locstream["ESMF:Lat"] = np.asarray(lats, dtype=np.float64)
+            
+            self.src_field = ESMF.Field(self.src_mesh, name='src', meshloc=ESMF.MeshLoc.NODE)
+            self.dst_field = ESMF.Field(self.dst_locstream, name='dst')
+            
+            self.regridder = ESMF.Regrid(
+                self.src_field, 
+                self.dst_field,
+                regrid_method=ESMF.RegridMethod.BILINEAR,
+                unmapped_action=ESMF.UnmappedAction.IGNORE
+            )
+        else:
+            # Handling of pathological dateline cases particularly for low resolution model
+            nx = len(self.ds.lon.values)
+            dx = 360./nx
+            self.ds = self.ds.pad(lon=1,mode="wrap")
+            self.ds = self.ds.assign_coords(lon=np.arange(0,(nx+2)*dx,dx)-(180.+dx))
+        
+        self.cs = cs
+            
     #--
     def sample(self,Variables=None,method='linear'):
         """
@@ -162,7 +352,15 @@ class TRAJECTORY(object):
 
         """
         if Variables is None:
-            Variables = list(self.ds.data_vars)
+            if self.cs:
+                # Only include variables with standard horizontal dims
+                Variables = [
+                    vn for vn in self.ds.data_vars
+                    if all(d in self.ds[vn].dims for d in ('nf', 'Ydim', 'Xdim'))
+                ]
+            else:
+                Variables = list(self.ds.data_vars)
+
 
         elif isinstance(Variables,str):
             Variables = [Variables,]
@@ -171,9 +369,62 @@ class TRAJECTORY(object):
 
         for vn in Variables:
             if self.verb: print('[ ] sampling',vn)
-            sampled[vn] = self.ds[vn].interp(time=self.times,lon=self.lons,lat=self.lats,method=method)
+            if self.cs:
+                da_var = self.ds[vn]
+                
+                # Identify extra dims (like time, lev)
+                spatial_dims = ('nf', 'Ydim', 'Xdim')
+                extra_dims = [d for d in da_var.dims if d not in spatial_dims]
+                
+                # Reorder so extra dims are first
+                da_var = da_var.transpose(*extra_dims, *spatial_dims)
+                
+                # Calculate shapes
+                extra_shape = tuple(da_var.sizes[d] for d in extra_dims)
+                num_slices = int(np.prod(extra_shape)) if extra_shape else 1
+                num_elements = int(np.prod([da_var.sizes[d] for d in spatial_dims]))
+                num_locations = len(self.lons)
+                
+                # Reshape data into 2D and pre-allocate results
+                flat_data_2d = da_var.values.reshape(num_slices, num_elements)
+                interpolated_results = np.empty((num_slices, num_locations), dtype=da_var.dtype)
+                
+                # Spatial Regridding Loop
+                for i in range(num_slices):
+                    self.src_field.data[...] = flat_data_2d[i, :]
+                    self.regridder(self.src_field, self.dst_field)
+                    interpolated_results[i, :] = self.dst_field.data
+                    
+                # Reshape spatial results back to multidimensional
+                final_shape = extra_shape + (num_locations,)
+                interpolated_results = interpolated_results.reshape(final_shape)
+                
+                # Package into xarray DataArray for temporal interpolation
+                out_coords = {d: da_var.coords[d] for d in extra_dims if d in da_var.coords}
+                out_coords['locations'] = np.arange(num_locations) # temporary coordinate
+                
+                ds_spatial = xr.DataArray(
+                    interpolated_results,
+                    dims=extra_dims + ['locations'],
+                    coords=out_coords,
+                    attrs=da_var.attrs
+                )
+                
+                # Temporal interpolation (if 'time' is a dimension)
+                if 'time' in extra_dims:
+                    times_da = xr.DataArray(self.times.values, dims='locations')
+                    da_traj = ds_spatial.interp(time=times_da, method='linear')
+                else:
+                    da_traj = ds_spatial
+                
+                # Rename locations -> time (matching the trajectory format)
+                sampled[vn] = da_traj.assign_coords(time=('locations', self.times.values)).swap_dims({'locations': 'time'}).drop_vars('locations', errors='ignore')
 
-        return xr.Dataset(sampled).assign_coords({'time': self.times})
+            else:
+                sampled[vn] = self.ds[vn].interp(time=self.times,lon=self.lons,lat=self.lats,method=method)
+                sampled[vn] = sampled[vn].assign_coords({'time': self.times})
+
+        return xr.Dataset(sampled)
 
 #......................................................................................
 
@@ -265,6 +516,10 @@ def CLI_stnSampler():
                       action="store_true", dest="verbose",
                       help="Verbose mode.")
 
+    parser.add_option("--cs",
+                      action="store_true", dest="cs",
+                      help="Sampling on cubed sphere")
+
     (options, args) = parser.parse_args()
 
     if len(args) == 4 :
@@ -291,7 +546,7 @@ def CLI_stnSampler():
 
     # Sample variables at station locations
     # -------------------------------------
-    stn = STATION(stations,lons,lats,dataset,verbose=options.verbose)
+    stn = STATION(stations,lons,lats,dataset,verbose=options.verbose,cs=options.cs)
     ds = stn.sample(Variables=options.Vars,method=method)
     if options.verbose:
         print(ds)
@@ -496,6 +751,10 @@ def CLI_trjSampler():
                       action="store_true", dest="verbose",
                       help="Verbose mode.")
 
+    parser.add_option("--cs",
+                      action="store_true", dest="cs",
+                      help="Sampling on cubed sphere")
+
     (options, args) = parser.parse_args()
 
     if options.traj == 'WP':
@@ -563,7 +822,7 @@ def CLI_trjSampler():
             time = df.index.values
             lon = df['lon'].values
             lat = df['lat'].values
-            trj = TRAJECTORY(time,lon,lat,dataset,verbose=options.verbose)
+            trj = TRAJECTORY(time,lon,lat,dataset,verbose=options.verbose,cs=options.cs)
             ds = trj.sample(Variables=options.Vars,method=method)
 
             if options.verbose:
@@ -575,7 +834,7 @@ def CLI_trjSampler():
     # --------
     else:
 
-        trj = TRAJECTORY(time,lon,lat,dataset,verbose=options.verbose)
+        trj = TRAJECTORY(time,lon,lat,dataset,verbose=options.verbose,cs=options.cs)
         ds = trj.sample(Variables=options.Vars,method=method)
         if options.verbose:
             #print(ds)

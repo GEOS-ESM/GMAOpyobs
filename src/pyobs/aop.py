@@ -42,6 +42,12 @@ DU:
     - DU003
     - DU004
     - DU005
+  bin:
+    - 1
+    - 2
+    - 3
+    - 4
+    - 5
   shapefactor: 1.4
   rhod:
     - 2500
@@ -61,6 +67,12 @@ SS:
     - SS003
     - SS004
     - SS005
+  bin:
+    - 1
+    - 2
+    - 3
+    - 4
+    - 5
   shapefactor: 1
   rhod:
     - 2200
@@ -77,6 +89,9 @@ OC:
   tracers:
     - OCPHOBIC
     - OCPHILIC
+  bin:
+    - 1
+    - 2
   shapefactor: 1
   rhod:
     - 1800
@@ -89,6 +104,9 @@ BC:
   tracers:
     - BCPHOBIC
     - BCPHILIC
+  bin:
+    - 1
+    - 2
   shapefactor: 1
   rhod:
     - 1800
@@ -99,8 +117,11 @@ BR:
   monoFile: ExtData/chemistry/AerosolOptics/v1.0.0/x/optics_BRC.v1_5.nc4
   bandFile: ExtData/chemistry/AerosolOptics/v1.0.0/x/opticsBands_BRC.v1_5.RRTMG.nc4
   tracers:
-    - BRCPHOBIC
-    - BRCPHILIC
+    - BRPHOBIC
+    - BRPHILIC
+  bin:
+    - 1
+    - 2
   shapefactor: 1
   rhod:
     - 1800
@@ -112,6 +133,8 @@ SU:
   bandFile: ExtData/chemistry/AerosolOptics/v1.0.0/x/opticsBands_SU.v1_3.RRTMG.nc4
   tracers:
     - SO4
+  bin:
+    - 1
   shapefactor: 1
   rhod:
     - 1700
@@ -121,9 +144,13 @@ NI:
   monoFile: ExtData/chemistry/AerosolOptics/v1.0.0/x/optics_NI.v2_5.nc4
   bandFile: ExtData/chemistry/AerosolOptics/v1.0.0/x/opticsBands_NI.v2_5.RRTMG.nc4
   tracers:
-    - NO3AN1
-    - NO3AN2
-    - NO3AN3
+    - NI001
+    - NI002
+    - NI003
+  bin:
+    - 1
+    - 2
+    - 3
   shapefactor: 1
   rhod:
     - 1725
@@ -322,8 +349,11 @@ class G2GAOP(object):
             Tracers = self.mieTable[s]['tracers']
             mie = self.mieTable[s]['mie']
 
-            bin = 1
-            for q in Tracers:
+            bins = self.mieTable[s].get('bin',[])
+            if not bins:
+                bins = list(range(1,len(Tracers)+1))
+            
+            for q,bin in zip(Tracers,bins):
 
                 if self.verbose:
                     print('   -',q)
@@ -356,8 +386,6 @@ class G2GAOP(object):
 
                     g   += sca_ * g_
 
-
-                bin += 1
 
         # Final normalization of SSA and g
         # protect against divide by zero
@@ -497,8 +525,11 @@ class G2GAOP(object):
             Tracers = self.mieTable[s]['tracers']
             mie = self.mieTable[s]['mie']
 
-            bin = 1
-            for q in Tracers:
+            bins = self.mieTable[s].get('bin',[])
+            if not bins:
+                bins = list(range(1,len(Tracers)+1))
+
+            for q,bin in zip(Tracers,bins):
 
                 if self.verbose:
                     print('   -',q)
@@ -521,7 +552,6 @@ class G2GAOP(object):
                 depol1 += (pback11_-pback22_) * sca_
                 depol2 += (pback11_+pback22_) * sca_
 
-                bin += 1
 
         if doaback:
             # Compute Molecular Scattering and Total Attenuated Backscatter Coefficient
@@ -555,7 +585,7 @@ class G2GAOP(object):
         # ----------
         A = dict (EXT = {'long_name':'Aerosol Extinction Coefficient', 'units':'km-1'},
                   SCA = {'long_name':'Aerosol Scattering Coefficient', 'units':'km-1'},
-                  BSC = {'long_name':'Aerosol Backscatter Coefficient', 'units':'km-1'},
+                  BSC = {'long_name':'Aerosol Backscatter Coefficient', 'units':'km-1 sr-1'},
                   DEPOL = {'long_name':'Depolarization Ratio', 'units':'1'}
                   )
         if doaback:
@@ -748,8 +778,14 @@ class G2GAOP(object):
             Tracers = self.mieTable[s]['tracers']
             mie = self.mieTable[s]['mie']
 
-            bin = 1
-            for q in Tracers:
+            bins = self.mieTable[s].get('bin',[])
+            if not bins:
+                bins = list(range(1,len(Tracers)+1))
+
+            # Dry aerosol density in kg m-3
+            # rhod is not in all of the standard optics files, and is for now read from the yaml config
+            rhod = self.mieTable[s]['rhod']
+            for q,bin,rhod_ in zip(Tracers,bins,rhod):
 
                 if self.verbose:
                     print('   -',q)
@@ -758,20 +794,30 @@ class G2GAOP(object):
                 # Aerosol mass concentration in kg/m3                
                 q_conc = (a['AIRDENS'] * a[q]).values
   
-                # Dry aerosol density in kg m-3
-                # rhod is not in all of the standard optics files, and is for now read from the yaml config 
                 # rhod_ = mie.getAOP('rhod',  bin, rh, wavelength=wavelength).values
-                rhod_ = self.mieTable[s]['rhod'][bin-1] 
 
                 # Lower and upper bound of the bin's radius converted from meters to microns
-                rLow_ = mie.getBinInfo('rLow', bin)*1000000 
-                rUp_ = mie.getBinInfo('rUp', bin)*1000000 
-
+                try:
+                    rhdry = rh.copy()
+                    rhdry[:] = 0.0
+                    rLow_ = mie.getAOP('rLow', bin, rhdry, wavelength=None).values*1000000 
+                    rUp_  = mie.getAOP('rUp',  bin, rhdry, wavelength=None).values*1000000
+                    # Force recast of rLow_ and rUp_ to be dry value (scalar) for compatibility with old code
+                    rLow_ = np.squeeze(rLow_[0,0])
+                    rUp_  = np.squeeze(rUp_[0,0])
+                except:
+                    print("rLow and rDry provided at 0% RH only; use v2.x.x tables and later")
+                    rLow_ = mie.getBinInfo('rLow', bin)*1000000
+                    rUp_ = mie.getBinInfo('rUp', bin)*1000000
+                    
                 # Effective radius at the specified humidity converted from meters to microns
                 rEff_ = mie.getAOP('rEff', bin, rh, wavelength=None).values*1000000 
 
                 # Effective radius at a relative humidity of 0% converted from meters to microns
-                rEff_zero = mie.getBinInfo('rEffDry', bin)*1000000 
+                rhdry = rh.copy()
+                rhdry[:] = 0.0
+                rEff_zero = mie.getAOP('rEff', bin, rhdry, wavelength=None).values*1000000 
+                rEff_zero = np.squeeze(rEff_zero[0,0])
 
                 # If necessary, compute the aerodynamic particle radius
                 # shape factor accounts for changes in the particle's dragging coefficient (see https://doi.org/10.1029/2002JD002485 for more info)
@@ -816,8 +862,6 @@ class G2GAOP(object):
                 waterfactor = 1 - (1./growthfactor)
                 wm += pm_ * waterfactor
 
-                bin += 1
-                
 
         # Get the fraction of the total PM that is water
         # ------------------------------------------------

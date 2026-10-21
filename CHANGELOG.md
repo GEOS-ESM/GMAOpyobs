@@ -5,15 +5,46 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-# [Unreleased] - yyyy-mm-dd
+## [Unreleased] - yyyy-mm-dd
 
 ### Fixed
+
 ### Added
+
 ### Changed
-### Remoed
+
+### Removed
 ### Deprecated
 
-# [1.7.0] - yyyy-mm-dd
+## [1.8.0] - 2026-10-21
+
+### Fixed
+- dial.py to accomodate python change for nan
+- update hsrl.py to use py3 integer divide. fixes date parsing.
+- units for backscatter coeffiecient to km-1 sr-1 in output files generated with aop.py
+- conversion from km to m in icartt.py 
+- fixed an edge case for low model resolution sampling for trajectories across dateline
+  subsequent bugfix introduced for not-considering 1x1 resolution
+
+### Added
+- add optional explicit bin ordering to aop.py yaml. this allows for calculating AOP's for a single bin, or subset of bins
+- add configuration file for GEOS-5430 (current FP)
+- add a buddy check code for station observation QC
+- add reader for GloSSAC data
+- support for HALO in hsrl.py
+- support sampling on the cubed sphere
+- additional lat/lon/altitude variable possibility in icartt.py (updated for CPEX)
+
+### Changed
+- use xesmf regridder to station sampling. this is more efficient that using xarray native interp
+- changed 'compat' keyword definition in xrctl.py to make more flexible if 'override' is needed
+- changed aop.py and mietable.py code to handle v2.x.x optics tables consistent with how v1.0.0
+  handled
+- changed tracer names in default aop.py configuration to be like current fp
+- updated components to latest environment stack
+- code can now read VIIRS L2 data version 2.0, 2.1 and the new 2.2.3 NRT.
+
+## [1.7.0] - 2026-03-02
 
 ### Fixed
 - fixed vx04 reader. empty object is now returned when DB and DT granules do not align. 
@@ -22,7 +53,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - made an update in ICARTT reader to allow additional vertical altitude names
 - created a simple CALIPSO L3 reader
 
-# [v1.6.0] - 2026-01-22
+## [v1.6.0] - 2026-01-22
 ### Added
 - added improve_sampler notebook example showing how to use the station sampler and aop.getPM function to compare MERRA-2 to IMPROVE surface measurements of PM2.5
 - added uv package management files pyproject.toml and uv.lock
@@ -32,7 +63,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - updatde the improve.py reader to work for files obtained from CIRA.  the old files that are on calculon are no longer generated.
 - Minor template name change for ease of integration in ADAS
 
-# [v1.5.0] - 2025-12-03
+## [v1.5.0] - 2025-12-03
 
 
 ### Added
@@ -40,7 +71,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - vx04.py now can read in DT and DB granules together and use the DT cloud fraction to filter DB obs 
 
 
-# [v1.4.0] - 2025-09-25
+## [v1.4.0] - 2025-09-25
 
 ### Fixed
 
@@ -54,7 +85,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - add KX for NOAA-20 and NOAA-21 AOD obs
 
 
-# [v1.3.0] - 2025-07-28
+## [v1.3.0] - 2025-07-28
 
 ### Fixed
 - Fixed some misspelled `ValueError` exceptions
@@ -67,13 +98,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Update to ESMA_cmake v3.62.1
 
 
-# [v1.2.6] - 2025-07-28
+## [v1.2.6] - 2025-07-28
 
 ### Fixed
 - hotfix in aeronet.py for double decoding
 
 
-# [v1.2.5] - 2025-06-05
+## [v1.2.5] - 2025-06-05
 
 ### Fixed
 - fixed mietable runtime warning for pback calculation. don't do this recursively anymore.
@@ -87,12 +118,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Deprecated
 
 
-# [v1.2.4] - 2025-05-29
+## [v1.2.4] - 2025-05-29
 
 ### Fixed
 - Added list parsing for variables in trajectory sampler
 - fixed byte string bug in aeronet.py
-- - use a local copy of RH in aop calculator.  otherwise it overwrites when fixRH is used
+- use a local copy of RH in aop calculator.  otherwise it overwrites when fixRH is used
 ### Added
 - MPL reader and plot curtain 
 - calculation of total backscatter coefficient in aop.py
@@ -112,7 +143,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Deprecated
 
-# [v1.2.3] - 2025-03-20
+## [v1.2.3] - 2025-03-20
 
 ### Fixed
 - bug/typo in aop.py for vector AOP calculation
@@ -126,7 +157,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Deprecated
 
-# [v1.2.2] - 2025-03-03 
+## [v1.2.2] - 2025-03-03 
 
 ### Fixed 
 - bad reshape import in kde.py
@@ -139,7 +170,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Deprecated 
 
 
-# [v1.2.1] - 2025-02-04 
+## [v1.2.1] - 2025-02-04 
 
 ### Fixed 
 - Bug fix in aop.py for returning PMOM
@@ -153,7 +184,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Deprecated 
 
 
-# [v1.2.0] - 2025-01-16
+## [v1.2.0] - 2025-01-16
 
 ### Added 
 - Added module mcbef for handling plume rise/fire related functionality.	
@@ -186,7 +217,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed 
 
-# [v1.1.0] 2024-03-20
+## [v1.1.0] 2024-03-20
 
 ### Added 
 
@@ -213,7 +244,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed 
 
-# [v1.0.8]
+## [v1.0.8]
 
 ### Added
 
@@ -223,7 +254,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
-# [v1.0.7]
+## [v1.0.7]
 
 ### Fixed
 
@@ -233,7 +264,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
-# [v1.0.6] 2023-09-08
+## [v1.0.6] 2023-09-08
 
 ### Added
 
@@ -241,7 +272,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
-# [v1.0.5] 2023-06-15
+## [v1.0.5] 2023-06-15
 
 ### Added
 
@@ -263,7 +294,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
-# [v1.0.3] 2023-05-25
+## [v1.0.3] 2023-05-25
 
 ### Added
 
@@ -272,7 +303,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - vx04.py VIIRS reader
 
 
-# [v1.0.2] 2023-05-17
+## [v1.0.2] 2023-05-17
 
 
 ### Fixed

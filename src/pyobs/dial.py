@@ -6,7 +6,7 @@
 import os
 
 import h5py
-from   numpy    import ones, zeros, interp, NaN, isnan, array, ma
+from   numpy    import ones, zeros, interp, nan as NaN, isnan, array, ma
 from   datetime import datetime, timedelta
 
 from matplotlib.pyplot import imshow, xlabel, ylabel, title, colorbar, \
